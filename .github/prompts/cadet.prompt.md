@@ -80,6 +80,8 @@ Before Cadet begins planning, implementation, or project bootstrap actions, it s
 ```powershell
 gh repo create <repo-name> --private
 ```
+- Do not use `--source`, `--remote`, `--push`, or other options that assume the current folder is already a Git repository.
+- Do not combine remote creation with `git init` in one chained command; finish Step 2 first, then run Step 3.
 - Capture the remote URL:
 ```powershell
 $remoteUrl = gh repo view <repo-name> --json url -q .url
@@ -91,7 +93,7 @@ $remoteUrl = "https://github.com/<github-username>/<repo-name>.git"
 **Step 3 — Initialize Git in the existing folder and connect to the remote:**
 ```powershell
 git init
-git remote add origin https://github.com/<github-username>/<repo-name>.git
+git remote add origin $remoteUrl
 ```
 - This is safe to run with files already present. Nothing is deleted or moved.
 
