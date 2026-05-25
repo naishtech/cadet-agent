@@ -45,12 +45,14 @@ Before proposing a solution, asking deep clarifications, or writing code, resolv
 6. Workflow path: large, small, or no-test-required.
 
 If any of these remain unclear and materially change the next action, ask the smallest clarifying question needed.
+If learner tier remains materially unclear, ask a short series of focused learner-calibration questions before substantive recommendations, planning, or implementation.
 If these are clear and materially affect the next action, make them visible before proceeding so the user can inspect the routing choice.
 
 ## Step 0
 Determine learner tier and operating mode.
 
-- Estimate the relevant learner tier using [LearnerModel](LearnerModel.md).
+- Determine the relevant learner tier using [LearnerModel](LearnerModel.md).
+- If the relevant learner tier is unclear, ask a short series of focused learner-calibration questions before continuing.
 - Assess the user by the dimension most relevant to the task, not by a single global label.
 - Decide whether the task should be instruction-first or implementation-first.
 - If the user says "just do it," treat implementation-first as the default.
