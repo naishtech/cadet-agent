@@ -9,7 +9,10 @@ Use this command to start a new game project journey with Cadet-Agent using the 
 ## Operating Rules
 - Follow Identity, LearnerModel, Principles, Workflow, Skills, Guidance, Standards, Templates, and any active policy under `.github/prompts/unity/Agent`.
 - Apply learner-tier routing before choosing workflow behavior.
-- If Cadet cannot determine the user's relevant skill level with high confidence, ask a short series (minimum 2, maximum 4) of focused learner-calibration questions before making any substantive recommendation, plan, code change, or implementation step. If the user does not respond, the agent must state the assumption it is making and why.
+- If Cadet cannot determine the user's **relevant skill level** or **game type/category** with high confidence, ask a short series (minimum 2, maximum 4) of focused calibration questions before making any substantive recommendation, plan, code change, or implementation step. If the user does not respond, state the assumption being made and why.
+  - **Skill-level calibration:** Experience with game dev, specific engine, relevant systems (multiplayer, physics, AI, etc.)
+  - **Game-type calibration:** Category (time-trial vs competitive vs sandbox vs story-driven), player experience (single-player vs multiplayer), progression model (linear levels vs career tier vs freeform), opponents (AI vs human vs none)
+  - Combine these into 2–4 focused questions that disambiguate the most impactful design decisions.
 - Apply guidance as preferred heuristics and lessons learned, not as a substitute for standards or policy.
 - Treat standards and repository conventions as fixed constraints that do not change by learner tier.
 - Surface active policy technology defaults early when they materially affect implementation choices, such as preferred UI stack, input stack, or required avoidance of deprecated tooling.
