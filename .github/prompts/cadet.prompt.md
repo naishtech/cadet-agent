@@ -104,7 +104,14 @@ Invoke-WebRequest "https://raw.githubusercontent.com/github/gitignore/main/Unity
 ```
 - Ask the user for a one-line game description and create `README.md` with it.
 - The agent docs from the extracted zip are already in `.github\prompts\unity\Agent\` — include them.
-- Create a bootstrap branch, commit, push that branch, and merge through a pull request:
+- If the remote repository is empty and has no default branch yet, create the first bootstrap commit on local `main` and push it once to establish the remote default branch:
+```powershell
+git add .
+git commit -m "chore: project bootstrap — readme, gitignore, Cadet-Agent framework"
+git push -u origin main
+```
+- After `main` exists on the remote, return to the normal PR-based workflow for all later changes.
+- If the remote already has a default branch, create a bootstrap branch, commit, push that branch, and merge through a pull request:
 ```powershell
 git checkout -b chore/bootstrap-framework
 git add .
@@ -116,7 +123,7 @@ gh pr merge --squash --delete-branch
 
 **Step 5 — Create the Unity project inside this folder:**
 - Open Unity Hub, choose "New project", and set the **location** to this folder (Unity places files at the root, not in a subfolder).
-- After the bootstrap PR is merged and Unity finishes generating files, create a new branch, commit the scaffold, and merge it through a pull request:
+- After the bootstrap state is established on `main` and Unity finishes generating files, create a new branch, commit the scaffold, and merge it through a pull request:
 ```powershell
 git checkout main
 git pull --ff-only
@@ -128,7 +135,7 @@ gh pr create --base main --head chore/unity-initial-scaffold --title "chore: ini
 gh pr merge --squash --delete-branch
 ```
 
-Do not proceed to detailed game vision, requirements, or planning until all five steps are complete: remote repo created, Git initialized in the folder, bootstrap PR merged, Unity project created, and scaffold PR merged.
+Do not proceed to detailed game vision, requirements, or planning until all five steps are complete: remote repo created or confirmed, Git initialized in the folder, bootstrap state established on `main`, Unity project created, and scaffold PR merged.
 
 ---
 
