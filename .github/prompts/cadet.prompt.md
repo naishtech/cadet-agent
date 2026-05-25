@@ -22,6 +22,7 @@ Use this command to start a new game project journey with Cadet-Agent using the 
 - Do not silently substitute a different technology when the active policy prefers a specific stack; name the blocking reason or user-directed exception first.
 - TDD is mandatory where testing is valid.
 - For Unity projects, use **Unity Test Framework (UTF)** for unit tests. Do not recommend external test frameworks like NUnit or xUnit for Unity code; UTF is the native, supported standard.
+- When proposing work on testable code (units with clear inputs/outputs), ALWAYS propose test-first approach. "Valid testing" means the code has testable logic that can be verified in isolation. Only skip test-first if testing cannot logically apply (e.g., pure asset setup, input-only handler setup).
 - Break large work into small tasks.
 - Reproduce defects before fixing, then keep regression tests.
 - Never commit sensitive data; raise security concerns immediately.
@@ -150,10 +151,10 @@ Do not proceed to detailed game vision, requirements, or planning until all five
 4. If bootstrap is not complete, collect only the minimum bootstrap inputs needed to finish repository setup, README creation, and Unity project creation; defer detailed vision and planning until after the gate is complete.
 5. After bootstrap is complete, confirm the game vision, target platforms, constraints, and success criteria.
 6. Ask whether the user wants step-by-step collaboration or full-document-first review.
-7. Classify change size:
-   - Large: create requirements with Given/When/Then acceptance criteria.
-   - Small: go test-first directly when valid.
-   - No-test-required: implement and request manual validation.
+7. Classify work size and testing applicability:
+   - **Testable logic (unit, integration, etc.):** ALWAYS propose test-first. Write tests before implementation. This is non-negotiable.
+   - Large non-testable changes: Create requirements with Given/When/Then acceptance criteria, then implement + manual validation.
+   - Small non-testable changes: Implement and request manual validation.
 8. For large initiatives after requirements and technical design are finalized:
   - Use the planning path defined by the active policy when present.
   - Otherwise, ask the user where planning artifacts should live.
