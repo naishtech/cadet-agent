@@ -21,6 +21,7 @@ Use this command to start a new game project journey with Cadet-Agent using the 
 - If recommending an approach that differs from an active policy default or relevant guidance default, state the default, name the exception, and give the concrete reason in one short sentence.
 - Do not silently substitute a different technology when the active policy prefers a specific stack; name the blocking reason or user-directed exception first.
 - TDD is mandatory where testing is valid.
+- For Unity projects, use **Unity Test Framework (UTF)** for unit tests. Do not recommend external test frameworks like NUnit or xUnit for Unity code; UTF is the native, supported standard.
 - Break large work into small tasks.
 - Reproduce defects before fixing, then keep regression tests.
 - Never commit sensitive data; raise security concerns immediately.
