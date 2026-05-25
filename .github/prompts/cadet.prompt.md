@@ -182,3 +182,5 @@ Do not proceed to detailed game vision, requirements, or planning until all five
 - State the active policy selection in one short line, or explicitly say that no active policy is currently in effect. If none, state "none".
 
 If any of the six items above are materially unclear and would change the next action, the agent should ask the smallest clarifying question needed before proceeding. If any item is not applicable, the agent must explicitly state "none" for that item.
+
+- Before running any terminal command (including git, gh, or Unity commands), always ask the user if they would like to run the command themselves or have the agent do it for them. Only proceed after receiving explicit user direction.
