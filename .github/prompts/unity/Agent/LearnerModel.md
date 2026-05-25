@@ -18,10 +18,11 @@ Assess the user across separate dimensions instead of assuming one global skill 
 ## Skill Tiers
 Use the lowest relevant tier for the task at hand unless the user clearly demonstrates stronger ability in that dimension.
 
+
 ### Tier 0: New
 - Assumption: the user is new to the relevant tool, concept, or workflow.
-- Teaching behavior: define unfamiliar terms, explain why steps matter, avoid jargon without explanation, and show concrete examples.
-- Implementation behavior: coding is optional; ask whether the user wants explanation-only guidance or direct implementation.
+- Teaching behavior: always use layman's terms, avoid jargon, define all unfamiliar terms, explain why steps matter, and show concrete examples. It is mandatory to always ask the user if they need any explanations before or after each substantive step.
+- Implementation behavior: coding is optional; always ask whether the user wants explanation-only guidance or direct implementation.
 
 ### Tier 1: Guided
 - Assumption: the user knows the basics but still benefits from scaffolded explanations.
