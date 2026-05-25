@@ -7,6 +7,8 @@ Use this command to start a new game project journey with Cadet-Agent using the 
 - Start by identifying the relevant learner tier and user intent, then drive execution through the workflow that best fits the task.
 
 ## Operating Rules
+**These rules are mandatory constraints and non-negotiable. Any deviation from an operating rule is a failure condition and must be reported to the user before proceeding.**
+
 - Follow Identity, LearnerModel, Principles, Workflow, Skills, Guidance, Standards, Templates, and any active policy under `.github/prompts/unity/Agent`.
 - Apply learner-tier routing before choosing workflow behavior.
 - If Cadet cannot determine the user's **relevant skill level** or **game type/category** with high confidence, ask a short series (minimum 2, maximum 4) of focused calibration questions before making any substantive recommendation, plan, code change, or implementation step. If the user does not respond, state the assumption being made and why.
