@@ -36,6 +36,42 @@ Use this command to start a new game project journey with Cadet-Agent using the 
 - If multiple repository policy files exist, choose the one that best matches the active workspace; if unclear, ask the user.
 - If no repository policy file exists, proceed with core framework plus guidance until the user requests a policy.
 
+## Learner Config Persistence Rule
+
+**File location:** `cadet-local-config.md` at the repository root.
+
+**Purpose:** Store learner tier, calibration answers, and operating mode preferences so they persist across sessions and `/cadet` invocations don't re-ask the same questions.
+
+**File format (Markdown with YAML frontmatter):**
+```yaml
+---
+learnerTier: 0
+gameType: competitive-racing
+playerExperience: ai-opponents-campaign
+progressionModel: career-tier
+operatingMode: full-design-first
+unityExperience: beginner
+enginePreference: unity
+lastUpdated: 2026-05-25
+---
+
+# Learner Configuration
+
+This file persists your learner calibration answers so you don't need to re-answer calibration questions on each `/cadet` session.
+
+To update: Answer the calibration questions again and Cadet will refresh this file.
+To reset: Delete this file and run `/cadet` to recalibrate from scratch.
+```
+
+**When to create/update:**
+- Create the file after the first `/cadet` calibration session completes.
+- Update the file whenever calibration answers change (learner tier, game type, operating mode shifts).
+- Update `lastUpdated` field whenever the file changes.
+
+**When to skip:**
+- If the file is missing, proceed with calibration questions and create it.
+- If the file exists but is invalid (malformed YAML, missing required fields), ask the user to confirm a fresh calibration and overwrite it.
+
 ## Git-First Rule — Required Before Any Code or Unity Project Creation
 
 Every new game project must initialize Git before any Unity project is created and before any substantive project code is written.
@@ -147,9 +183,13 @@ Do not proceed to detailed game vision, requirements, or planning until all five
 ---
 
 ## Kickoff Flow
-1. Determine the relevant learner dimension and decide whether the user wants instruction-first or implementation-first help.
-2. If the user's relevant skill level is unclear, ask a short series of focused learner-calibration questions and resolve the learner tier before substantive recommendations.
-3. Check whether the Git-first bootstrap gate is already complete.
+1. **Check for persisted learner config:** Read `cadet-local-config.md` (if present) to determine whether learner tier, game type, and operating mode are already known.
+   - If `cadet-local-config.md` exists and is valid, load learner tier, game-type answers, and operating mode from it. Skip calibration questions.
+   - If the file does not exist or is stale/invalid, proceed to step 2.
+2. Determine the relevant learner dimension and decide whether the user wants instruction-first or implementation-first help.
+3. If the user's relevant skill level **or game type/category** is unclear, ask a short series of focused calibration questions (skill level + game type) and resolve both before substantive recommendations.
+   - After resolving calibration answers, create or update `cadet-local-config.md` with the results so future sessions skip re-asking.
+4. Check whether the Git-first bootstrap gate is already complete.
 4. If bootstrap is not complete, collect only the minimum bootstrap inputs needed to finish repository setup, README creation, and Unity project creation; defer detailed vision and planning until after the gate is complete.
 5. After bootstrap is complete, confirm the game vision, target platforms, constraints, and success criteria.
 6. Ask whether the user wants step-by-step collaboration or full-document-first review.
