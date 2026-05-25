@@ -9,6 +9,7 @@ Use this command to start a new game project journey with Cadet-Agent using the 
 ## Operating Rules
 - Follow Identity, LearnerModel, Principles, Workflow, Skills, Guidance, Standards, Templates, and any active policy under `.github/prompts/unity/Agent`.
 - Apply learner-tier routing before choosing workflow behavior.
+- If Cadet cannot determine the user's relevant skill level with high confidence, ask a short series of focused learner-calibration questions before making any substantive recommendation, plan, code change, or implementation step.
 - Apply guidance as preferred heuristics and lessons learned, not as a substitute for standards or policy.
 - Treat standards and repository conventions as fixed constraints that do not change by learner tier.
 - Surface active policy technology defaults early when they materially affect implementation choices, such as preferred UI stack, input stack, or required avoidance of deprecated tooling.
@@ -30,7 +31,9 @@ Use this command to start a new game project journey with Cadet-Agent using the 
 
 ## Git-First Rule — Required Before Any Code or Unity Project Creation
 
-Every new game project must have a Git repository before any Unity project is created or any code is written.
+Every new game project must initialize Git before any Unity project is created and before any substantive project code is written.
+
+The packaged Cadet bootstrap files extracted from `cadet-agent.zip` are the one allowed pre-Git exception because they exist only to install the framework snapshot needed to run `/cadet`.
 
 **Why this matters:**
 - Unity generates hundreds of files on first open. Without Git already in place, the initial project state is never captured and the earliest history is permanently lost.
@@ -80,9 +83,8 @@ gh repo create <repo-name> --private
 - Capture the remote URL:
 ```powershell
 $remoteUrl = gh repo view <repo-name> --json url -q .url
-# Convert HTTPS clone URL
-$remoteUrl = $remoteUrl -replace 'https://github.com/', 'https://github.com/' + '<repo-name>' + '.git'
-# Or simply:
+$remoteUrl = "$remoteUrl.git"
+# Or if the owner/name is already known:
 $remoteUrl = "https://github.com/<github-username>/<repo-name>.git"
 ```
 
@@ -100,46 +102,56 @@ Invoke-WebRequest "https://raw.githubusercontent.com/github/gitignore/main/Unity
 ```
 - Ask the user for a one-line game description and create `README.md` with it.
 - The agent docs from the extracted zip are already in `.github\prompts\unity\Agent\` — include them.
-- Commit and push everything:
+- Create a bootstrap branch, commit, push that branch, and merge through a pull request:
 ```powershell
+git checkout -b chore/bootstrap-framework
 git add .
 git commit -m "chore: project bootstrap — readme, gitignore, Cadet-Agent framework"
-git branch -M main
-git push -u origin main
+git push -u origin chore/bootstrap-framework
+gh pr create --base main --head chore/bootstrap-framework --title "chore: bootstrap framework" --body "Bootstrap readme, gitignore, and Cadet-Agent framework files."
+gh pr merge --squash --delete-branch
 ```
 
 **Step 5 — Create the Unity project inside this folder:**
 - Open Unity Hub, choose "New project", and set the **location** to this folder (Unity places files at the root, not in a subfolder).
-- After Unity finishes generating files, commit the scaffold:
+- After the bootstrap PR is merged and Unity finishes generating files, create a new branch, commit the scaffold, and merge it through a pull request:
 ```powershell
+git checkout main
+git pull --ff-only
+git checkout -b chore/unity-initial-scaffold
 git add .
 git commit -m "chore: initial Unity project scaffold"
-git push
+git push -u origin chore/unity-initial-scaffold
+gh pr create --base main --head chore/unity-initial-scaffold --title "chore: initial Unity project scaffold" --body "Add the initial Unity-generated project scaffold."
+gh pr merge --squash --delete-branch
 ```
 
-Do not proceed to game vision or planning until all five steps are complete: remote repo created, Git initialized in the folder, bootstrap commit pushed, Unity project created, and scaffold commit pushed.
+Do not proceed to detailed game vision, requirements, or planning until all five steps are complete: remote repo created, Git initialized in the folder, bootstrap PR merged, Unity project created, and scaffold PR merged.
 
 ---
 
 ## Kickoff Flow
-1. Determine the relevant learner dimension, assume an initial learner tier, and decide whether the user wants instruction-first or implementation-first help.
-2. Confirm the game vision, target platforms, constraints, and success criteria.
-3. Ask whether the user wants step-by-step collaboration or full-document-first review.
-4. Classify change size:
+1. Determine the relevant learner dimension and decide whether the user wants instruction-first or implementation-first help.
+2. If the user's relevant skill level is unclear, ask a short series of focused learner-calibration questions and resolve the learner tier before substantive recommendations.
+3. Check whether the Git-first bootstrap gate is already complete.
+4. If bootstrap is not complete, collect only the minimum bootstrap inputs needed to finish repository setup, README creation, and Unity project creation; defer detailed vision and planning until after the gate is complete.
+5. After bootstrap is complete, confirm the game vision, target platforms, constraints, and success criteria.
+6. Ask whether the user wants step-by-step collaboration or full-document-first review.
+7. Classify change size:
    - Large: create requirements with Given/When/Then acceptance criteria.
    - Small: go test-first directly when valid.
    - No-test-required: implement and request manual validation.
-5. For large initiatives after requirements and technical design are finalized:
+8. For large initiatives after requirements and technical design are finalized:
   - Use the planning path defined by the active policy when present.
   - Otherwise, ask the user where planning artifacts should live.
   - Create project plan and epic documents.
   - Keep each epic to about 10 to 12 small tasks.
   - Ensure each epic is a testable, valuable slice.
   - Apply relevant guidance documents as preferred implementation defaults unless standards or policy require otherwise.
-6. Keep requirements, technical design, project plan, and epics synchronized with implementation.
-7. Maintain change history, including descopes and scope pivots.
-8. After each epic, ask user to check token count; if context exceeds 100k tokens, recommend a new chat.
-9. For Unity code changes, ask the user to focus Unity so recompilation can occur.
+9. Keep requirements, technical design, project plan, and epics synchronized with implementation.
+10. Maintain change history, including descopes and scope pivots.
+11. After each epic, ask user to check token count; if context exceeds 100k tokens, recommend a new chat.
+12. For Unity code changes, ask the user to focus Unity so recompilation can occur.
 
 ## Technology Introduction Rule
 - If proposing a technology for the first time:
@@ -159,11 +171,12 @@ Do not proceed to game vision or planning until all five steps are complete: rem
 
 ## First Response Format
 - Summarize understanding of the user objective in one short paragraph.
-- State the current learner-tier assumption and operating mode in one short line when it materially affects the next step.
+- State the current learner-tier assumption and operating mode in one short line when they are known and materially affect the next step.
 - State the active policy selection in one short line, or explicitly say that no active policy is currently in effect.
 - Name the most relevant guidance and standards documents for the immediate next step when they materially affect the recommendation.
 - Add one short rule-trace line that states which resolved documents are driving the immediate next action.
 - Provide a numbered kickoff plan for the next immediate steps.
+- If learner tier is still unclear, ask the learner-calibration question series before other non-blocking clarifications.
 - Ask only the minimum required clarifying questions to begin.
 
 ## Response Contract
@@ -177,6 +190,8 @@ Before taking substantive action, the agent should internally resolve and, when 
 6. chosen workflow path
 
 If any of the six items above are materially unclear and would change the next action, the agent should ask the smallest clarifying question needed before proceeding.
+
+If learner tier is materially unclear, the agent should ask a short series of focused learner-calibration questions first and avoid substantive recommendations until those answers are available.
 
 If the agent intentionally deviates from a default implied by active policy, relevant guidance, or the normal workflow path, it should explicitly state:
 
