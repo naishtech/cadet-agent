@@ -165,7 +165,31 @@ gh pr merge --squash --delete-branch
 ```
 
 **Step 5 — Create the Unity project inside this folder:**
-- Open Unity Hub, choose "New project", and set the **location** to this folder (Unity places files at the root, not in a subfolder).
+
+Unity Hub refuses to create a project in a non-empty directory. Because the folder already contains `.gitignore`, `README.md`, and `.github/`, use the Unity Editor CLI instead, which has no empty-folder restriction.
+
+**5a — Confirm Unity is installed:**
+- Unity must already be installed via Unity Hub before this step can run.
+- If the user has not installed Unity yet, direct them to open Unity Hub, go to **Installs**, and add their target Unity version. Return to this step once installation is complete.
+
+**5b — Discover the installed Unity version:**
+```powershell
+Get-ChildItem "C:\Program Files\Unity\Hub\Editor" | Select-Object Name
+```
+- This lists all installed editor versions (e.g. `6000.0.47f1`).
+- If the path returns nothing, the Hub editors root may be in a custom location — ask the user where they installed Unity Hub and adjust the path accordingly.
+- If more than one version is listed, ask the user to confirm which version to use.
+
+**5c — Create the project via the Unity Editor CLI:**
+```powershell
+$unityVersion = "<version-confirmed-in-5b>"
+$unityExe = "C:\Program Files\Unity\Hub\Editor\$unityVersion\Editor\Unity.exe"
+& $unityExe -batchmode -createProject "$PWD" -quit
+```
+- `-batchmode -quit` creates the Unity project files (`Assets/`, `Packages/`, `ProjectSettings/`) and exits without opening the editor UI.
+- This takes 20–60 seconds. Wait for the process to exit before continuing.
+- Once complete, open Unity Hub → **Open > Add project from disk** → select this folder to register and open the project normally.
+
 - After the bootstrap state is established on `main` and Unity finishes generating files, create a new branch, commit the scaffold, and merge it through a pull request:
 ```powershell
 git checkout main
