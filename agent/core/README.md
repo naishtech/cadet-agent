@@ -17,11 +17,11 @@ Purpose: Provide a single navigation entry point for Cadet-Agent identity, opera
 - [LocalizationPatterns](Guidance/LocalizationPatterns.md)
 
 ## Policy System
-- Repository-specific policy files should live in `../Policies` relative to this folder.
+- Repository-specific policy files should live in `agent/policies` at the repository root.
 - Create repository-specific policy files only when the user explicitly requests one.
 - Use [PolicyTemplate](Templates/PolicyTemplate.md) to create a new repository policy.
 - Name repository policy files using the convention `{RepoName}Policy.md`.
-- When exactly one repository policy file exists in `../Policies` besides templates or placeholders, treat it as the active policy.
+- When exactly one repository policy file exists in `agent/policies` besides templates or placeholders, treat it as the active policy.
 - When multiple repository policy files exist, choose the one whose scope best matches the active workspace; if that is unclear, ask the user which policy should be active.
 - When no repository policy file exists, proceed with core framework plus guidance and create a policy only on explicit user request.
 
@@ -49,7 +49,7 @@ Purpose: Provide a single navigation entry point for Cadet-Agent identity, opera
 - [CC BY 4.0 License](LICENSE.md)
 
 ## Slash Command
-- Project-wide kickoff command: [cadet](../../cadet.prompt.md)
+- Project-wide kickoff command: [cadet](../adapters/github-copilot/.github/prompts/cadet.prompt.md)
 
 ## Document Precedence
 Apply framework documents in this order when deciding how to respond:
@@ -58,7 +58,7 @@ Apply framework documents in this order when deciding how to respond:
 2. [Workflow](Workflow.md): sets routing, operating mode, and execution path.
 3. Guidance documents under [Guidance](Guidance/UnityPatterns.md): set preferred defaults and lessons learned.
 4. Standards documents under [Standards](Standards/Testing.md): set mandatory quality bars.
-5. Active policy files under `.github/prompts/unity/Policies`: set repository-specific required conventions and delivery rules.
+5. Active policy files under `agent/policies`: set repository-specific required conventions and delivery rules.
 
 If two documents appear to conflict, prefer the higher-precedence document for its specific concern and do not let guidance weaken standards or policy.
 
@@ -76,7 +76,7 @@ If two documents appear to conflict, prefer the higher-precedence document for i
 - Interface-first and mock-first patterns are required for service-style architecture and testing seams.
 - Do not guess: if uncertain, state uncertainty, ask the user, and request permission before online research if needed.
 - When a local policy file is present, use it for repository layout, naming, planning paths, delivery policies, and studio-specific constraints.
-- Generated repository policies should be created in `.github/prompts/unity/Policies` only after an explicit user request.
+- Generated repository policies should be created in `agent/policies` only after an explicit user request.
 - All code changes should be done on branches; do not push directly to `main` from local.
 - `main` integration should happen through pull requests only.
 - Rebase-first branch maintenance and force-push with lease are preferred when branch history rewrite is intentional.
@@ -96,7 +96,7 @@ If two documents appear to conflict, prefer the higher-precedence document for i
 - [Workflow](Workflow.md): how to route work based on learner tier, user intent, and task size.
 - [Guidance](Guidance/UnityPatterns.md) and the other guidance docs: preferred patterns and lessons learned that Cadet should favor by default.
 - [Standards](Standards/Testing.md) and the other standards docs: the quality bar that does not change by learner tier.
-- Policy files in `.github/prompts/unity/Policies`: repository-specific conventions that do not change by learner tier.
+- Policy files in `agent/policies`: repository-specific conventions that do not change by learner tier.
 
 ## Planning Location Convention
 - If a local policy defines a planning directory, use that location.

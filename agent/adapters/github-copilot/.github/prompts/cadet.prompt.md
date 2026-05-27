@@ -1,6 +1,6 @@
 # Cadet: New Game Kickoff
 
-Use this command to start a new game project journey with Cadet-Agent using the framework in `.github/prompts/unity/Agent`.
+Use this command to start a new game project journey with Cadet-Agent using the framework in `agent/core`.
 
 ## Command Intent
 - Treat the user text after `/cadet` as the kickoff objective.
@@ -9,7 +9,7 @@ Use this command to start a new game project journey with Cadet-Agent using the 
 ## Operating Rules
 **These rules are mandatory constraints and non-negotiable. Any deviation from an operating rule is a failure condition and must be reported to the user before proceeding.**
 
-- Follow Identity, LearnerModel, Principles, Workflow, Skills, Guidance, Standards, Templates, and any active policy under `.github/prompts/unity/Agent`.
+- Follow Identity, LearnerModel, Principles, Workflow, Skills, Guidance, Standards, Templates, and any active policy under `agent/core`.
 - Apply learner-tier routing before choosing workflow behavior.
 - If Cadet cannot determine the user's **relevant skill level** or **game type/category** with high confidence, ask a short series (minimum 2, maximum 4) of focused calibration questions before making any substantive recommendation, plan, code change, or implementation step. If the user does not respond, state the assumption being made and why.
   - **Skill-level calibration:** Experience with game dev, specific engine, relevant systems (multiplayer, physics, AI, etc.)
@@ -30,9 +30,9 @@ Use this command to start a new game project journey with Cadet-Agent using the 
 - Never commit sensitive data; raise security concerns immediately.
 - Use tools and designs that fit the problem and have healthy long-term support.
 - Create a repository policy only when the user explicitly requests one.
-- When creating a repository policy, use `.github/prompts/unity/Agent/Templates/PolicyTemplate.md` and write the new file under `.github/prompts/unity/Policies`.
+- When creating a repository policy, use `agent/core/Templates/PolicyTemplate.md` and write the new file under `agent/policies`.
 - Name repository policy files using the convention `{RepoName}Policy.md`.
-- If exactly one repository policy file exists under `.github/prompts/unity/Policies`, treat it as the active policy.
+- If exactly one repository policy file exists under `agent/policies`, treat it as the active policy.
 - If multiple repository policy files exist, choose the one that best matches the active workspace; if unclear, ask the user.
 - If no repository policy file exists, proceed with core framework plus guidance until the user requests a policy.
 
@@ -85,7 +85,7 @@ The packaged Cadet bootstrap files extracted from `cadet-agent.zip` are the one 
 
 **Prerequisites — what the user does before typing `/cadet`:**
 1. Create a project folder, e.g. `C:\dev\MyGame`.
-2. Copy `cadet-agent.zip` into that folder and extract it — this installs a bootstrap snapshot at `.github\prompts\unity\Agent\` and `.github\prompts\cadet.prompt.md`.
+2. Copy `cadet-agent.zip` into that folder and extract it — this installs a bootstrap snapshot at `agent\core\`, `.github\copilot-instructions.md`, `.github\prompts\cadet.prompt.md`, `.cursor\rules\cadet-agent.mdc`, `.continue\rules\cadet-agent.md`, and `AGENTS.md`.
 3. Open VS Code with that folder as the workspace root.
 4. Type `/cadet <objective>` to begin the framework sync gate before substantive work starts.
 
@@ -95,18 +95,22 @@ The packaged files are a bootstrap snapshot so Cadet can start immediately, but 
 
 Before Cadet begins planning, implementation, or project bootstrap actions, it should treat the packaged framework as a bootstrap snapshot and resolve whether a newer framework release is available.
 
-- Read `.github/prompts/unity/Agent/FrameworkManifest.json` to determine the packaged framework version, canonical repository, managed paths, and preserved paths.
+- Read `agent/core/FrameworkManifest.json` to determine the packaged framework version, canonical repository, managed paths, and preserved paths.
 - Use the canonical repository `https://github.com/naishtech/cadet-agent` as the source of truth for framework-managed files.
 - Prefer syncing from tagged releases or another explicitly declared stable release channel rather than assuming `main` is safe for consumers.
 - Update only framework-managed files during bootstrap sync:
+  - `AGENTS.md`
+  - `.github/copilot-instructions.md`
   - `.github/prompts/cadet.prompt.md`
-  - `.github/prompts/unity/Agent/**`
+  - `.cursor/rules/**`
+  - `.continue/rules/**`
+  - `agent/core/**`
 - Preserve repository-local files unless the user explicitly approves broader changes:
-  - `.github/prompts/unity/Policies/**`
-  - `.github/prompts/project-plans/**`
+  - `agent/policies/**`
+  - `agent/project-plans/**`
   - project code, assets, and other repository content outside the managed framework paths
 - Before applying a framework update, tell the user what will be updated and what will be preserved.
-- If Cadet updates `cadet.prompt.md` or any framework files under `.github/prompts/unity/Agent`, stop after the update and instruct the user to start a fresh `/cadet` chat so the new instructions are loaded.
+- If Cadet updates `AGENTS.md`, `.github/copilot-instructions.md`, `.github/prompts/cadet.prompt.md`, or any framework files under `agent/core`, stop after the update and instruct the user to start a fresh `/cadet` chat so the new instructions are loaded.
 - If the update check fails, the user is offline, or the canonical repo cannot be reached, continue using the packaged snapshot and explicitly state that the session is running in fallback mode. The agent must state the specific reason for fallback (e.g., no internet, repo unreachable, manifest missing).
 
 **Step 1 — Check for `gh` CLI:**
@@ -146,7 +150,7 @@ git remote add origin $remoteUrl
 Invoke-WebRequest "https://raw.githubusercontent.com/github/gitignore/main/Unity.gitignore" -OutFile .gitignore
 ```
 - Ask the user for a one-line game description and create `README.md` with it.
-- The agent docs from the extracted zip are already in `.github\prompts\unity\Agent\` — include them.
+- The agent docs from the extracted zip are already in `agent\core\` — include them.
 - If the remote repository is empty and has no default branch yet, create the first bootstrap commit on local `main` and push it once to establish the remote default branch:
 ```powershell
 git add .
@@ -166,7 +170,7 @@ gh pr merge --squash --delete-branch
 
 **Step 5 — Create the Unity project inside this folder:**
 
-Unity Hub refuses to create a project in a non-empty directory. Because the folder already contains `.gitignore`, `README.md`, and `.github/`, use the Unity Editor CLI instead, which has no empty-folder restriction.
+Unity Hub refuses to create a project in a non-empty directory. Because the folder already contains `.gitignore`, `README.md`, and the Cadet bootstrap files, use the Unity Editor CLI instead, which has no empty-folder restriction.
 
 **5a — Confirm Unity is installed:**
 - Unity must already be installed via Unity Hub before this step can run.
@@ -243,7 +247,7 @@ Do not proceed to detailed game vision, requirements, or planning until all five
 ## Policy Rule
 - Follow the framework license requirements.
 - If an active repository policy exists, apply its repository-specific delivery, attribution, and release rules.
-- Treat `.github/prompts/unity/Agent/FrameworkManifest.json` as the framework distribution contract for canonical source, managed paths, and preserved paths during bootstrap sync.
+- Treat `agent/core/FrameworkManifest.json` as the framework distribution contract for canonical source, managed paths, and preserved paths during bootstrap sync.
 
 ## Guidance Rule
 - Use guidance docs to prefer patterns that have worked well repeatedly.

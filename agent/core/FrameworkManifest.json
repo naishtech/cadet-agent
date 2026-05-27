@@ -1,0 +1,29 @@
+{
+  "frameworkName": "Cadet-Agent",
+  "frameworkVersion": "0.2.0",
+  "distributionMode": "cross-ide-universal-package",
+  "canonicalRepository": "https://github.com/naishtech/cadet-agent",
+  "preferredUpdateChannel": "releases",
+  "supportedIDEs": [
+    "github-copilot",
+    "cursor",
+    "continue"
+  ],
+  "managedPaths": [
+    "AGENTS.md",
+    ".github/copilot-instructions.md",
+    ".github/prompts/cadet.prompt.md",
+    ".cursor/rules/cadet-agent.mdc",
+    ".continue/rules/cadet-agent.md",
+    "agent/core"
+  ],
+  "preservedPaths": [
+    "agent/policies",
+    "agent/project-plans"
+  ],
+  "notes": [
+    "Use this manifest to decide which packaged files Cadet may update during bootstrap sync.",
+    "If managed framework files are updated, require a fresh /cadet chat before continuing.",
+    "Treat the packaged zip as a universal bootstrap package rather than the long-term source of truth."
+  ]
+}
