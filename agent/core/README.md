@@ -49,7 +49,7 @@ Purpose: Provide a single navigation entry point for Cadet-Agent identity, opera
 - [CC BY 4.0 License](LICENSE.md)
 
 ## Slash Command
-- Project-wide kickoff command: [cadet](../adapters/github-copilot/.github/prompts/cadet.prompt.md)
+- Project-wide kickoff command: [cadet](../../.github/prompts/cadet.prompt.md)
 
 ## Document Precedence
 Apply framework documents in this order when deciding how to respond:

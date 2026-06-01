@@ -14,10 +14,10 @@ $ErrorActionPreference = "Stop"
 
 $scriptDir    = $PSScriptRoot
 $coreSource   = Join-Path $scriptDir "agent\core"
-$sharedSource = Join-Path $scriptDir "agent\adapters\shared\AGENTS.md"
-$githubSource = Join-Path $scriptDir "agent\adapters\github-copilot"
-$cursorSource = Join-Path $scriptDir "agent\adapters\cursor"
-$continueSource = Join-Path $scriptDir "agent\adapters\continue"
+$sharedSource = Join-Path $scriptDir "AGENTS.md"
+$githubSource = Join-Path $scriptDir ".github"
+$cursorSource = Join-Path $scriptDir ".cursor"
+$continueSource = Join-Path $scriptDir ".continue"
 $outputZip    = Join-Path $scriptDir "cadet-agent.zip"
 $preferredZip = $outputZip
 
@@ -114,9 +114,9 @@ if (Test-Path $staging) {
 
 Copy-TreeIntoStaging -SourceRoot $coreSource -StagingRoot $staging -TargetRoot "agent\core"
 Copy-FileIntoStaging -SourceFile $sharedSource -StagingRoot $staging -TargetPath "AGENTS.md"
-Copy-TreeIntoStaging -SourceRoot $githubSource -StagingRoot $staging -TargetRoot ""
-Copy-TreeIntoStaging -SourceRoot $cursorSource -StagingRoot $staging -TargetRoot ""
-Copy-TreeIntoStaging -SourceRoot $continueSource -StagingRoot $staging -TargetRoot ""
+Copy-TreeIntoStaging -SourceRoot $githubSource -StagingRoot $staging -TargetRoot ".github"
+Copy-TreeIntoStaging -SourceRoot $cursorSource -StagingRoot $staging -TargetRoot ".cursor"
+Copy-TreeIntoStaging -SourceRoot $continueSource -StagingRoot $staging -TargetRoot ".continue"
 
 Compress-Archive -Path (Join-Path $staging "*") -DestinationPath $outputZip
 

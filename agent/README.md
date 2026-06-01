@@ -4,10 +4,7 @@ This repository packages Cadet-Agent as a cross-IDE framework with a shared core
 
 ## Layout
 - `core/` contains the shared Cadet-Agent framework.
-- `adapters/github-copilot/` contains GitHub Copilot-specific adapter files.
-- `adapters/cursor/` contains Cursor-specific adapter files.
-- `adapters/continue/` contains Continue-specific adapter files.
-- `adapters/shared/` contains shared top-level agent instructions.
+- The repository root contains the authored IDE-specific files at `AGENTS.md`, `.github/`, `.cursor/`, and `.continue/`.
 - `docs/` contains setup guides for each supported IDE.
 
 ## Package Output
