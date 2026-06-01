@@ -62,6 +62,29 @@ foreach ($path in @($sharedSource, $githubSource, $cursorSource, $continueSource
     }
 }
 
+# Validate that every managed path listed in FrameworkManifest.json exists in
+# the local source tree before staging begins. A missing file would otherwise
+# produce a silently incomplete package.
+$manifestPath = Join-Path $coreSource "FrameworkManifest.json"
+if (-not (Test-Path $manifestPath)) {
+    Write-Error "FrameworkManifest.json not found at: $manifestPath"
+    exit 1
+}
+
+$manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+$missingPaths = @()
+foreach ($managedPath in $manifest.managedPaths) {
+    $localPath = Join-Path $scriptDir ($managedPath -replace '/', '\')
+    if (-not (Test-Path $localPath)) {
+        $missingPaths += $managedPath
+    }
+}
+
+if ($missingPaths.Count -gt 0) {
+    Write-Error "Manifest validation failed. The following managed paths are missing from the local source tree:`n  $($missingPaths -join "`n  ")`nUpdate FrameworkManifest.json or restore the missing files before packaging."
+    exit 1
+}
+
 function Copy-TreeIntoStaging {
     param(
         [string]$SourceRoot,

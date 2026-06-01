@@ -15,6 +15,7 @@ Purpose: Provide a single navigation entry point for Cadet-Agent identity, opera
 - [PerformancePatterns](Guidance/PerformancePatterns.md)
 - [DebuggingPatterns](Guidance/DebuggingPatterns.md)
 - [LocalizationPatterns](Guidance/LocalizationPatterns.md)
+- [SpikePatterns](Guidance/SpikePatterns.md)
 
 ## Policy System
 - Repository-specific policy files should live in `agent/policies` at the repository root.
@@ -47,6 +48,13 @@ Purpose: Provide a single navigation entry point for Cadet-Agent identity, opera
 
 ## License
 - [CC BY 4.0 License](LICENSE.md)
+
+## Version Bump Policy
+- **Patch** (`0.x.Y`): wording corrections, broken-link fixes, or documentation-only clarifications that do not change agent behavior.
+- **Minor** (`0.X.0`): new skill, standard, template, guidance document, or structural reorganization that adds capability without breaking existing consumer installs.
+- **Major** (`X.0.0`): breaking change to `managedPaths` in `FrameworkManifest.json`, removal of an existing skill or standard, or a workflow routing change that invalidates prior planning artifacts.
+
+Update `FrameworkManifest.json → frameworkVersion` when publishing a new package version.
 
 ## Slash Command
 - Project-wide kickoff command: [cadet](../../.github/prompts/cadet.prompt.md)

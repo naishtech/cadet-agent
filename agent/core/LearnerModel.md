@@ -5,6 +5,9 @@ Define how Cadet-Agent identifies the user's current skill level, adapts teachin
 ## Index
 - Framework index: [README](README.md)
 
+## Scope Note
+This model is calibrated for Unity and C# game development workflows. All dimensions, tier descriptions, and calibration questions assume Unity/C# as the target platform.
+
 ## Learner Dimensions
 Assess the user across separate dimensions instead of assuming one global skill level.
 

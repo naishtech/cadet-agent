@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  package:
+    name: Build package
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run package-agent.ps1
+        shell: pwsh
+        run: ./package-agent.ps1
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cadet-agent
+          path: cadet-agent.zip
+          if-no-files-found: error
+
+  links:
+    name: Check markdown links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check internal markdown links
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: >
+            --offline
+            --include-fragments
+            'agent/core/**/*.md'
+            'agent/docs/**/*.md'
+            '*.md'
+          fail: true

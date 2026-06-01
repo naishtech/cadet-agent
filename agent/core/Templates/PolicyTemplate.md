@@ -8,6 +8,7 @@ Define a repository-specific policy overlay that extends the reusable Cadet-Agen
 - Name the generated file using the convention `{RepoName}Policy.md`, for example `AmethystPolicy.md` or `MyStudioPolicy.md`.
 - This policy augments the core framework documents; if a rule here conflicts with a general preference, the repository policy controls local behavior.
 - Keep repository paths, studio rules, product recommendations, and release-process requirements here rather than in the core identity, workflow, or principles docs.
+- See [ExamplePolicy.md](ExamplePolicy.md) for a fully worked example showing every section with concrete fictional rules.
 
 ## Repository Context
 - Repository or team name: [TODO]

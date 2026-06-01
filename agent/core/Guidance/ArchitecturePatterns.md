@@ -21,7 +21,7 @@ Capture preferred architecture patterns and design heuristics that have worked w
 - Prefer central service binding and routing patterns when they reduce duplicated platform logic.
 - Prefer explicit data flow and ownership boundaries over hidden side effects or implicit global coordination.
 - Prefer composition-based feature assembly over inheritance-heavy hierarchies when gameplay behavior needs to evolve incrementally.
-- Prefer recommending a quick spike for a new feature or mechanic first: get the simplest demonstrable version working end to end before investing in polish, extensibility, or production cleanup.
+- Prefer recommending a quick spike for a new feature or mechanic first: get the simplest demonstrable version working end to end before investing in polish, extensibility, or production cleanup. See [SpikePatterns](SpikePatterns.md) for the full spike lifecycle rules.
 - Prefer explicit state machines for game flow, connection flow, or actor modes once transitions become hard to reason about in a single script, especially when separate Enter, Update, and Exit behavior keeps change safer.
 - Prefer identifying persistence, migration, rollout, and fallback behavior up front when a design touches stateful systems.
 - Prefer keeping spike code and production code separate once the feasibility question has been answered.

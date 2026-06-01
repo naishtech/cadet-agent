@@ -99,7 +99,7 @@ Create the plan artifacts and tests according to change type.
 - Ensure each epic delivers a testable slice of valuable work.
 - Ensure task breakdown in epic files traces back to acceptance criteria and technical design decisions.
 - Prefer prefab-based implementation slices where practical so tests can instantiate consistent runtime objects.
-- If a spike is needed, define the exact feasibility question first (for example, "Can we demonstrably do X?").
+- If a spike is needed, define the exact feasibility question first. See [SpikePatterns](Guidance/SpikePatterns.md) for the full spike lifecycle rules.
 - For UI/editor-facing changes, identify localization impact early and include localization tasks in requirements/design/epics.
 - For localization key additions, include tasks to update all locale message sources and follow serialization-safe enum key append rules.
 - Small changes:
@@ -124,7 +124,7 @@ Implement in small, reviewable increments.
 - If Unity test validation is needed, tell the user exactly which tests to run and why.
 - Do not run Unity tests directly unless the user explicitly asks for it.
 - Use user-reported test outcomes to drive the next implementation or fix step.
-- Treat spikes as reference-only once their question is answered and keep production code paths separate.
+- Treat spikes as reference-only once their question is answered and keep production code paths separate. See [SpikePatterns](Guidance/SpikePatterns.md).
 - Keep game-specific logic in domain folders and shared logic in the repository's designated shared-code location when one exists.
 - Keep work on the active feature branch, rebase as needed to stay current, and use force-push with lease only when rewriting branch history intentionally.
 - Prepare changes for PR-based integration and prefer squash merge unless the user specifies a different merge policy.
@@ -133,7 +133,9 @@ Implement in small, reviewable increments.
 - After relevant code changes, prompt the user to recompile in Unity when needed.
 - Unity-specific rule: ask the user to focus the Unity window so compilation can run.
 
-## Validation
+## Step 4
+Validate the completed work against the workflow path criteria before closing.
+
 Validate based on workflow path.
 
 - Large changes:
@@ -181,7 +183,7 @@ Work is complete when all applicable conditions are met.
 - The user received an explanation depth appropriate to their learner tier and stated preference.
 - Unity recompilation was requested from the user when necessary.
 - The user has reviewed and accepted results or requested next iteration steps.
-- If spikes were used, the user was asked whether the spike should be removed after production completion.
+- If spikes were used, the user was asked whether the spike should be removed after production completion. See [SpikePatterns](Guidance/SpikePatterns.md).
 - Shared-code extraction decisions were communicated to the user before implementation and applied consistently.
 - Localization updates (when applicable) were included and validated with fallback-safe behavior.
 - Localization key and font asset update rules were followed for multilingual changes.

@@ -34,7 +34,7 @@ Identify defects, regressions, security concerns, and process drift before chang
 5. Confirm no sensitive data is committed.
 6. Confirm implementation matches technical design intent.
 7. Confirm service and system boundaries remain interface-first where applicable.
-8. Confirm production changes do not depend on spike/example assets unless explicitly approved.
+8. Confirm production changes do not depend on spike/example assets unless explicitly approved. See [SpikePatterns](../Guidance/SpikePatterns.md).
 9. Confirm failure paths provide actionable diagnostics rather than generic messages.
 10. Confirm project plan and epic status reflect actual implementation progress.
 11. Compare the implementation against relevant guidance documents and note when a preferred pattern was usefully followed or deliberately rejected.
@@ -42,7 +42,7 @@ Identify defects, regressions, security concerns, and process drift before chang
 13. Confirm any active repository policy is respected for naming, layout, logging, shared-code placement, and other local conventions.
 14. Confirm localization behavior, fallback handling, and asset updates remain correct when localization is affected.
 15. Confirm prefab usage, scene boundaries, and composition choices support testability and team scalability.
-16. Confirm spikes are reference-only after feasibility is proven and check whether spike cleanup was requested after production completion.
+16. Confirm spikes are reference-only after feasibility is proven and check whether spike cleanup was requested after production completion. See [SpikePatterns](../Guidance/SpikePatterns.md).
 17. Provide findings ordered by severity with clear remediation steps.
 
 ## Expected Outputs
