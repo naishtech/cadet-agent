@@ -1,3 +1,6 @@
 # Cadet-Agent build outputs
 cadet-agent.zip
 cadet-agent-updated.zip
+
+# Orchestrator runtime state
+.cadet/orchestrator/state.json

@@ -1,11 +1,11 @@
 # package-agent.ps1
 # Packages the Cadet-Agent universal bootstrap package into a zip archive.
 # Extract the zip at any Unity project root and files will land at:
-#   agent\core\
+#   .cadet\agent\core\
 #   AGENTS.md
-#   .github\copilot-instructions.md
+#   .github\cadet-copilot-instructions.md
 #   .github\prompts\cadet.prompt.md
-#   .cursor\rules\cadet-agent.mdc
+#   .cursor\rules\cadet-agent.md
 #   .continue\rules\cadet-agent.md
 # The packaged core folder includes FrameworkManifest.json, which points to the
 # canonical source-of-truth repo for later Cadet framework sync.
@@ -13,7 +13,7 @@
 $ErrorActionPreference = "Stop"
 
 $scriptDir    = $PSScriptRoot
-$coreSource   = Join-Path $scriptDir "agent\core"
+$coreSource   = Join-Path $scriptDir ".cadet\agent\core"
 $sharedSource = Join-Path $scriptDir "AGENTS.md"
 $githubSource = Join-Path $scriptDir ".github"
 $cursorSource = Join-Path $scriptDir ".cursor"
@@ -135,20 +135,21 @@ if (Test-Path $staging) {
     Remove-Item $staging -Recurse -Force
 }
 
-Copy-TreeIntoStaging -SourceRoot $coreSource -StagingRoot $staging -TargetRoot "agent\core"
+Copy-TreeIntoStaging -SourceRoot $coreSource -StagingRoot $staging -TargetRoot ".cadet\agent\core"
 Copy-FileIntoStaging -SourceFile $sharedSource -StagingRoot $staging -TargetPath "AGENTS.md"
-Copy-TreeIntoStaging -SourceRoot $githubSource -StagingRoot $staging -TargetRoot ".github"
+
+# Only copy managed .github files — exclude CI workflows from the consumer package
+Copy-FileIntoStaging -SourceFile (Join-Path $githubSource "cadet-copilot-instructions.md") -StagingRoot $staging -TargetPath ".github\cadet-copilot-instructions.md"
+Copy-TreeIntoStaging -SourceRoot (Join-Path $githubSource "prompts") -StagingRoot $staging -TargetRoot ".github\prompts"
+
 Copy-TreeIntoStaging -SourceRoot $cursorSource -StagingRoot $staging -TargetRoot ".cursor"
 Copy-TreeIntoStaging -SourceRoot $continueSource -StagingRoot $staging -TargetRoot ".continue"
+
+$fileCount = (Get-ChildItem -Path $staging -Recurse -File).Count
 
 Compress-Archive -Path (Join-Path $staging "*") -DestinationPath $outputZip
 
 Remove-Item $staging -Recurse -Force
-
-$fileCount = (Get-ChildItem -Path $coreSource -Recurse -File).Count +
-    (Get-ChildItem -Path $githubSource -Recurse -File).Count +
-    (Get-ChildItem -Path $cursorSource -Recurse -File).Count +
-    (Get-ChildItem -Path $continueSource -Recurse -File).Count + 1
 $zipSize   = [math]::Round((Get-Item $outputZip).Length / 1KB, 1)
 
 Write-Host ""
@@ -158,11 +159,11 @@ Write-Host "To install in another project:"
 Write-Host "  1. Copy $(Split-Path $outputZip -Leaf) to the target project root"
 Write-Host "  2. Expand-Archive .\$(Split-Path $outputZip -Leaf) -DestinationPath . -Force"
 Write-Host "  Files will extract to:"
-Write-Host "    agent\core\"
+Write-Host "    .cadet\agent\core\"
 Write-Host "    AGENTS.md"
-Write-Host "    .github\copilot-instructions.md"
+Write-Host "    .github\cadet-copilot-instructions.md"
 Write-Host "    .github\prompts\cadet.prompt.md"
-Write-Host "    .cursor\rules\cadet-agent.mdc"
+Write-Host "    .cursor\rules\cadet-agent.md"
 Write-Host "    .continue\rules\cadet-agent.md"
 if ($outputZip -ne $preferredZip) {
     Write-Host ""

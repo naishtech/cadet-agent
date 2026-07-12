@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# cadet-orchestrator — Entry point for Cadet-Agent orchestrator CLI
+# Usage: cadet-orchestrator <command> [args...]
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export ORCHESTRATOR_STATE_DIR="${ORCHESTRATOR_STATE_DIR:-$SCRIPT_DIR}"
+
+source "${SCRIPT_DIR}/lib/state.sh"
+source "${SCRIPT_DIR}/lib/context.sh"
+source "${SCRIPT_DIR}/lib/classify.sh"
+source "${SCRIPT_DIR}/lib/dispatch.sh"
+source "${SCRIPT_DIR}/lib/track.sh"
+source "${SCRIPT_DIR}/lib/validate.sh"
+
+print_usage() {
+    cat << EOF
+cadet-orchestrator — Cadet-Agent workflow orchestrator
+
+Usage: cadet-orchestrator <command> [args]
+
+Commands:
+  init <workspace>         Initialize state for a workspace
+  classify <description>   Classify a change as large/small/no_test_required
+  dispatch <skill>         Dispatch a single skill
+  dispatch-seq <s1> [s2..] Dispatch skills in sequence
+  epic-start <id> <count>  Begin tracking an epic
+  task-done <eid> <tid>    Mark a task complete
+  epic-done <id>           Mark an epic complete
+  resync?                  Check if artifact re-sync is needed
+  validate <path>          Run validation gates
+  status                   Show current session state
+  help                     Show this help
+
+State is stored in \$ORCHESTRATOR_STATE_DIR/state.json
+EOF
+}
+
+cmd="${1:-help}"
+shift || true
+
+case "$cmd" in
+    init)
+        orchestrator_context_resolve "${1:-$(pwd)}"
+        ;;
+    classify)
+        orchestrator_classify "$@"
+        ;;
+    dispatch)
+        orchestrator_dispatch "$@"
+        ;;
+    dispatch-seq)
+        orchestrator_dispatch_sequence "$@"
+        ;;
+    epic-start)
+        orchestrator_begin_epic "$@"
+        ;;
+    task-done)
+        orchestrator_complete_task "$@"
+        ;;
+    epic-done)
+        orchestrator_mark_epic_complete "$@"
+        ;;
+    resync?)
+        orchestrator_requires_resync
+        ;;
+    validate)
+        orchestrator_validate_gates "$@"
+        ;;
+    status)
+        cat "$(_resolve_state_file)" 2>/dev/null || echo "No state file found. Run 'init' first."
+        ;;
+    help|--help|-h)
+        print_usage
+        ;;
+    *)
+        echo "Unknown command: $cmd" >&2
+        print_usage
+        exit 1
+        ;;
+esac

@@ -9,11 +9,11 @@ This repository packages Cadet-Agent as a cross-IDE framework with a shared core
 
 ## Package Output
 Running `package-agent.ps1` produces `cadet-agent.zip` with these install paths:
-- `agent/core/`
+- `.cadet/agent/core/`
 - `AGENTS.md`
-- `.github/copilot-instructions.md`
+- `.github/cadet-copilot-instructions.md`
 - `.github/prompts/cadet.prompt.md`
-- `.cursor/rules/cadet-agent.mdc`
+- `.cursor/rules/cadet-agent.md`
 - `.continue/rules/cadet-agent.md`
 
 ## Setup Guides
@@ -22,6 +22,6 @@ Running `package-agent.ps1` produces `cadet-agent.zip` with these install paths:
 - [Continue](docs/continue.md)
 
 ## Shared Conventions
-- Repository-specific policy overlays belong in `agent/policies`.
-- Planning artifacts belong in `agent/project-plans` unless an active policy says otherwise.
-- `agent/core/FrameworkManifest.json` is the packaging and sync contract.
+- Repository-specific policy overlays belong in `.cadet/agent/policies`.
+- Planning artifacts belong in `.cadet/agent/project-plans` unless an active policy says otherwise.
+- `.cadet/agent/core/FrameworkManifest.json` is the packaging and sync contract.
