@@ -137,18 +137,19 @@ if (Test-Path $staging) {
 
 Copy-TreeIntoStaging -SourceRoot $coreSource -StagingRoot $staging -TargetRoot ".cadet\agent\core"
 Copy-FileIntoStaging -SourceFile $sharedSource -StagingRoot $staging -TargetPath "AGENTS.md"
-Copy-TreeIntoStaging -SourceRoot $githubSource -StagingRoot $staging -TargetRoot ".github"
+
+# Only copy managed .github files — exclude CI workflows from the consumer package
+Copy-FileIntoStaging -SourceFile (Join-Path $githubSource "copilot-instructions.md") -StagingRoot $staging -TargetPath ".github\copilot-instructions.md"
+Copy-TreeIntoStaging -SourceRoot (Join-Path $githubSource "prompts") -StagingRoot $staging -TargetRoot ".github\prompts"
+
 Copy-TreeIntoStaging -SourceRoot $cursorSource -StagingRoot $staging -TargetRoot ".cursor"
 Copy-TreeIntoStaging -SourceRoot $continueSource -StagingRoot $staging -TargetRoot ".continue"
+
+$fileCount = (Get-ChildItem -Path $staging -Recurse -File).Count
 
 Compress-Archive -Path (Join-Path $staging "*") -DestinationPath $outputZip
 
 Remove-Item $staging -Recurse -Force
-
-$fileCount = (Get-ChildItem -Path $coreSource -Recurse -File).Count +
-    (Get-ChildItem -Path $githubSource -Recurse -File).Count +
-    (Get-ChildItem -Path $cursorSource -Recurse -File).Count +
-    (Get-ChildItem -Path $continueSource -Recurse -File).Count + 1
 $zipSize   = [math]::Round((Get-Item $outputZip).Length / 1KB, 1)
 
 Write-Host ""
