@@ -11,6 +11,22 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ---
 
+## [0.3.0] — 2026-07-12
+
+### Changed
+- **Breaking:** Moved `agent/` → `.cadet/agent/` so framework files live under `.cadet/` alongside the orchestrator.
+- Updated `FrameworkManifest.json` managed and preserved paths to reflect new `.cadet/agent/` root.
+- Updated `package-agent.ps1` to source from and package to `.cadet/agent/core/`.
+- Updated all IDE adapter files (`AGENTS.md`, `.github/copilot-instructions.md`, `.cursor/rules/cadet-agent.md`, `.continue/rules/cadet-agent.md`, `.github/prompts/cadet.prompt.md`) to reference `.cadet/agent/` paths.
+- Renamed `.cursor/rules/cadet-agent.mdc` → `.cursor/rules/cadet-agent.md` (old `.mdc` file is not removed by package extraction — consumers upgrading from 0.2.0 must delete the stale `.mdc` file manually).
+- Updated `README.md`, `CONTRIBUTING.md` to reflect new layout.
+
+### Added
+- `Skills/Orchestrator.md` — declarative skill document defining the orchestrator pattern for Cadet-Agent workflow coordination.
+- `.cadet/orchestrator/` — bash implementation of the orchestrator with CLI entry point, JSON state management, and bats test suite (45 tests).
+
+---
+
 ## [0.2.0] — 2026-06-01
 
 ### Added

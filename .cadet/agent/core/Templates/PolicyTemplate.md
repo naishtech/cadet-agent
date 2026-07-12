@@ -3,7 +3,7 @@
 Define a repository-specific policy overlay that extends the reusable Cadet-Agent framework with local conventions, layout rules, and delivery preferences.
 
 ## How To Apply
-- Use this template to create a policy file for a specific repository under `agent/policies`.
+- Use this template to create a policy file for a specific repository under `.cadet/agent/policies`.
 - Create a repository policy only when the user explicitly requests one.
 - Name the generated file using the convention `{RepoName}Policy.md`, for example `AmethystPolicy.md` or `MyStudioPolicy.md`.
 - This policy augments the core framework documents; if a rule here conflicts with a general preference, the repository policy controls local behavior.
