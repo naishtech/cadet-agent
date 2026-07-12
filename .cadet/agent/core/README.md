@@ -58,7 +58,7 @@ Purpose: Provide a single navigation entry point for Cadet-Agent identity, opera
 Update `FrameworkManifest.json → frameworkVersion` when publishing a new package version.
 
 ## Slash Command
-- Project-wide kickoff command: [cadet](../../.github/prompts/cadet.prompt.md)
+- Project-wide kickoff command: [cadet](../../../.github/prompts/cadet.prompt.md)
 
 ## Document Precedence
 Apply framework documents in this order when deciding how to respond:
