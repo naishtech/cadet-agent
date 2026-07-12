@@ -11,7 +11,7 @@ This repository packages Cadet-Agent as a cross-IDE framework with a shared core
 Running `package-agent.ps1` produces `cadet-agent.zip` with these install paths:
 - `.cadet/agent/core/`
 - `AGENTS.md`
-- `.github/copilot-instructions.md`
+- `.github/cadet-copilot-instructions.md`
 - `.github/prompts/cadet.prompt.md`
 - `.cursor/rules/cadet-agent.md`
 - `.continue/rules/cadet-agent.md`

@@ -85,7 +85,7 @@ The packaged Cadet bootstrap files extracted from `cadet-agent.zip` are the one 
 
 **Prerequisites — what the user does before typing `/cadet`:**
 1. Create a project folder, e.g. `C:\dev\MyGame`.
-2. Copy `cadet-agent.zip` into that folder and extract it — this installs a bootstrap snapshot at `.cadet\agent\core\`, `.github\copilot-instructions.md`, `.github\prompts\cadet.prompt.md`, `.cursor\rules\cadet-agent.md`, `.continue\rules\cadet-agent.md`, and `AGENTS.md`.
+2. Copy `cadet-agent.zip` into that folder and extract it — this installs a bootstrap snapshot at `.cadet\agent\core\`, `.github\cadet-copilot-instructions.md`, `.github\prompts\cadet.prompt.md`, `.cursor\rules\cadet-agent.md`, `.continue\rules\cadet-agent.md`, and `AGENTS.md`.
 3. Open VS Code with that folder as the workspace root.
 4. Type `/cadet <objective>` to begin the framework sync gate before substantive work starts.
 
@@ -100,7 +100,7 @@ Before Cadet begins planning, implementation, or project bootstrap actions, it s
 - Prefer syncing from tagged releases or another explicitly declared stable release channel rather than assuming `main` is safe for consumers.
 - Update only framework-managed files during bootstrap sync:
   - `AGENTS.md`
-  - `.github/copilot-instructions.md`
+  - `.github/cadet-copilot-instructions.md`
   - `.github/prompts/cadet.prompt.md`
   - `.cursor/rules/**`
   - `.continue/rules/**`
@@ -110,7 +110,7 @@ Before Cadet begins planning, implementation, or project bootstrap actions, it s
   - `.cadet/agent/project-plans/**`
   - project code, assets, and other repository content outside the managed framework paths
 - Before applying a framework update, tell the user what will be updated and what will be preserved.
-- If Cadet updates `AGENTS.md`, `.github/copilot-instructions.md`, `.github/prompts/cadet.prompt.md`, or any framework files under `.cadet/agent/core`, stop after the update and instruct the user to start a fresh `/cadet` chat so the new instructions are loaded.
+- If Cadet updates `AGENTS.md`, `.github/cadet-copilot-instructions.md`, `.github/prompts/cadet.prompt.md`, or any framework files under `.cadet/agent/core`, stop after the update and instruct the user to start a fresh `/cadet` chat so the new instructions are loaded.
 - If the update check fails, the user is offline, or the canonical repo cannot be reached, continue using the packaged snapshot and explicitly state that the session is running in fallback mode. The agent must state the specific reason for fallback (e.g., no internet, repo unreachable, manifest missing).
 
 **Step 1 — Check for `gh` CLI:**
