@@ -1,6 +1,6 @@
 # Cadet-Agent
 
-Cadet-Agent is a cross-IDE agent framework for game-development workflows, with a shared framework core and authored root integrations for GitHub Copilot, Cursor, and Continue.
+Cadet-Agent is a cross-IDE agent framework for game-development workflows, with a shared framework core and authored root integrations for GitHub Copilot, Cursor, Continue, and Claude Code.
 
 ## Repository Layout
 - `.cadet/agent/core/` contains the shared Cadet-Agent framework documents.
@@ -9,6 +9,7 @@ Cadet-Agent is a cross-IDE agent framework for game-development workflows, with 
 - `.github/` contains GitHub Copilot-specific authored files.
 - `.cursor/` contains Cursor-specific authored files.
 - `.continue/` contains Continue-specific authored files.
+- `.claude/` contains Claude Code-specific authored files.
 - `package-agent.ps1` builds the distributable `cadet-agent.zip` package.
 
 ## Getting Started
@@ -17,6 +18,7 @@ Cadet-Agent is a cross-IDE agent framework for game-development workflows, with 
 - For GitHub Copilot setup, see [.cadet/agent/docs/github-copilot.md](.cadet/agent/docs/github-copilot.md).
 - For Cursor setup, see [.cadet/agent/docs/cursor.md](.cadet/agent/docs/cursor.md).
 - For Continue setup, see [.cadet/agent/docs/continue.md](.cadet/agent/docs/continue.md).
+- For Claude Code setup, see [.cadet/agent/docs/claude-code.md](.cadet/agent/docs/claude-code.md).
 
 ## Examples
 
@@ -61,6 +63,7 @@ Running `./package-agent.ps1` produces `cadet-agent.zip` with this layout:
 - `.github/prompts/cadet.prompt.md`
 - `.cursor/rules/cadet-agent.md`
 - `.continue/rules/cadet-agent.md`
+- `.claude/skills/cadet-agent.md`
 
 ## Notes
 - `.cadet/agent/core/FrameworkManifest.json` defines the managed and preserved paths for packaged installs.

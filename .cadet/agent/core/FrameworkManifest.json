@@ -7,7 +7,8 @@
   "supportedIDEs": [
     "github-copilot",
     "cursor",
-    "continue"
+    "continue",
+    "claude-code"
   ],
   "managedPaths": [
     "AGENTS.md",
@@ -15,6 +16,7 @@
     ".github/prompts/cadet.prompt.md",
     ".cursor/rules/cadet-agent.md",
     ".continue/rules/cadet-agent.md",
+    ".claude/skills/cadet-agent.md",
     ".cadet/agent/core"
   ],
   "preservedPaths": [
