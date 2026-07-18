@@ -25,6 +25,7 @@
 11. Maintain change history, including descopes and scope pivots.
 12. After each epic, ask user to check token count; if context exceeds 100k tokens, recommend a new chat.
 13. For Unity code changes, ask the user to focus Unity so recompilation can occur.
+14. After each epic is complete, run the review gate per `.cadet/agent/core/Workflow.md` Step 3.5 — apply the full CodeReview skill, file prioritized findings, and recommend the user optionally review the output in a separate chat with a different AI model for an independent second opinion.
 
 ---
 

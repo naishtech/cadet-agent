@@ -26,6 +26,14 @@ Identify defects, regressions, security concerns, and process drift before chang
 - Applicable guidance documents for preferred patterns and lessons learned.
 - Applicable standards documents and any active repository policy.
 
+## Multi-Model Review Recommendation
+
+Before starting the review, **recommend the user optionally copy the design, code, or artifact under review into a separate chat instance with a different AI model.** A fresh context window avoids bias from the conversation history, and a different model provides an independent second opinion. This is especially valuable for:
+- Technical designs and architecture decisions
+- Security-sensitive changes
+- Performance-critical code paths
+- High-risk or breaking changes
+
 ## Process
 1. Review for functional correctness against acceptance criteria.
 2. Verify test coverage relevance and red/green evidence where required.
