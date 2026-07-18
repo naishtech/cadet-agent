@@ -3,7 +3,6 @@
 # Extract the zip at any Unity project root and files will land at:
 #   .cadet\agent\core\
 #   AGENTS.md
-#   .github\cadet-copilot-instructions.md
 #   .github\prompts\cadet.prompt.md
 #   .cursor\rules\cadet-agent.md
 #   .continue\rules\cadet-agent.md
@@ -141,7 +140,6 @@ Copy-TreeIntoStaging -SourceRoot $coreSource -StagingRoot $staging -TargetRoot "
 Copy-FileIntoStaging -SourceFile $sharedSource -StagingRoot $staging -TargetPath "AGENTS.md"
 
 # Only copy managed .github files — exclude CI workflows from the consumer package
-Copy-FileIntoStaging -SourceFile (Join-Path $githubSource "cadet-copilot-instructions.md") -StagingRoot $staging -TargetPath ".github\cadet-copilot-instructions.md"
 Copy-TreeIntoStaging -SourceRoot (Join-Path $githubSource "prompts") -StagingRoot $staging -TargetRoot ".github\prompts"
 
 Copy-TreeIntoStaging -SourceRoot $cursorSource -StagingRoot $staging -TargetRoot ".cursor"
@@ -164,10 +162,10 @@ Write-Host "  2. Expand-Archive .\$(Split-Path $outputZip -Leaf) -DestinationPat
 Write-Host "  Files will extract to:"
 Write-Host "    .cadet\agent\core\"
 Write-Host "    AGENTS.md"
-Write-Host "    .github\cadet-copilot-instructions.md"
 Write-Host "    .github\prompts\cadet.prompt.md"
 Write-Host "    .cursor\rules\cadet-agent.md"
 Write-Host "    .continue\rules\cadet-agent.md"
+Write-Host "    .claude\skills\cadet-agent.md"
 if ($outputZip -ne $preferredZip) {
     Write-Host ""
     Write-Host "Note: The primary output zip was in use, so a fallback filename was used for this package."
