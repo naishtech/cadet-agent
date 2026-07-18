@@ -20,10 +20,10 @@ All changes must happen on a feature branch. Direct commits to `main` are not pe
 **Managed paths** (owned by Cadet-Agent, overwritten on sync):
 - `.cadet/agent/core/`
 - `AGENTS.md`
-- `.github/cadet-copilot-instructions.md`
 - `.github/prompts/cadet.prompt.md`
 - `.cursor/rules/cadet-agent.md`
 - `.continue/rules/cadet-agent.md`
+- `.claude/skills/cadet-agent.md`
 
 **Preserved paths** (owned by the consumer, never overwritten by a Cadet update):
 - `.cadet/agent/policies/`

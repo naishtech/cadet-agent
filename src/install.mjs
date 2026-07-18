@@ -193,8 +193,7 @@ export async function install(targetDir) {
   // Print per-IDE next steps
   console.log('── Next steps ──');
   console.log('  GitHub Copilot:');
-  console.log('    Rename .github\\cadet-copilot-instructions.md → .github\\copilot-instructions.md');
-  console.log('    Then start a chat: /cadet');
+  console.log('    Start a chat: /cadet');
   console.log('  Cursor:');
   console.log('    Already active — .cursor\\rules\\cadet-agent.md loads automatically');
   console.log('  Continue:');

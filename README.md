@@ -80,7 +80,6 @@ If a specific game repository needs local conventions, add a policy file under `
 Running `./package-agent.ps1` produces `cadet-agent.zip` with this layout:
 - `.cadet/agent/core/`
 - `AGENTS.md`
-- `.github/cadet-copilot-instructions.md`
 - `.github/prompts/cadet.prompt.md`
 - `.cursor/rules/cadet-agent.md`
 - `.continue/rules/cadet-agent.md`
