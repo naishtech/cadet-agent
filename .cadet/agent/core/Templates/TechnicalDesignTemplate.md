@@ -79,6 +79,7 @@ Purpose: Translate approved requirements into an implementation-ready design wit
 ## Review and Approval
 - Reviewer(s): [TODO]
 - Review Notes: [TODO]
+- **Multi-model review:** Recommend the user optionally copy this design into a separate chat with a different AI model for an independent review. A fresh context window and different model perspective help catch blind spots.
 - Approval Decision: [TODO]
 - Approval Date: [TODO]
 

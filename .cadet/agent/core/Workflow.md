@@ -134,6 +134,15 @@ Implement in small, reviewable increments.
 - After relevant code changes, prompt the user to recompile in Unity when needed.
 - Unity-specific rule: ask the user to focus the Unity window so compilation can run.
 
+## Step 3.5 — Review Gate (mandatory after epic completion)
+
+After completing an epic and before moving to the next or marking work as done, run the review skill in [CodeReview](Skills/CodeReview.md).
+
+- Apply the full 17-step review process against the completed epic's changes.
+- File prioritized findings with clear remediation steps.
+- Do not proceed to the next epic or PR merge until critical/high-risk findings are resolved.
+- After completing the review, **recommend the user optionally review the output in a separate chat instance with a different AI model.** A fresh context window avoids bias from the conversation history, and a different model provides an independent second opinion. This is especially valuable for technical designs, architecture decisions, and security-sensitive changes.
+
 ## Step 4
 Validate the completed work against the workflow path criteria before closing.
 
