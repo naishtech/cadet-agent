@@ -11,6 +11,19 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ---
 
+## [0.4.0] — 2026-07-18
+
+### Added
+- Claude Code IDE adapter: `.claude/skills/cadet-agent.md` skill file referencing the `.cadet/agent/core/` framework.
+- Claude Code setup documentation at `.cadet/agent/docs/claude-code.md`.
+
+### Changed
+- Updated `FrameworkManifest.json` to include `claude-code` in `supportedIDEs` and `.claude/skills/cadet-agent.md` in `managedPaths`.
+- Updated `package-agent.ps1` to package `.claude/` alongside the other IDE adapters.
+- Updated `README.md` to list Claude Code as a supported IDE.
+
+---
+
 ## [0.3.0] — 2026-07-12
 
 ### Changed

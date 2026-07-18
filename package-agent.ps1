@@ -7,6 +7,7 @@
 #   .github\prompts\cadet.prompt.md
 #   .cursor\rules\cadet-agent.md
 #   .continue\rules\cadet-agent.md
+#   .claude\skills\cadet-agent.md
 # The packaged core folder includes FrameworkManifest.json, which points to the
 # canonical source-of-truth repo for later Cadet framework sync.
 
@@ -18,6 +19,7 @@ $sharedSource = Join-Path $scriptDir "AGENTS.md"
 $githubSource = Join-Path $scriptDir ".github"
 $cursorSource = Join-Path $scriptDir ".cursor"
 $continueSource = Join-Path $scriptDir ".continue"
+$claudeSource  = Join-Path $scriptDir ".claude"
 $outputZip    = Join-Path $scriptDir "cadet-agent.zip"
 $preferredZip = $outputZip
 
@@ -55,7 +57,7 @@ if (-not (Test-Path $coreSource)) {
     exit 1
 }
 
-foreach ($path in @($sharedSource, $githubSource, $cursorSource, $continueSource)) {
+foreach ($path in @($sharedSource, $githubSource, $cursorSource, $continueSource, $claudeSource)) {
     if (-not (Test-Path $path)) {
         Write-Error "Adapter source not found at: $path"
         exit 1
@@ -144,6 +146,7 @@ Copy-TreeIntoStaging -SourceRoot (Join-Path $githubSource "prompts") -StagingRoo
 
 Copy-TreeIntoStaging -SourceRoot $cursorSource -StagingRoot $staging -TargetRoot ".cursor"
 Copy-TreeIntoStaging -SourceRoot $continueSource -StagingRoot $staging -TargetRoot ".continue"
+Copy-TreeIntoStaging -SourceRoot $claudeSource -StagingRoot $staging -TargetRoot ".claude"
 
 $fileCount = (Get-ChildItem -Path $staging -Recurse -File).Count
 
