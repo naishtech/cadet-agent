@@ -67,12 +67,14 @@ Classify the requested change.
 - Determine whether the work is large, small, or no-test-required.
 - Keep the learner tier and operating mode fixed unless new evidence justifies updating them.
 - For large work, identify impacted components, integration points, and end-to-end test implications.
+- When architectural or design decisions are made during classification, create an ADR using [ADRDecisionTemplate](Templates/ADRDecisionTemplate.md) and store under `.cadet/agent/project-plans/adr/`.
 - Confirm whether the user wants step-by-step guidance or one full draft for final review.
 - Confirm project-plan storage path.
 - Resolve the active policy using the README policy-system rules before applying any repository-specific convention.
 - If a local policy defines a default planning directory, recommend it.
 - Otherwise, ask the user for the preferred artifact location and use it.
 - If a new technology is introduced, follow the identity protocol: check familiarity, explain if needed, and request approval or equivalent alternative.
+- **Technology evaluation:** When a technology choice has multiple viable options, apply the [TechnologyDecisionFramework](Guidance/TechnologyDecisionFramework.md): identify viable options, ask the user with a clear default recommendation, and record the decision as an ADR.
 - If an active policy prefers a specific technology stack, do not silently recommend a different stack; state the policy default and the concrete reason for any exception first.
 - If implementation details are uncertain, explicitly state what is unknown, ask whether the user knows, and if neither side is certain ask permission before online research.
 - Identify which guidance documents are relevant to the task so their preferred patterns can inform the approach.
@@ -80,6 +82,7 @@ Classify the requested change.
 - Identify whether any planned code is shared infrastructure and whether the active workspace defines a specific shared-code location.
 - Before creating or moving shared code into a shared location, explicitly tell the user and confirm the extraction boundary.
 - Confirm branch strategy before implementation: create or use a feature branch and keep `main` protected from direct local pushes.
+- **ADR recording:** When a significant architectural or design decision is made (technology choice, pattern adoption, structural tradeoff, deferral with rationale), create an Architecture Decision Record using [ADRDecisionTemplate](Templates/ADRDecisionTemplate.md). Store ADRs under `.cadet/agent/project-plans/adr/` using the naming convention `NNNN-lowercase-title.md` (e.g., `0001-use-legacy-input-manager-for-prototype.md`). ADRs are immutable once accepted — supersede, don't edit.
 - Before the first substantive action, include a short rule-trace that names the resolved policy, guidance, standards, and workflow path when they materially affect the decision.
 
 ## Step 2

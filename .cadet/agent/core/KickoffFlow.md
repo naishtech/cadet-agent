@@ -15,6 +15,7 @@
    - Large non-testable changes: Create requirements with Given/When/Then acceptance criteria, then implement + manual validation.
    - Small non-testable changes: Implement and request manual validation.
 9. For large initiatives after requirements and technical design are finalized:
+   - Evaluate technology choices using `.cadet/agent/core/Guidance/TechnologyDecisionFramework.md`: identify viable options, ask the user, record ADRs.
   - Use the planning path defined by the active policy when present.
   - Otherwise, ask the user where planning artifacts should live.
   - Create project plan and epic documents.
