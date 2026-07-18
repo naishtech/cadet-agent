@@ -26,6 +26,7 @@ Purpose: Provide a single navigation entry point for Cadet-Agent identity, opera
 - [DebuggingPatterns](Guidance/DebuggingPatterns.md)
 - [LocalizationPatterns](Guidance/LocalizationPatterns.md)
 - [SpikePatterns](Guidance/SpikePatterns.md)
+- [TechnologyDecisionFramework](Guidance/TechnologyDecisionFramework.md)
 
 ## Policy System
 - Repository-specific policy files should live in `.cadet/agent/policies` at the repository root.
@@ -56,6 +57,7 @@ Purpose: Provide a single navigation entry point for Cadet-Agent identity, opera
 - [ProjectPlanTemplate](Templates/ProjectPlanTemplate.md)
 - [EpicTemplate](Templates/EpicTemplate.md)
 - [PolicyTemplate](Templates/PolicyTemplate.md)
+- [ADRDecisionTemplate](Templates/ADRDecisionTemplate.md)
 
 ## License
 - [CC BY 4.0 License](LICENSE.md)
