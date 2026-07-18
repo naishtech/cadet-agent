@@ -9,6 +9,16 @@ Purpose: Provide a single navigation entry point for Cadet-Agent identity, opera
 - [Workflow](Workflow.md)
 - [FrameworkManifest](FrameworkManifest.json)
 
+## Operating Rules
+- [OperatingRules](OperatingRules.md) — Non-negotiable constraints for all Cadet behavior
+- [LearnerConfigPersistence](LearnerConfigPersistence.md) — Store/load learner tier and calibration answers
+- [GitFirstRule](GitFirstRule.md) — Git must be initialized before any Unity project or code
+- [FrameworkSyncGate](FrameworkSyncGate.md) — Check for framework updates before substantive work
+- [KickoffFlow](KickoffFlow.md) — Step-by-step kickoff sequence
+- [TechnologyIntroductionRule](TechnologyIntroductionRule.md) — How to introduce new technologies
+- [PolicyAndGuidanceRules](PolicyAndGuidanceRules.md) — Policy enforcement and guidance application
+- [FirstResponseFormat](FirstResponseFormat.md) — Required format for first response
+
 ## Guidance
 - [ArchitecturePatterns](Guidance/ArchitecturePatterns.md)
 - [UnityPatterns](Guidance/UnityPatterns.md)

@@ -17,7 +17,14 @@
 
 Use `.cadet/agent/core/README.md` as the framework index for Cadet-Agent.
 
-Before substantial recommendations or code changes, resolve the active workflow path from `.cadet/agent/core/Workflow.md`, the learner tier from `.cadet/agent/core/LearnerModel.md`, the standards from `.cadet/agent/core/Standards`, and any repository policy in `.cadet/agent/policies`.
+Before substantial recommendations or code changes:
+- Apply operating rules from `.cadet/agent/core/OperatingRules.md`, `.cadet/agent/core/GitFirstRule.md`, `.cadet/agent/core/FrameworkSyncGate.md`, and `.cadet/agent/core/KickoffFlow.md`.
+- Resolve learner config from `.cadet/agent/core/LearnerConfigPersistence.md` and the learner tier from `.cadet/agent/core/LearnerModel.md`.
+- Resolve the active workflow path from `.cadet/agent/core/Workflow.md`.
+- Pull task-specific rules from `.cadet/agent/core/Skills`, `.cadet/agent/core/Guidance`, `.cadet/agent/core/Standards`, and `.cadet/agent/core/Templates`.
+- Apply the technology introduction rule in `.cadet/agent/core/TechnologyIntroductionRule.md`.
+- Apply policy and guidance rules in `.cadet/agent/core/PolicyAndGuidanceRules.md`.
+- Follow the response format in `.cadet/agent/core/FirstResponseFormat.md`.
 
 For GitHub Copilot slash-command kickoff flows, use `.github/prompts/cadet.prompt.md`.
 

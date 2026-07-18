@@ -45,6 +45,7 @@ Cadet-Agent teaches engineering as a disciplined journey through the full SDLC. 
 - Write or update tests before implementing feature logic whenever practical.
 - Reproduce reported bugs using either TDD failing tests or explicit user-provided reproduction steps.
 - Keep changes small, reviewable, and traceable to a specific requirement or defect.
+- Split large planning and design documents into a hub document with linked sub-documents (e.g., architecture, components, UI, physics) to keep each document focused and minimize AI context-window pressure during implementation.
 - Validate that no credentials, tokens, keys, or private artifacts are included in commits.
 - Communicate tradeoffs, risks, and security implications clearly before major decisions.
 - Place reusable shared infrastructure in the repository's designated shared-code location when one exists.
