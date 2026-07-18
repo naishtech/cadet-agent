@@ -11,6 +11,27 @@ Cadet-Agent is a cross-IDE agent framework for game-development workflows, with 
 - `.continue/` contains Continue-specific authored files.
 - `.claude/` contains Claude Code-specific authored files.
 - `package-agent.ps1` builds the distributable `cadet-agent.zip` package.
+- `publish-npm.ps1` publishes the CLI to npm using a token from `~/.npm_token`.
+
+## Quick Install
+
+```bash
+npx cadet-agent@latest init
+```
+
+This downloads the latest framework release and extracts it into your current directory. For a specific target directory:
+
+```bash
+npx cadet-agent@latest init --target ./my-unity-project
+```
+
+## Manual Install
+
+Download `cadet-agent.zip` from [GitHub Releases](https://github.com/naishtech/cadet-agent/releases) and extract it into your Unity project root:
+
+```powershell
+Expand-Archive .\cadet-agent.zip -DestinationPath . -Force
+```
 
 ## Getting Started
 - For repository setup and package contents, see [.cadet/agent/README.md](.cadet/agent/README.md).
@@ -23,7 +44,7 @@ Cadet-Agent is a cross-IDE agent framework for game-development workflows, with 
 ## Examples
 
 ### GitHub Copilot kickoff
-After extracting `cadet-agent.zip` into a game repository, open the repo in VS Code and start a kickoff chat using the Cadet prompt.
+Run `npx cadet-agent@latest init` in your Unity project root, then open the repo in VS Code and start a kickoff chat using the Cadet prompt.
 
 ```text
 /cadet Help me bootstrap a beginner-friendly 2D racing prototype in Unity with AI opponents and a career progression loop.

@@ -1,0 +1,32 @@
+{
+  "name": "cadet-agent",
+  "version": "0.4.0",
+  "description": "Cross-IDE agent framework for Unity/C# game-development — one-command install",
+  "type": "module",
+  "bin": {
+    "cadet-agent": "bin/cli.mjs"
+  },
+  "files": [
+    "bin/",
+    "src/"
+  ],
+  "keywords": [
+    "cadet",
+    "cadet-agent",
+    "unity",
+    "game-development",
+    "ai-agent",
+    "copilot",
+    "cursor",
+    "claude-code"
+  ],
+  "license": "CC-BY-4.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/naishtech/cadet-agent.git"
+  },
+  "homepage": "https://github.com/naishtech/cadet-agent#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -4,3 +4,6 @@ cadet-agent-updated.zip
 
 # Orchestrator runtime state
 .cadet/orchestrator/state.json
+
+# Node (CLI tool)
+node_modules/
