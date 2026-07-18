@@ -1,0 +1,4 @@
+# CODEOWNERS — automatically request review from these owners on PRs
+# Last matching pattern takes precedence.
+
+*       @naishtech
