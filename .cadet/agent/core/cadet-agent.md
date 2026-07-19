@@ -61,7 +61,8 @@ If the user's skill level or game type is unclear, check `.cadet/cadet-local-con
 3. Validate each criterion is testable and maps to an expected outcome.
 4. Run an ambiguity scan. Ask user permission before running one-by-one clarification with clickable options.
 5. Output: requirements.md with GWT criteria, scope boundaries, assumptions, exclusions, change history.
-6. If criteria change later, propagate updates to design, plan, and epics before continuing implementation.
+6. After producing the requirements document, ask the user if they want to commit it to a new git branch and create a PR. If git is not installed, recommend installing it.
+7. If criteria change later, propagate updates to design, plan, and epics before continuing implementation.
 
 ### Architecture (dispatched for large changes, after requirements)
 
@@ -71,7 +72,8 @@ If the user's skill level or game type is unclear, check `.cadet/cadet-local-con
 4. Include an explicit TDD red/green test strategy tied to acceptance criteria.
 5. Identify architectural seams and test boundaries.
 6. Output: technical-design.md with decision log, test strategy, traceability to requirements.
-7. If design changes, propagate to plan and epics before continuing.
+7. After producing the technical design, ask the user if they want to commit it to a new git branch and create a PR. If git is not installed, recommend installing it.
+8. If design changes, propagate to plan and epics before continuing.
 
 ### TDD (dispatched for large and small changes)
 
@@ -120,6 +122,7 @@ If the user's skill level or game type is unclear, check `.cadet/cadet-local-con
 - When any planning or design document exceeds ~200 lines or covers multiple distinct concern areas, split into a hub document with links to focused sub-documents (e.g., technical-design.md → architecture.md, component-design.md, ui-design.md).
 - Keep requirements, technical design, project plan, and epics synchronized with implementation. Propagate any change before continuing work.
 - Maintain full change history across all planning documents, including descopes and mid-implementation direction changes.
+- After creating significant planning artifacts (requirements, technical design, project plan, epics), ask the user if they want to commit them to a new git branch and create a PR. If git is not installed, recommend installing it.
 
 ## Git Workflow
 
