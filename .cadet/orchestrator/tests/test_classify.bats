@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 
-# Tests for classify.sh — Phase 1: change classification
+# Tests for classify.sh — Phase 1: explicit path classification
 
 setup() {
     TEST_DIR="$(mktemp -d)"
@@ -15,53 +15,64 @@ teardown() {
     rm -rf "$TEST_DIR"
 }
 
-@test "classify returns 'large' for system-level changes" {
-    run orchestrator_classify "add a new multiplayer matchmaking system with ELO ranking"
+@test "classify accepts 'large'" {
+    run orchestrator_classify "large"
 
     [ "$status" -eq 0 ]
     [ "$output" = "large" ]
 }
 
-@test "classify returns 'small' for bug fixes" {
-    run orchestrator_classify "fix the jump button not working on mobile"
+@test "classify accepts 'small'" {
+    run orchestrator_classify "small"
 
     [ "$status" -eq 0 ]
     [ "$output" = "small" ]
 }
 
-@test "classify returns 'no_test_required' for documentation changes" {
-    run orchestrator_classify "update the README with new setup instructions"
+@test "classify accepts 'no_test_required'" {
+    run orchestrator_classify "no_test_required"
 
     [ "$status" -eq 0 ]
     [ "$output" = "no_test_required" ]
 }
 
-@test "classify detects refactor as large" {
-    run orchestrator_classify "refactor the entire save system"
+@test "classify rejects invalid path" {
+    run orchestrator_classify "bogus"
 
-    [ "$status" -eq 0 ]
-    [ "$output" = "large" ]
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"ERROR"* ]]
+    [[ "$output" == *"invalid path"* ]]
 }
 
-@test "classify detects networking as large" {
-    run orchestrator_classify "implement networking for multiplayer"
+@test "classify rejects empty path" {
+    run orchestrator_classify ""
 
-    [ "$status" -eq 0 ]
-    [ "$output" = "large" ]
+    [ "$status" -eq 1 ]
 }
 
-@test "classify default is small for generic requests" {
-    run orchestrator_classify "add a health bar to the player HUD"
+@test "classify writes path to state for 'large'" {
+    orchestrator_classify "large" > /dev/null
 
-    [ "$status" -eq 0 ]
-    [ "$output" = "small" ]
+    [ "$(orchestrator_state_get 'path')" = "large" ]
 }
 
-@test "classify writes path to state" {
-    orchestrator_state_init "/ws"
-    orchestrator_classify "add multiplayer matchmaking" > /dev/null
+@test "classify writes path to state for 'small'" {
+    orchestrator_classify "small" > /dev/null
 
-    run orchestrator_state_get "path"
+    [ "$(orchestrator_state_get 'path')" = "small" ]
+}
 
-    [ "$output" = "large" ]
+@test "classify writes path to state for 'no_test_required'" {
+    orchestrator_classify "no_test_required" > /dev/null
+
+    [ "$(orchestrator_state_get 'path')" = "no_test_required" ]
+}
+
+@test "classify does not modify state on invalid path" {
+    orchestrator_classify "large" > /dev/null
+    run orchestrator_classify "invalid"
+
+    [ "$status" -eq 1 ]
+    # State should still be 'large' — not overwritten on error
+    [ "$(orchestrator_state_get 'path')" = "large" ]
 }

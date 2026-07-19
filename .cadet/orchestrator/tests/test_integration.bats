@@ -28,7 +28,7 @@ teardown() {
     [ "$(orchestrator_state_get 'phase')" = "context_resolution" ]
 
     # Phase 1: Classification
-    orchestrator_classify "add a multiplayer matchmaking system with ELO" > /dev/null
+    orchestrator_classify "large" > /dev/null
     [ "$(orchestrator_state_get 'path')" = "large" ]
 
     # Phase 2: Skill dispatch sequence
@@ -53,7 +53,7 @@ teardown() {
 
 @test "full small-change workflow completes end-to-end" {
     orchestrator_context_resolve "/ws" > /dev/null
-    orchestrator_classify "fix the jump button on mobile" > /dev/null
+    orchestrator_classify "small" > /dev/null
     [ "$(orchestrator_state_get 'path')" = "small" ]
 
     orchestrator_dispatch "tdd" > /dev/null
@@ -68,7 +68,7 @@ teardown() {
 
 @test "full no-test workflow completes end-to-end" {
     orchestrator_context_resolve "/ws" > /dev/null
-    orchestrator_classify "update the README" > /dev/null
+    orchestrator_classify "no_test_required" > /dev/null
     [ "$(orchestrator_state_get 'path')" = "no_test_required" ]
 
     run orchestrator_validate_gates "no_test_required"

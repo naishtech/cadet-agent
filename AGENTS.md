@@ -1,21 +1,20 @@
 # Cadet-Agent
 
-## Source Of Truth
-- Use `.cadet/agent/core/README.md` as the index for the Cadet-Agent framework.
-- Apply `.cadet/agent/core/Identity.md`, `.cadet/agent/core/LearnerModel.md`, `.cadet/agent/core/Principles.md`, and `.cadet/agent/core/Workflow.md` before selecting a working mode.
-- Apply operating rules from `.cadet/agent/core/OperatingRules.md`, `.cadet/agent/core/GitFirstRule.md`, `.cadet/agent/core/FrameworkSyncGate.md`, and `.cadet/agent/core/KickoffFlow.md`.
-- Resolve learner config from `.cadet/agent/core/LearnerConfigPersistence.md`.
-- Pull task-specific behavior from the relevant files under `.cadet/agent/core/Skills`, `.cadet/agent/core/Guidance`, `.cadet/agent/core/Standards`, and `.cadet/agent/core/Templates`.
+## Primary Agent Instruction File
+- Read `.cadet/agent/core/cadet-agent.md` as the single condensed instruction file. It contains all non-negotiable rules, orchestrator integration, skill instructions, Unity-specific rules, document rules, Git workflow, framework sync, and context management.
+
+## Operational Files
+- `.cadet/agent/core/README.md` — Framework index and policy system rules.
+- `.cadet/agent/core/GitFirstRule.md` — Git must be initialized before any Unity project or code.
+- `.cadet/agent/core/FrameworkSyncGate.md` — Check for framework updates before substantive work.
+- `.cadet/agent/core/KickoffFlow.md` — Step-by-step kickoff sequence.
+- `.cadet/agent/core/FirstResponseFormat.md` — Required format for first response.
+
+## Full Documentation
+- Rationale, examples, anti-patterns, and detailed process reference are in the `docs/` directory, deployed to GitHub Pages. See `docs/index.md` for navigation.
 
 ## Repository Conventions
 - Repository-specific policy overlays belong in `.cadet/agent/policies`.
 - Planning artifacts belong in `.cadet/agent/project-plans` unless an active policy says otherwise.
 - Treat `.cadet/agent/core/FrameworkManifest.json` as the packaging and sync contract for managed versus preserved paths.
-
-## Execution Rules
-- Apply learner-tier routing before substantial recommendations or edits.
-- Follow the technology introduction rule in `.cadet/agent/core/TechnologyIntroductionRule.md`.
-- Apply policy and guidance rules in `.cadet/agent/core/PolicyAndGuidanceRules.md`.
-- Follow the response format in `.cadet/agent/core/FirstResponseFormat.md`.
-- Use TDD when testing is valid, reproduce defects before fixing them, and keep regression coverage.
-- Keep changes aligned with the active policy when one exists.
+- The orchestrator CLI at `.cadet/orchestrator/cadet-orchestrator` manages workflow state, routing, and validation gates.

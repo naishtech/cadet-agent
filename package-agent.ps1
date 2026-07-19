@@ -2,18 +2,22 @@
 # Packages the Cadet-Agent universal bootstrap package into a zip archive.
 # Extract the zip at any Unity project root and files will land at:
 #   .cadet\agent\core\
+#   .cadet\orchestrator\
 #   AGENTS.md
 #   .github\prompts\cadet.prompt.md
 #   .cursor\rules\cadet-agent.md
 #   .continue\rules\cadet-agent.md
 #   .claude\skills\cadet-agent.md
-# The packaged core folder includes FrameworkManifest.json, which points to the
-# canonical source-of-truth repo for later Cadet framework sync.
+# The core folder contains cadet-agent.md (condensed agent instructions) and
+# FrameworkManifest.json. Full rationale, guidance, standards, and templates
+# are in the docs/ directory (GitHub Pages).
+# The orchestrator folder contains the bash-based workflow state machine.
 
 $ErrorActionPreference = "Stop"
 
 $scriptDir    = $PSScriptRoot
 $coreSource   = Join-Path $scriptDir ".cadet\agent\core"
+$orchSource   = Join-Path $scriptDir ".cadet\orchestrator"
 $sharedSource = Join-Path $scriptDir "AGENTS.md"
 $githubSource = Join-Path $scriptDir ".github"
 $cursorSource = Join-Path $scriptDir ".cursor"
@@ -56,11 +60,18 @@ if (-not (Test-Path $coreSource)) {
     exit 1
 }
 
-foreach ($path in @($sharedSource, $githubSource, $cursorSource, $continueSource, $claudeSource)) {
+foreach ($path in @($sharedSource, $githubSource, $cursorSource, $continueSource, $claudeSource, $orchSource)) {
     if (-not (Test-Path $path)) {
         Write-Error "Adapter source not found at: $path"
         exit 1
     }
+}
+
+# Validate that cadet-agent.md exists — it is the condensed agent instruction file
+$condensedAgent = Join-Path $coreSource "cadet-agent.md"
+if (-not (Test-Path $condensedAgent)) {
+    Write-Error "cadet-agent.md not found at: $condensedAgent"
+    exit 1
 }
 
 # Validate that every managed path listed in FrameworkManifest.json exists in
@@ -137,6 +148,7 @@ if (Test-Path $staging) {
 }
 
 Copy-TreeIntoStaging -SourceRoot $coreSource -StagingRoot $staging -TargetRoot ".cadet\agent\core"
+Copy-TreeIntoStaging -SourceRoot $orchSource -StagingRoot $staging -TargetRoot ".cadet\orchestrator"
 Copy-FileIntoStaging -SourceFile $sharedSource -StagingRoot $staging -TargetPath "AGENTS.md"
 
 # Only copy managed .github files — exclude CI workflows from the consumer package
@@ -161,6 +173,7 @@ Write-Host "  1. Copy $(Split-Path $outputZip -Leaf) to the target project root"
 Write-Host "  2. Expand-Archive .\$(Split-Path $outputZip -Leaf) -DestinationPath . -Force"
 Write-Host "  Files will extract to:"
 Write-Host "    .cadet\agent\core\"
+Write-Host "    .cadet\orchestrator\"
 Write-Host "    AGENTS.md"
 Write-Host "    .github\prompts\cadet.prompt.md"
 Write-Host "    .cursor\rules\cadet-agent.md"
