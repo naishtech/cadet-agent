@@ -116,6 +116,7 @@ If the user's skill level or game type is unclear, check `.cadet/cadet-local-con
 - Prefer composition-based design over inheritance-heavy abstraction.
 - Public serialized fields in production runtime components are an anti-pattern.
 - Event subscription in `OnEnable`/`OnDisable`, not `Awake`, when lifecycle-safe patterns are expected.
+- When creating Unity asset files that require GUIDs (`.inputactions`, `.asmdef`, `.meta`, `.asset`), always generate proper UUIDs via the OS — never hand-craft or fabricate placeholder IDs. On Windows: `powershell -NoProfile -Command "[guid]::NewGuid().ToString()"`. On macOS/Linux: `uuidgen`.
 
 ## Document Rules
 
