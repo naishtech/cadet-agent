@@ -11,6 +11,24 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ---
 
+## [0.5.0] — 2026-07-19
+
+### Changed
+- **Framework condensation:** Collapsed 36+ markdown files into a single `cadet-agent.md` (~150 lines) as the primary agent instruction file. Full rationale, guidance, standards, templates, and skills reference moved to `docs/` for GitHub Pages deployment.
+- **Orchestrator classify:** Replaced keyword-based change classification with explicit path validation (`large|small|no_test_required`). The LLM determines the path by asking the user; the orchestrator validates and sets state.
+- **Orchestrator in package:** `.cadet/orchestrator/` now ships in the distributed zip as part of `managedPaths`.
+- **Build pipeline:** `package-agent.ps1` includes orchestrator directory and validates `cadet-agent.md` existence before packaging.
+- **AGENTS.md:** Updated to reference `cadet-agent.md` as the single primary instruction file.
+- **README.md:** Restructured to point to docs/ for full documentation.
+
+### Added
+- `verify-coverage.sh` — instruction-loss verification script for auditing condensed coverage.
+- `docs/coverage-report.md` — manual audit tracing every source instruction to its disposition.
+- `docs/index.md` — GitHub Pages landing page with navigation.
+- `.github/workflows/pages.yml` — GitHub Actions workflow for docs deployment.
+
+---
+
 ## [0.4.0] — 2026-07-18
 
 ### Added
