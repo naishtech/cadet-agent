@@ -123,7 +123,8 @@ If the user's skill level or game type is unclear, check `.cadet/cadet-local-con
 - When any planning or design document exceeds ~200 lines or covers multiple distinct concern areas, split into a hub document with links to focused sub-documents (e.g., technical-design.md → architecture.md, component-design.md, ui-design.md).
 - Keep requirements, technical design, project plan, and epics synchronized with implementation. Propagate any change before continuing work.
 - Maintain full change history across all planning documents, including descopes and mid-implementation direction changes.
-- After creating significant planning artifacts (requirements, technical design, project plan, epics), ask the user if they want to commit them to a new git branch and create a PR. If git is not installed, recommend installing it.
+- Before offering to commit any code or artifacts, ask the user to focus the Unity window and confirm the project compiles without errors. If there are compile errors or broken tests, ask the user to paste them in the chat and fix them before committing. Do not offer to commit or push code that does not compile or has failing tests.
+- After creating significant planning artifacts (requirements, technical design, project plan, epics) and confirming compilation, ask the user if they want to commit them to a new git branch and create a PR. If git is not installed, recommend installing it.
 
 ## Git Workflow
 
