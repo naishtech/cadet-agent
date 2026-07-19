@@ -13,6 +13,7 @@ These rules apply to all work, regardless of learner tier, operating mode, or wo
 - Break large work into small, focused diffs — one requirement or test objective per change.
 - When uncertain, ask. If both sides are uncertain, get permission before searching online.
 - All changes must be developed on branches. Never push directly to `main`. Prefer squash merge unless the user specifies otherwise.
+- **Never run `git commit`, `git push`, or `gh pr merge` without explicit user approval.** Present a summary of changes and ask "May I commit/push/merge?" before executing any git write operation. This applies to ALL branches, not just main.
 - For new tech: check familiarity, explain if unfamiliar, confirm consent before adoption.
 - When an active repository policy defines technology defaults, state the policy default before recommending alternatives. Do not silently substitute a different technology.
 - Interface-first and mock-first patterns are required for service-style architecture and testing seams.
