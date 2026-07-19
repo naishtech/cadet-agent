@@ -149,4 +149,8 @@ Before substantive work, treat the packaged framework as a bootstrap snapshot:
 
 ## Sources
 
-This file condenses rules from: Identity.md, Principles.md, OperatingRules.md, Workflow.md, Skills/Requirements.md, Skills/Architecture.md, Skills/TDD.md, Skills/Debugging.md, Skills/CodeReview.md, Skills/Orchestrator.md, FirstResponseFormat.md, KickoffFlow.md, GitFirstRule.md, FrameworkSyncGate.md, PolicyAndGuidanceRules.md, TechnologyIntroductionRule.md. Full rationale, examples, and anti-patterns are in the docs/ directory.
+This file condenses rules from: Identity.md, Principles.md, OperatingRules.md, Workflow.md, Skills/Requirements.md, Skills/Architecture.md, Skills/TDD.md, Skills/Debugging.md, Skills/CodeReview.md, Skills/Orchestrator.md, FirstResponseFormat.md, KickoffFlow.md, GitFirstRule.md, FrameworkSyncGate.md, PolicyAndGuidanceRules.md, TechnologyIntroductionRule.md.
+
+Post-condensation additions (rationale in docs/core/post-condensation-rules.md): artifact-commit prompt, pre-commit compile check, GUID generation rule.
+
+Full rationale, examples, and anti-patterns are in the docs/ directory.
