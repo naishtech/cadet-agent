@@ -10,10 +10,10 @@ These rules apply to all work, regardless of learner tier, operating mode, or wo
 - For Unity projects, use Unity Test Framework (UTF) for unit tests. Do not recommend external test frameworks like NUnit or xUnit for Unity code.
 - Reproduce defects before fixing them, then keep regression tests.
 - Never commit sensitive data (secrets, tokens, keys, credentials). Surface security concerns immediately.
-- Break large work into small tasks. Keep diffs focused and aligned to one requirement or test objective at a time.
-- Do not guess when uncertain. State uncertainty, ask the user for clarification. If neither side is certain, ask permission before online research.
+- Break large work into small, focused diffs — one requirement or test objective per change.
+- When uncertain, ask. If both sides are uncertain, get permission before searching online.
 - All changes must be developed on branches. Never push directly to `main`. Prefer squash merge unless the user specifies otherwise.
-- When introducing a new technology, check user familiarity, explain if needed, and confirm consent before adoption.
+- For new tech: check familiarity, explain if unfamiliar, confirm consent before adoption.
 - When an active repository policy defines technology defaults, state the policy default before recommending alternatives. Do not silently substitute a different technology.
 - Interface-first and mock-first patterns are required for service-style architecture and testing seams.
 - Do not skip required large-change artifacts (requirements, technical design, project plan, epics) unless the user explicitly directs that exception. If they do, state the skipped artifact and the reason before continuing.
@@ -23,7 +23,7 @@ These rules apply to all work, regardless of learner tier, operating mode, or wo
 
 ## Orchestrator Integration
 
-Cadet uses the `cadet-orchestrator` CLI to manage workflow state. The orchestrator handles routing, artifact tracking, and validation gates. The agent's role is to determine the workflow path and execute skills when dispatched.
+Use `cadet-orchestrator` for workflow routing, artifact tracking, and validation gates. The agent determines the workflow path and executes dispatched skills.
 
 ### Determining the Workflow Path
 
@@ -116,14 +116,15 @@ If the user's skill level or game type is unclear, check `.cadet/cadet-local-con
 - Prefer composition-based design over inheritance-heavy abstraction.
 - Public serialized fields in production runtime components are an anti-pattern.
 - Event subscription in `OnEnable`/`OnDisable`, not `Awake`, when lifecycle-safe patterns are expected.
-- When creating Unity asset files that require GUIDs (`.inputactions`, `.asmdef`, `.meta`, `.asset`), always generate proper UUIDs via the OS — never hand-craft or fabricate placeholder IDs. On Windows: `powershell -NoProfile -Command "[guid]::NewGuid().ToString()"`. On macOS/Linux: `uuidgen`.
+- Never hand-craft GUIDs/UUIDs in Unity asset files. Generate proper UUIDs via the OS: `uuidgen` (macOS/Linux) or `powershell -Command "[guid]::NewGuid()"` (Windows).
 
 ## Document Rules
 
 - When any planning or design document exceeds ~200 lines or covers multiple distinct concern areas, split into a hub document with links to focused sub-documents (e.g., technical-design.md → architecture.md, component-design.md, ui-design.md).
 - Keep requirements, technical design, project plan, and epics synchronized with implementation. Propagate any change before continuing work.
 - Maintain full change history across all planning documents, including descopes and mid-implementation direction changes.
-- After creating significant planning artifacts (requirements, technical design, project plan, epics), ask the user if they want to commit them to a new git branch and create a PR. If git is not installed, recommend installing it.
+- Before offering to commit any code or artifacts, ask the user to focus the Unity window and confirm the project compiles without errors. If there are compile errors or broken tests, ask the user to paste them in the chat and fix them before committing. Do not offer to commit or push code that does not compile or has failing tests.
+- After creating significant planning artifacts (requirements, technical design, project plan, epics) and confirming compilation, ask the user if they want to commit them to a new git branch and create a PR. If git is not installed, recommend installing it.
 
 ## Git Workflow
 
@@ -142,10 +143,8 @@ Before substantive work, treat the packaged framework as a bootstrap snapshot:
 
 ## Context Management
 
-- After each epic is completed, ask the user to check AI token count.
-- If context exceeds ~100k tokens, recommend starting a new chat before continuing.
-- This is the user's responsibility to action — the agent cannot see its own token count.
+- After each epic, ask the user to check token count. If >100k, recommend a fresh chat.
 
 ## Sources
 
-This file condenses rules from: Identity.md, Principles.md, OperatingRules.md, Workflow.md, Skills/Requirements.md, Skills/Architecture.md, Skills/TDD.md, Skills/Debugging.md, Skills/CodeReview.md, Skills/Orchestrator.md, FirstResponseFormat.md, KickoffFlow.md, GitFirstRule.md, FrameworkSyncGate.md, PolicyAndGuidanceRules.md, TechnologyIntroductionRule.md. Full rationale, examples, and anti-patterns are in the docs/ directory.
+Condensed from the 16 original core framework files in docs/core/. Post-condensation additions (rationale: docs/core/post-condensation-rules.md): artifact-commit prompt, pre-commit compile check, GUID generation rule. Full rationale, examples, and anti-patterns: docs/.
