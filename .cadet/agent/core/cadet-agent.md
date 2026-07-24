@@ -14,6 +14,7 @@ These rules apply to all work, regardless of learner tier, operating mode, or wo
 - Reproduce defects before fixing them, then keep regression tests.
 - Break large work into small, focused diffs — one requirement or test objective per change.
 - Implementation work is scoped to stories, not epics. Epics are grouping containers for related stories. Only stories are worked on individually, reviewed, and committed. After epics are created, each epic must be broken down into small, independently implementable stories before any code is written.
+- When a story hits a blocker that cannot be resolved within the current design (e.g., a missing interface, an incompatible integration, a flawed architectural assumption), do not force the implementation. Pause the story, document the blocker, and trace it upstream: update the technical design, propagate changes to epics and stories (adding, removing, or modifying stories as needed), then resume with the revised story. Apply the decommission rule if the design change makes existing code obsolete.
 - When a refactor or major design change replaces or removes existing functionality (e.g., switching APIs, replacing a subsystem, retiring a pattern), identify any obsolete code, interfaces, integrations, or assets that should be decommissioned. Ask the user whether cleanup and decommissioning should be included in the plan before proceeding with implementation.
 - Interface-first and mock-first patterns are required for service-style architecture and testing seams.
 - Do not skip required large-change artifacts (requirements, technical design, project plan, epics) unless the user explicitly directs that exception. If they do, state the skipped artifact and the reason before continuing.
@@ -93,6 +94,7 @@ If the user's skill level or game type is unclear, check `.cadet/cadet-local-con
 4. For bug fixes: reproduce the bug via failing test first, then implement the fix.
 5. Keep regression tests for all fixed defects.
 6. Output: test evidence (failing-to-passing), updated tests mapping to acceptance criteria.
+7. After all tests pass and code review is complete, update the story markdown file to mark the story as done. Update the parent epic file to reflect the completed story count and overall progress.
 
 ### Debugging (dispatched on defect reports)
 
@@ -109,7 +111,7 @@ If the user's skill level or game type is unclear, check `.cadet/cadet-local-con
 2. Verify test coverage relevance and red/green evidence.
 3. Check for regressions, edge-case risks, security concerns, secrets exposure.
 4. Confirm implementation matches technical design intent.
-5. Confirm project plan and epic status reflect actual progress.
+5. Confirm project plan, epic, and story status reflect actual progress. Update story and epic markdown files to mark completed items as done.
 6. Confirm no production code depends on spike/example assets.
 7. Provide prioritized findings with clear remediation steps.
 8. Recommend the user optionally review in a separate chat with a different AI model for independent second opinion.
@@ -131,7 +133,7 @@ If the user's skill level or game type is unclear, check `.cadet/cadet-local-con
 ## Document Rules
 
 - When any planning or design document exceeds ~200 lines or covers multiple distinct concern areas, split into a hub document with links to focused sub-documents (e.g., technical-design.md → architecture.md, component-design.md, ui-design.md).
-- Keep requirements, technical design, project plan, and epics synchronized with implementation. Propagate any change before continuing work.
+- Keep requirements, technical design, project plan, epics, and stories synchronized with implementation. After each story is completed, update the story and epic markdown files to reflect completion before moving to the next story.
 - Maintain full change history across all planning documents, including descopes and mid-implementation direction changes.
 - Before offering to commit any code or artifacts, ask the user to focus the Unity window and confirm the project compiles without errors. If there are compile errors or broken tests, ask the user to paste them in the chat and fix them before committing. Do not offer to commit or push code that does not compile or has failing tests.
 - After creating significant planning artifacts (requirements, technical design, project plan, epics) and confirming compilation, ask the user if they want to commit them to a new git branch and create a PR. If git is not installed, recommend installing it.
