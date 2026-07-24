@@ -5,8 +5,8 @@ Cadet-Agent is a cross-IDE agent framework for game-development workflows, with 
 ## Repository Layout
 - `.cadet/agent/core/` contains the shared Cadet-Agent framework documents.
 - `.cadet/agent/docs/` contains setup guides for each supported IDE.
-- `AGENTS.md` contains shared top-level agent instructions.
-- `.github/` contains GitHub Copilot-specific authored files.
+- `.github/agents/` contains the Copilot custom agent definition (agent mode).
+- `.github/prompts/` contains the Copilot slash-command prompt (fallback).
 - `.cursor/` contains Cursor-specific authored files.
 - `.continue/` contains Continue-specific authored files.
 - `.claude/` contains Claude Code-specific authored files.
@@ -43,14 +43,18 @@ Expand-Archive .\cadet-agent.zip -DestinationPath . -Force
 
 ## Examples
 
-### GitHub Copilot kickoff
-Run `npx cadet-agent@latest init` in your Unity project root, then open the repo in VS Code and start a kickoff chat using the Cadet prompt.
+### GitHub Copilot
+Run `npx cadet-agent@latest init` in your Unity project root, then open the repo in VS Code.
+
+**Agent mode (recommended):** Select the **Cadet** agent from the agent picker in Copilot Chat. The agent definition at `.github/agents/cadet.agent.md` provides focused instructions and tool configuration.
+
+**Slash command (fallback):** Use `/cadet` in Copilot Chat to invoke the prompt-based path:
 
 ```text
 /cadet Help me bootstrap a beginner-friendly 2D racing prototype in Unity with AI opponents and a career progression loop.
 ```
 
-Cadet-Agent will use `.github/prompts/cadet.prompt.md` plus the shared framework in `.cadet/agent/core` to route the conversation through learner calibration, bootstrap checks, and planning.
+Cadet will use the shared framework in `.cadet/agent/core` to route the conversation through learner calibration, bootstrap checks, and planning.
 
 ### Cursor feature request
 After opening the repository in Cursor, the always-apply rule in `.cursor/rules/cadet-agent.md` should load automatically. A typical request looks like this:
@@ -79,7 +83,8 @@ If a specific game repository needs local conventions, add a policy file under `
 ## Package Output
 Running `./package-agent.ps1` produces `cadet-agent.zip` with this layout:
 - `.cadet/agent/core/`
-- `AGENTS.md`
+- `.cadet/orchestrator/`
+- `.github/agents/cadet.agent.md`
 - `.github/prompts/cadet.prompt.md`
 - `.cursor/rules/cadet-agent.md`
 - `.continue/rules/cadet-agent.md`
