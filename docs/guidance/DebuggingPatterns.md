@@ -3,11 +3,11 @@
 Capture preferred debugging and diagnostics patterns that have worked well in practice so Cadet can investigate Unity defects with concrete evidence before making speculative fixes.
 
 ## Backlinks
-- Identity reference: [../Identity](../Identity.md)
-- Learner model reference: [../LearnerModel](../LearnerModel.md)
-- Principles reference: [../Principles](../Principles.md)
-- Workflow reference: [../Workflow](../Workflow.md)
-- Debugging skill: [../Skills/Debugging](../Skills/Debugging.md)
+- Identity reference: [Identity](../core/Identity.md)
+- Learner model reference: [LearnerModel](../core/LearnerModel.md)
+- Principles reference: [Principles](../core/Principles.md)
+- Workflow reference: [Workflow](../core/Workflow.md)
+- Debugging skill: [Debugging](../core/skills/Debugging.md)
 
 ## Guidance Role
 - This document records preferred debugging heuristics, not mandatory standards.

@@ -3,10 +3,10 @@
 Purpose: Break finalized requirements and technical design into sequenced implementation phases and epic delivery milestones.
 
 ## Backlinks
-- Identity: [Identity](../Identity.md)
-- Learner model: [LearnerModel](../LearnerModel.md)
-- Principles: [Principles](../Principles.md)
-- Workflow: [Workflow](../Workflow.md)
+- Identity: [Identity](../core/Identity.md)
+- Learner model: [LearnerModel](../core/LearnerModel.md)
+- Principles: [Principles](../core/Principles.md)
+- Workflow: [Workflow](../core/Workflow.md)
 - Requirements document: [TODO]
 - Technical design document: [TODO]
 

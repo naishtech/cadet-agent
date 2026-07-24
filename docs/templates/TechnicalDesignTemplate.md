@@ -3,10 +3,10 @@
 Purpose: Translate approved requirements into an implementation-ready design with explicit red/green TDD strategy and traceability to execution.
 
 ## Backlinks
-- Identity: [Identity](../Identity.md)
-- Learner model: [LearnerModel](../LearnerModel.md)
-- Principles: [Principles](../Principles.md)
-- Workflow: [Workflow](../Workflow.md)
+- Identity: [Identity](../core/Identity.md)
+- Learner model: [LearnerModel](../core/LearnerModel.md)
+- Principles: [Principles](../core/Principles.md)
+- Workflow: [Workflow](../core/Workflow.md)
 - Requirements document: [TODO]
 - Related project plan: [TODO]
 

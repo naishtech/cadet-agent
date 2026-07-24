@@ -3,9 +3,9 @@
 Purpose: Capture a significant architectural or design decision, the context that produced it, the options considered, and the invariants it creates. ADRs are immutable once accepted — supersede, don't edit.
 
 ## Backlinks
-- Identity: [Identity](../Identity.md)
-- Principles: [Principles](../Principles.md)
-- Workflow: [Workflow](../Workflow.md)
+- Identity: [Identity](../core/Identity.md)
+- Principles: [Principles](../core/Principles.md)
+- Workflow: [Workflow](../core/Workflow.md)
 
 ## Document Control
 - ADR Number: [TODO — e.g., 0001]
@@ -61,4 +61,4 @@ What becomes easier, harder, or impossible as a result?
 ---
 
 ## Backlinks
-- Framework index: [README](../README.md)
+- Docs index: [index](../index.md)

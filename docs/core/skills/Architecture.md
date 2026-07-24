@@ -4,8 +4,8 @@ Define how Cadet-Agent produces technical designs that are fit-for-purpose, test
 
 ## Backlinks
 - Identity reference: [Identity](../Identity.md)
-- Guidance reference: [../Guidance/ArchitecturePatterns](../Guidance/ArchitecturePatterns.md)
-- Guidance reference: [../Guidance/UnityPatterns](../Guidance/UnityPatterns.md)
+- Guidance reference: [ArchitecturePatterns](../../guidance/ArchitecturePatterns.md)
+- Guidance reference: [UnityPatterns](../../guidance/UnityPatterns.md)
 - Principles reference: [Principles](../Principles.md)
 - Workflow reference: [Workflow](../Workflow.md)
 
@@ -26,15 +26,15 @@ Create technical designs that translate approved requirements into implementable
 - User preferences for tools/technology (including first-time technology consent).
 - Workflow expectations for plan and epic decomposition.
 - Applicable guidance documents for preferred patterns and lessons learned.
-- [TechnologyDecisionFramework](../Guidance/TechnologyDecisionFramework.md) for consistent technology evaluations.
+- [TechnologyDecisionFramework](../../guidance/TechnologyDecisionFramework.md) for consistent technology evaluations.
 - Applicable standards documents and any active repository policy.
 
 ## Process
 1. Derive design decisions directly from approved acceptance criteria.
 2. Define components, interfaces, data flow, and integration boundaries.
-3. Evaluate options against the [TechnologyDecisionFramework](../Guidance/TechnologyDecisionFramework.md) matrix and select the right design and tools for the specific problem.
+3. Evaluate options against the [TechnologyDecisionFramework](../../guidance/TechnologyDecisionFramework.md) matrix and select the right design and tools for the specific problem.
 4. For first-time technology proposals, confirm user familiarity, explain when needed, and request consent or equivalent alternative.
-5. **Record architectural decisions:** For every significant design decision (technology choice, pattern adoption, structural tradeoff), create an ADR using [ADRDecisionTemplate](../Templates/ADRDecisionTemplate.md). Store under `.cadet/agent/project-plans/adr/` as `NNNN-lowercase-title.md`. ADRs are immutable once accepted — supersede, don't edit.
+5. **Record architectural decisions:** For every significant design decision (technology choice, pattern adoption, structural tradeoff), create an ADR using [ADRDecisionTemplate](../../templates/ADRDecisionTemplate.md). Store under `.cadet/agent/project-plans/adr/` as `NNNN-lowercase-title.md`. ADRs are immutable once accepted — supersede, don't edit.
 5. Include a TDD red/green test strategy tied to acceptance criteria.
 6. Define the architectural seams, extension points, and test boundaries the implementation will rely on.
 7. Keep production code out of spike or example folders; treat spike assets as reference-only unless explicitly directed otherwise.

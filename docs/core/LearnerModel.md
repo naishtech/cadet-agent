@@ -3,7 +3,7 @@
 Define how Cadet-Agent identifies the user's current skill level, adapts teaching depth, and routes responses without weakening technical standards or repository conventions.
 
 ## Index
-- Framework index: [README](README.md)
+- Docs index: [index](../index.md)
 
 ## Scope Note
 This model is calibrated for Unity and C# game development workflows. All dimensions, tier descriptions, and calibration questions assume Unity/C# as the target platform.

@@ -3,10 +3,10 @@
 Purpose: Define a single epic as a testable slice of valuable work with approximately 10 to 12 small tasks and full traceability to requirements and design.
 
 ## Backlinks
-- Identity: [Identity](../Identity.md)
-- Learner model: [LearnerModel](../LearnerModel.md)
-- Principles: [Principles](../Principles.md)
-- Workflow: [Workflow](../Workflow.md)
+- Identity: [Identity](../core/Identity.md)
+- Learner model: [LearnerModel](../core/LearnerModel.md)
+- Principles: [Principles](../core/Principles.md)
+- Workflow: [Workflow](../core/Workflow.md)
 - Requirements document: [TODO]
 - Technical design document: [TODO]
 - Project plan document: [TODO]

@@ -3,10 +3,10 @@
 Purpose: Capture clear, testable requirements with Given/When/Then acceptance criteria that drive design, planning, and implementation.
 
 ## Backlinks
-- Identity: [Identity](../Identity.md)
-- Learner model: [LearnerModel](../LearnerModel.md)
-- Principles: [Principles](../Principles.md)
-- Workflow: [Workflow](../Workflow.md)
+- Identity: [Identity](../core/Identity.md)
+- Learner model: [LearnerModel](../core/LearnerModel.md)
+- Principles: [Principles](../core/Principles.md)
+- Workflow: [Workflow](../core/Workflow.md)
 - Related technical design: [TODO]
 - Related project plan: [TODO]
 

@@ -3,10 +3,10 @@
 Capture preferred Unity engineering patterns that have worked well in practice and should guide Cadet's default recommendations unless the current problem gives a better reason to choose differently.
 
 ## Backlinks
-- Identity reference: [../Identity](../Identity.md)
-- Learner model reference: [../LearnerModel](../LearnerModel.md)
-- Principles reference: [../Principles](../Principles.md)
-- Workflow reference: [../Workflow](../Workflow.md)
+- Identity reference: [Identity](../core/Identity.md)
+- Learner model reference: [LearnerModel](../core/LearnerModel.md)
+- Principles reference: [Principles](../core/Principles.md)
+- Workflow reference: [Workflow](../core/Workflow.md)
 
 ## Guidance Role
 - This document records preferred patterns, not mandatory standards.

@@ -3,9 +3,9 @@
 Define testing standards for Unity and C# work so behavior is validated through reproducible evidence before and after change.
 
 ## Backlinks
-- Identity reference: [Identity](../Identity.md)
-- Principles reference: [Principles](../Principles.md)
-- Workflow reference: [Workflow](../Workflow.md)
+- Identity reference: [Identity](../core/Identity.md)
+- Principles reference: [Principles](../core/Principles.md)
+- Workflow reference: [Workflow](../core/Workflow.md)
 
 ## Standard Description
 This standard enforces mandatory TDD where valid, reproduce-first defect handling, and layered automated testing using Unity Test Framework and related tooling. It ensures each relevant change is proven by tests mapped to acceptance criteria and planning artifacts.

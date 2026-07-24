@@ -3,9 +3,9 @@
 Capture preferred spike practices so Cadet defaults to well-scoped, safely isolated feasibility work rather than exploratory code that bleeds into production paths.
 
 ## Backlinks
-- Identity reference: [../Identity](../Identity.md)
-- Principles reference: [../Principles](../Principles.md)
-- Workflow reference: [../Workflow](../Workflow.md)
+- Identity reference: [Identity](../core/Identity.md)
+- Principles reference: [Principles](../core/Principles.md)
+- Workflow reference: [Workflow](../core/Workflow.md)
 - Architecture guidance: [ArchitecturePatterns](ArchitecturePatterns.md)
 
 ## Guidance Role

@@ -3,9 +3,9 @@
 Purpose: Provide a technology-agnostic, structured approach to version, stability, and dependency decisions. Use this to make consistent, justified recommendations and to surface the right ADRs regardless of the engine, language, or platform.
 
 ## Backlinks
-- Framework index: [README](../README.md)
-- Architecture skill: [Skills/Architecture](../Skills/Architecture.md)
-- ADR template: [Templates/ADRDecisionTemplate](../Templates/ADRDecisionTemplate.md)
+- Docs index: [index](../index.md)
+- Architecture skill: [Architecture](../core/skills/Architecture.md)
+- ADR template: [ADRDecisionTemplate](../templates/ADRDecisionTemplate.md)
 
 ## How To Use
 
@@ -144,9 +144,9 @@ When making a technology choice:
 5. **Identify viable options** — apply the checks above to filter down to the options that are stable, maintained, and ecosystem-appropriate.
 6. **Ask the user** — if multiple viable options remain, present them with a clear default recommendation and concise tradeoffs. Let the user choose. If only one option is viable, recommend it directly with rationale.
 7. **Apply learner-tier override** — frame the ask at the user's experience level. Tier-0 gets a strong recommendation; Tier-2+ gets full tradeoff analysis.
-8. **Record the ADR** — create an ADR under `.cadet/agent/project-plans/adr/` for every significant technology decision. Use [ADRDecisionTemplate](../Templates/ADRDecisionTemplate.md).
+8. **Record the ADR** — create an ADR under `.cadet/agent/project-plans/adr/` for every significant technology decision. Use [ADRDecisionTemplate](../templates/ADRDecisionTemplate.md).
 
 ---
 
 ## Backlinks
-- Framework index: [README](../README.md)
+- Docs index: [index](../index.md)

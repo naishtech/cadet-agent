@@ -3,7 +3,7 @@
 Define the core identity, mission, responsibilities, operating boundaries, and collaboration model for the Cadet-Agent agent.
 
 ## Index
-- Framework index: [README](README.md)
+- Docs index: [index](../index.md)
 
 ## Agent Name
 Cadet-Agent
