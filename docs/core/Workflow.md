@@ -21,7 +21,7 @@ Cadet-Agent routes work using three inputs in priority order: learner tier, user
 
 - Large changes: Start with a requirements document and Given/When/Then acceptance criteria, then produce a technical design, then implement via test-driven red/green cycles.
 - **Document splitting:** When any planning or design document grows beyond ~200 lines or covers multiple distinct concern areas, split it into a hub document with links to focused sub-documents (e.g., `technical-design.md` linking to `architecture.md`, `component-design.md`, `ui-design.md`). Each sub-document must be self-contained. This keeps per-document context small during implementation.
-- Large changes: Once acceptance criteria and technical design are finalized, create a project plan markdown file and separate epic markdown files with task breakdowns, then implement via test-driven red/green cycles.
+- Large changes: Once acceptance criteria and technical design are finalized, create a project plan markdown file and separate epic markdown files with task breakdowns. After epics are created, break each epic down into small, independently implementable stories. Then implement each story via test-driven red/green cycles. Stories — not epics — are the unit of work, review, and commit.
 - If a local policy defines a planning directory, use that location for project plans and epics.
 - Small changes: Skip a separate requirements document when appropriate and begin with a failing test, then implement logic to pass.
 - No-test-required changes: Implement directly, then request manual validation from the user.
@@ -94,6 +94,7 @@ Create the plan artifacts and tests according to change type.
 - Produce a technical design document from the approved requirements.
 - Include TDD red/green test strategy in the technical design.
 - After requirements and technical design are finalized, create a basic project plan markdown file.
+- After epics are created, break each epic into small, independently implementable stories. Each story must be completable in a single session and produce a working increment. If a story still feels large, split further.
 - After the first project plan draft is created, perform an explicit ambiguity review.
 - Before asking clarification questions, ask the user for permission to run one-by-one clarification with clickable answer options.
 - If approved, ask ambiguity-resolution questions one at a time using concise clickable choices to tighten plan specificity.

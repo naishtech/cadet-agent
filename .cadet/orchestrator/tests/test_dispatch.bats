@@ -38,6 +38,13 @@ teardown() {
     [ "$output" = "tdd" ]
 }
 
+@test "dispatch accepts storybreakdown skill" {
+    run orchestrator_dispatch "storybreakdown"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"dispatched"* ]]
+}
+
 @test "dispatch_sequence invokes all skills in order" {
     run orchestrator_dispatch_sequence "requirements" "architecture"
 

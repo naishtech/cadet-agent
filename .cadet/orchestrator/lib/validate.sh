@@ -12,7 +12,7 @@ orchestrator_validate_gates() {
             echo "artifact_synchronization: passed"
             echo "integration_behavior: passed"
             echo "change_history: passed"
-            echo "epic_value_slices: passed"
+            echo "story_value_slices: passed"
             echo "security_review: passed"
             ;;
         small)

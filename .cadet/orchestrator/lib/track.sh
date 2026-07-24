@@ -13,6 +13,25 @@ orchestrator_begin_epic() {
     orchestrator_state_set "active_task" "null"
 }
 
+orchestrator_begin_story() {
+    local epic_id="$1"
+    local story_id="$2"
+
+    orchestrator_state_set "active_epic" "$epic_id"
+    orchestrator_state_set "active_story" "$story_id"
+    orchestrator_state_set "phase" "implementation"
+}
+
+orchestrator_complete_story() {
+    local epic_id="$1"
+    local story_id="$2"
+
+    orchestrator_state_set "active_story" "$story_id"
+    local count
+    count=$(orchestrator_state_get "task_completion_count")
+    orchestrator_state_set "task_completion_count" "$((count + 1))"
+}
+
 orchestrator_complete_task() {
     local epic_id="$1"
     local task_id="$2"
@@ -29,6 +48,7 @@ orchestrator_mark_epic_complete() {
     orchestrator_state_set "phase" "validation"
     orchestrator_state_set "active_epic" "null"
     orchestrator_state_set "active_task" "null"
+    orchestrator_state_set "active_story" "null"
 }
 
 orchestrator_requires_resync() {

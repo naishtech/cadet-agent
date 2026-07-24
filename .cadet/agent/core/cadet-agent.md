@@ -19,6 +19,7 @@ These rules apply to all work, regardless of learner tier, operating mode, or wo
 - When an active repository policy defines technology defaults, state the policy default before recommending alternatives. Do not silently substitute a different technology.
 - Interface-first and mock-first patterns are required for service-style architecture and testing seams.
 - Do not skip required large-change artifacts (requirements, technical design, project plan, epics) unless the user explicitly directs that exception. If they do, state the skipped artifact and the reason before continuing.
+- **Implementation work is scoped to stories, not epics.** Epics are grouping containers for related stories. Only stories are worked on individually, reviewed, and committed. After epics are created, each epic must be broken down into small, independently implementable stories before any code is written.
 - Apply guidance as preferred heuristics and lessons learned, not as a substitute for standards or policy. In all outputs, distinguish guidance recommendations from mandatory requirements.
 - Place reusable shared infrastructure in the repository's designated shared-code location when one exists. Confirm extraction scope with the user before moving shared code.
 - License obligations must be followed for all framework usage and derivatives.
@@ -77,7 +78,16 @@ If the user's skill level or game type is unclear, check `.cadet/cadet-local-con
 7. After producing the technical design, ask the user if they want to commit it to a new git branch and create a PR. If git is not installed, recommend installing it.
 8. If design changes, propagate to plan and epics before continuing.
 
-### TDD (dispatched for large and small changes)
+### StoryBreakdown (dispatched for large changes, after epics)
+
+1. For each epic, decompose into small, independently implementable stories.
+2. Each story must be completable in a single session and produce a working, testable increment.
+3. A story should address exactly one user-observable behavior or integration point.
+4. If a story still feels large, split it further until each story is small enough for a focused code review.
+5. Output: one story markdown file per epic (e.g., `epic-1-stories.md`) listing stories with acceptance criteria, estimated scope, and parent epic reference.
+6. After producing story breakdowns, ask the user if they want to commit them before beginning implementation.
+
+### TDD (dispatched per story for large changes; per change for small)
 
 1. Define expected behavior in test form at confirmed seams.
 2. Write a failing test first (red).
@@ -95,7 +105,7 @@ If the user's skill level or game type is unclear, check `.cadet/cadet-local-con
 5. Ensure failure paths surface concrete diagnostic reasons, not generic messages.
 6. If unresolved after three genuine fix attempts, invoke the Persistent-Failure Protocol: ask the user to add diagnostic file-logging, reproduce, attach the log.
 
-### CodeReview (dispatched after each epic completion)
+### CodeReview (dispatched after each story completion)
 
 1. Review for functional correctness against acceptance criteria.
 2. Verify test coverage relevance and red/green evidence.
@@ -145,8 +155,8 @@ Before substantive work, treat the packaged framework as a bootstrap snapshot:
 
 ## Context Management
 
-- After each epic, ask the user to check token count. If >100k, recommend a fresh chat.
+- After each story, ask the user to check token count. If >100k, recommend a fresh chat.
 
 ## Sources
 
-Condensed from the 16 original core framework files in docs/core/. Post-condensation additions (rationale: docs/core/post-condensation-rules.md): artifact-commit prompt, pre-commit compile check, GUID generation rule. Full rationale, examples, and anti-patterns: docs/.
+Condensed from the 16 original core framework files in docs/core/. Post-condensation additions (rationale: docs/core/post-condensation-rules.md): artifact-commit prompt, pre-commit compile check, GUID generation rule, decommission-on-refactor rule, story-breakdown rule. Full rationale, examples, and anti-patterns: docs/.

@@ -3,7 +3,7 @@
 # Dispatches skills individually or in sequence.
 
 # Known skill names
-_VALID_SKILLS=("requirements" "architecture" "tdd" "debugging" "codereview" "orchestrator")
+_VALID_SKILLS=("requirements" "architecture" "storybreakdown" "tdd" "debugging" "codereview" "orchestrator")
 
 _is_known_skill() {
     local skill="$1"

@@ -23,7 +23,7 @@ Replace implicit LLM interpretation of workflow routing with an explicit orchest
 
 - Use for every user request that triggers a substantive action, recommendation, or code change.
 - Use as the pre-flight gate before any Skill executes.
-- Use to enforce artifact sequencing (requirements → design → plan → epics → implementation → validation).
+- Use to enforce artifact sequencing (requirements → design → plan → epics → stories → implementation → validation).
 - Use to track cross-skill state when multiple skills must be invoked in a defined order.
 
 ## Required Inputs
@@ -60,8 +60,8 @@ Replace implicit LLM interpretation of workflow routing with an explicit orchest
 ### Phase 2: Skill Dispatch
 
 1. For large changes, dispatch skills in strict sequence:
-   - `Requirements` → `Architecture` → `TDD` (test strategy in design) → implementation via epics.
-2. After requirements and design finalization, dispatch for project plan and epic decomposition.
+   - `Requirements` → `Architecture` → `TDD` (test strategy in design) → `StoryBreakdown` → implementation per story.
+2. After requirements and design finalization, dispatch for project plan, epic decomposition, and story breakdown.
 3. For small changes, dispatch directly to `TDD` with red/green cycle.
 4. For no-test-required changes, dispatch to direct implementation with manual validation preparation.
 5. Each skill receives the `OrchestratorContext` and a skill-specific input contract.
@@ -70,10 +70,10 @@ Replace implicit LLM interpretation of workflow routing with an explicit orchest
 
 ### Phase 3: Implementation Tracking
 
-1. Track which epic and task is currently active.
-2. After each task completes, update the project plan and epic status.
+1. Track which story is currently active within the parent epic.
+2. After each story completes, update the project plan, epic, and story status.
 3. Detect when acceptance criteria or design changes mid-implementation and trigger re-sync.
-4. After each epic completes, prompt the user for token-count check.
+4. After each story completes, prompt the user for token-count check.
 5. Manage spike lifecycle: ensure spikes stay reference-only and prompt for cleanup after production completion.
 
 ### Phase 4: Validation and Closure

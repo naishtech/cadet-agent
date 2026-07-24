@@ -82,3 +82,36 @@ teardown() {
     [ "$status" -eq 0 ]
     [ "$output" = "false" ]
 }
+
+@test "begin_story sets active epic and story" {
+    run orchestrator_begin_story "EPIC-1" "STORY-1"
+
+    [ "$status" -eq 0 ]
+    [ "$(orchestrator_state_get 'active_epic')" = "EPIC-1" ]
+    [ "$(orchestrator_state_get 'active_story')" = "STORY-1" ]
+    [ "$(orchestrator_state_get 'phase')" = "implementation" ]
+}
+
+@test "complete_story updates active story and increments counter" {
+    orchestrator_begin_epic "EPIC-1" 5
+    orchestrator_begin_story "EPIC-1" "STORY-1"
+
+    run orchestrator_complete_story "EPIC-1" "STORY-1"
+
+    [ "$status" -eq 0 ]
+    [ "$(orchestrator_state_get 'active_story')" = "STORY-1" ]
+
+    run jq -r '.task_completion_count' "$ORCHESTRATOR_STATE"
+    [ "$output" = "1" ]
+}
+
+@test "mark_epic_complete also clears active_story" {
+    orchestrator_begin_epic "EPIC-1" 2
+    orchestrator_begin_story "EPIC-1" "STORY-1"
+    orchestrator_complete_task "EPIC-1" "TASK-1"
+
+    orchestrator_mark_epic_complete "EPIC-1"
+
+    [ "$(orchestrator_state_get 'active_story')" = "null" ]
+    [ "$(orchestrator_state_get 'active_epic')" = "null" ]
+}

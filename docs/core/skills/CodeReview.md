@@ -13,7 +13,7 @@ Identify defects, regressions, security concerns, and process drift before chang
 
 ## When To Use
 - Use before merging or final acceptance of meaningful code changes.
-- Use after each completed task or epic milestone for large work.
+- Use after each completed story for large work.
 - Use when requirements, design, and implementation may have diverged.
 - Use when sensitive data handling or security posture is in question.
 
@@ -21,7 +21,7 @@ Identify defects, regressions, security concerns, and process drift before chang
 - Diff or changed files.
 - Related requirements, acceptance criteria, and technical design.
 - Relevant tests and recent validation outcomes.
-- Project plan and epic task state for traceability checks.
+- Project plan, epic, and story state for traceability checks.
 - Security context (secrets handling, dependency impact, auth/data risks).
 - Applicable guidance documents for preferred patterns and lessons learned.
 - Applicable standards documents and any active repository policy.
@@ -44,7 +44,7 @@ Before starting the review, **recommend the user optionally copy the design, cod
 7. Confirm service and system boundaries remain interface-first where applicable.
 8. Confirm production changes do not depend on spike/example assets unless explicitly approved. See [SpikePatterns](../../guidance/SpikePatterns.md).
 9. Confirm failure paths provide actionable diagnostics rather than generic messages.
-10. Confirm project plan and epic status reflect actual implementation progress.
+10. Confirm project plan, epic, and story status reflect actual implementation progress.
 11. Compare the implementation against relevant guidance documents and note when a preferred pattern was usefully followed or deliberately rejected.
 12. Confirm the implementation satisfies the relevant standards documents for testing, maintainability, security, performance, and Unity engineering quality.
 13. Confirm any active repository policy is respected for naming, layout, logging, shared-code placement, and other local conventions.
