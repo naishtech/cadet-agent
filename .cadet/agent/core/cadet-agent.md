@@ -11,6 +11,7 @@ These rules apply to all work, regardless of learner tier, operating mode, or wo
 - Reproduce defects before fixing them, then keep regression tests.
 - Never commit sensitive data (secrets, tokens, keys, credentials). Surface security concerns immediately.
 - Break large work into small, focused diffs — one requirement or test objective per change.
+- When a refactor or major design change replaces or removes existing functionality (e.g., switching APIs, replacing a subsystem, retiring a pattern), identify any obsolete code, interfaces, integrations, or assets that should be decommissioned. Ask the user whether cleanup and decommissioning should be included in the plan before proceeding with implementation.
 - When uncertain, ask. If both sides are uncertain, get permission before searching online.
 - All changes must be developed on branches. Never push directly to `main`. Prefer squash merge unless the user specifies otherwise.
 - **Never run `git commit`, `git push`, or `gh pr merge` without explicit user approval.** Present a summary of changes and ask "May I commit/push/merge?" before executing any git write operation. This applies to ALL branches, not just main.

@@ -52,3 +52,16 @@ guid = Guid.NewGuid().ToString("N");  // or any hand-crafted GUID
 var path = AssetDatabase.GenerateUniqueAssetPath("Assets/NewAsset.asset");
 AssetDatabase.CreateAsset(myAsset, path);
 ```
+
+---
+
+## Decommission on Refactor
+
+**Rule:** When a refactor or major design change replaces or removes existing functionality (e.g., switching APIs, replacing a subsystem, retiring a pattern), identify any obsolete code, interfaces, integrations, or assets that should be decommissioned. Ask the user whether cleanup and decommissioning should be included in the plan before proceeding with implementation.
+
+**Why:** Refactors that introduce new implementations without removing old ones create dead code, zombie integrations, and maintenance debt. Old API connections left in place after migration, unused interfaces after a pattern change, and orphaned assets after a subsystem replacement all bloat the codebase and confuse future contributors. The agent is well-positioned to trace what becomes obsolete during a change, but the user must decide whether to scope cleanup into the current work or defer it.
+
+**When it applies:** Any time the agent proposes or the user requests a refactor, major design change, API migration, subsystem replacement, or pattern retirement.
+
+**Example:**
+> "This change replaces the old `ILegacyPaymentGateway` with `IPaymentService`. I've identified the following that should be decommissioned: the `LegacyPaymentGateway` implementation class, the `PaymentGatewayFactory` that only creates legacy instances, and the `LegacyGatewayConfig` asset. Should I include cleanup and removal of these in the implementation plan?"
