@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cadet-agent.dev/state-v1.json",
+  "title": "Cadet-Agent Session State",
+  "description": "Tracks workflow progress across a session. Updated via git commits at each story completion checkpoint.",
+  "type": "object",
+  "required": ["version", "session", "epics"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Schema version. Increment on breaking changes."
+    },
+    "session": {
+      "type": "object",
+      "required": ["workflowPath", "currentPhase", "trackingMode"],
+      "properties": {
+        "trackingMode": {
+          "type": "string",
+          "enum": ["markdown", "github"],
+          "default": "markdown",
+          "description": "How work is tracked. markdown: epic/story markdown files in directories. github: GitHub Projects/Issues for story tracking."
+        },
+        "learnerTier": {
+          "type": "string",
+          "enum": ["beginner", "intermediate", "advanced", "guided"],
+          "description": "Resolved learner tier for this session"
+        },
+        "operatingMode": {
+          "type": "string",
+          "enum": ["instruction-first", "implementation-first", "hybrid"],
+          "description": "Operating mode for this session"
+        },
+        "workflowPath": {
+          "type": "string",
+          "enum": ["large", "small", "no_test_required"],
+          "description": "Classified change size"
+        },
+        "currentPhase": {
+          "type": "string",
+          "enum": [
+            "context-resolution",
+            "requirements",
+            "architecture",
+            "spikes",
+            "story-breakdown",
+            "implementation",
+            "validation",
+            "closed"
+          ],
+          "description": "Current SDLC phase"
+        }
+      }
+    },
+    "epics": {
+      "type": "object",
+      "description": "Epic status keyed by epic directory name",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["status", "stories"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["planned", "in-progress", "complete"]
+          },
+          "stories": {
+            "type": "object",
+            "description": "Story status keyed by story filename",
+            "additionalProperties": {
+              "type": "string",
+              "enum": ["planned", "in-progress", "done"]
+            }
+          }
+        }
+      }
+    },
+    "spikes": {
+      "type": "object",
+      "description": "Spike status keyed by spike ID",
+      "additionalProperties": {
+        "type": "string",
+        "enum": ["planned", "in-progress", "complete"]
+      }
+    },
+    "changeHistory": {
+      "type": "array",
+      "description": "Audit trail of state changes",
+      "items": {
+        "type": "object",
+        "required": ["date", "change"],
+        "properties": {
+          "date": { "type": "string", "format": "date-time" },
+          "change": { "type": "string" },
+          "phase": { "type": "string" }
+        }
+      }
+    }
+  }
+}

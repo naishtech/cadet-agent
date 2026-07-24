@@ -47,6 +47,7 @@ For the condensed agent instruction set, see [cadet-agent.md](https://github.com
 - [Project Plan Template](templates/ProjectPlanTemplate.md)
 - [Epic Template](templates/EpicTemplate.md)
 - [Story Template](templates/StoryTemplate.md)
+- [Spike Template](templates/SpikeTemplate.md)
 - [Policy Template](templates/PolicyTemplate.md)
 - [ADR Decision Template](templates/ADRDecisionTemplate.md)
 - [Example Policy](templates/ExamplePolicy.md)

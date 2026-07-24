@@ -18,6 +18,7 @@ These rules apply to all work, regardless of learner tier, operating mode, or wo
 - When a refactor or major design change replaces or removes existing functionality (e.g., switching APIs, replacing a subsystem, retiring a pattern), identify any obsolete code, interfaces, integrations, or assets that should be decommissioned. Ask the user whether cleanup and decommissioning should be included in the plan before proceeding with implementation.
 - Interface-first and mock-first patterns are required for service-style architecture and testing seams.
 - Do not skip required large-change artifacts (requirements, technical design, project plan, epics) unless the user explicitly directs that exception. If they do, state the skipped artifact and the reason before continuing.
+- During planning (requirements and architecture), explicitly list every assumption being made about technology capabilities, integration behavior, performance characteristics, or platform constraints. For each assumption, classify it as **verified** (documented/known), **reasonable** (standard practice, low risk), or **unverified** (unknown, high risk). For unverified assumptions, recommend a spike to answer the open question before the assumption becomes a design dependency.
 - When uncertain, ask. If both sides are uncertain, get permission before searching online.
 - For new tech: check familiarity, explain if unfamiliar, confirm consent before adoption.
 - When an active repository policy defines technology defaults, state the policy default before recommending alternatives. Do not silently substitute a different technology.
@@ -54,6 +55,19 @@ Before the first substantive action, detect the active policy (`.cadet/agent/pol
 
 If the user's skill level or game type is unclear, check `.cadet/cadet-local-config.md` for persisted answers. If not found, ask 2-4 focused calibration questions before substantive recommendations. After resolving, save answers to `.cadet/cadet-local-config.md`.
 
+### State Management
+
+The agent maintains a session state file at `.cadet/state.json` conforming to `.cadet/state.schema.json`. This file is committed to git — it provides an auditable trail of workflow progress.
+
+- **Initialize state** on first substantive action: resolve learner tier, operating mode, workflow path, tracking mode, and current phase. Write `state.json`. The default `trackingMode` is `"markdown"`.
+- **Tracking modes:**
+  - `"markdown"` (default): Epics and stories are managed as markdown files in epic directories. State reflects canonical status; markdown files are updated alongside state.
+  - `"github"`: Epics and stories are tracked via GitHub Projects/Issues. The agent uses `gh issue` commands to create, update, and close issues that represent stories. State.json reflects the canonical status synced from GitHub.
+- Ask the user once during initialization which tracking mode they prefer. Persist the choice in `state.json → session.trackingMode`.
+- **Update state** at every checkpoint: when a phase transitions, when a story is completed, when an epic is done. In `"markdown"` mode, also update the corresponding markdown files. In `"github"` mode, update the corresponding GitHub issue.
+- **Read state** on session start: if `state.json` exists, resume from the last recorded phase, active story, and tracking mode.
+- **Never lose state**: if a state update fails, retry or ask the user for help before continuing work. The state file is the single source of truth for what has been completed.
+
 ## Skill Instructions
 
 ### Requirements (dispatched for large changes)
@@ -62,9 +76,10 @@ If the user's skill level or game type is unclear, check `.cadet/cadet-local-con
 2. Walk the user through each criterion at learner-appropriate depth (unless they request end-only review).
 3. Validate each criterion is testable and maps to an expected outcome.
 4. Run an ambiguity scan. Ask user permission before running one-by-one clarification with clickable options.
-5. Output: requirements.md with GWT criteria, scope boundaries, assumptions, exclusions, change history.
-6. After producing the requirements document, ask the user if they want to commit it to a new git branch and create a PR. If git is not installed, recommend installing it.
-7. If criteria change later, propagate updates to design, plan, and epics before continuing implementation.
+5. **Assumption audit:** List every assumption the requirements depend on (technology capabilities, integration behavior, platform constraints, user behavior). Classify each as verified, reasonable, or unverified. For unverified assumptions, recommend a spike to answer the open question. Include the assumption audit in the requirements document.
+6. Output: requirements.md with GWT criteria, scope boundaries, assumption audit, exclusions, change history.
+7. After producing the requirements document, ask the user if they want to commit it to a new git branch and create a PR. If git is not installed, recommend installing it.
+8. If criteria change later, propagate updates to design, plan, and epics before continuing implementation.
 
 ### Architecture (dispatched for large changes, after requirements)
 
@@ -73,13 +88,25 @@ If the user's skill level or game type is unclear, check `.cadet/cadet-local-con
 3. Evaluate technology options using the TechnologyDecisionFramework. Record decisions as ADRs under `.cadet/agent/project-plans/adr/`.
 4. Include an explicit TDD red/green test strategy tied to acceptance criteria.
 5. Identify architectural seams and test boundaries.
-6. Output: technical-design.md with decision log, test strategy, traceability to requirements.
-7. After producing the technical design, ask the user if they want to commit it to a new git branch and create a PR. If git is not installed, recommend installing it.
-8. If design changes, propagate to plan and epics before continuing.
+6. **Assumption audit:** List every design assumption (API capabilities, service behavior, latency bounds, platform support, third-party limitations). Classify each as verified, reasonable, or unverified. For unverified assumptions, recommend a spike. Cross-reference with the requirements assumption audit — any unverified assumption that survives into the design must be resolved by a spike before epics and stories are finalized.
+7. Output: technical-design.md with decision log, assumption audit, test strategy, traceability to requirements.
+8. After producing the technical design, ask the user if they want to commit it to a new git branch and create a PR. If git is not installed, recommend installing it.
+9. If design changes, propagate to plan and epics before continuing.
 
-### StoryBreakdown (dispatched for large changes, after epics)
+### Spike (dispatched for unverified assumptions during planning)
 
-Use `.cadet/agent/core/Templates/EpicTemplate.md` for epic files and `.cadet/agent/core/Templates/StoryTemplate.md` for story files.
+Use `.cadet/agent/core/Templates/SpikeTemplate.md` for spike output.
+
+1. Identify the exact question the spike must answer (e.g., "Does EOS support host migration on Xbox?"). State it in one sentence.
+2. Research the question using available sources (documentation, APIs, community knowledge, online search with user permission).
+3. Report findings: capabilities (what it can do), limitations (what it cannot do, constraints, edge cases), and a clear recommendation (use this, avoid this, or more research needed).
+4. Output: a spike markdown file under `.cadet/agent/project-plans/spikes/` using the SpikeTemplate.
+5. After the spike is complete, update the relevant assumptions in requirements and architecture from unverified to verified with the spike results.
+6. Spike code (if any) must remain isolated and reference-only. Do not wire spike code into production paths.
+
+### StoryBreakdown (dispatched for large changes, after epics and spikes)
+
+Use `.cadet/agent/core/Templates/EpicTemplate.md` for epic files and `.cadet/agent/core/Templates/StoryTemplate.md` for story files. Spike results must be incorporated — unverified assumptions that were resolved by spikes should direct which stories are created and what they contain.
 
 1. For each epic, create a directory named after the epic (e.g., `epic-1-player-movement/`).
 2. Inside the directory, create `epic.md` using the EpicTemplate — minimal content: ID, status, summary, requirements/design links, and a checklist of story links.
@@ -98,7 +125,7 @@ Use `.cadet/agent/core/Templates/EpicTemplate.md` for epic files and `.cadet/age
 4. For bug fixes: reproduce the bug via failing test first, then implement the fix.
 5. Keep regression tests for all fixed defects.
 6. Output: test evidence (failing-to-passing), updated tests mapping to acceptance criteria.
-7. After all tests pass and code review is complete, update the story markdown file to mark the story as done. Update the parent epic file to reflect the completed story count and overall progress.
+7. After all tests pass and code review is complete, update `.cadet/state.json` to mark the story as done. In `"markdown"` mode, also update the story markdown file and parent epic. In `"github"` mode, close the corresponding GitHub issue. In either mode, do not move to the next story until the state reflects completion.
 
 ### Debugging (dispatched on defect reports)
 
@@ -115,7 +142,7 @@ Use `.cadet/agent/core/Templates/EpicTemplate.md` for epic files and `.cadet/age
 2. Verify test coverage relevance and red/green evidence.
 3. Check for regressions, edge-case risks, security concerns, secrets exposure.
 4. Confirm implementation matches technical design intent.
-5. Confirm project plan, epic, and story status reflect actual progress. Update story and epic markdown files to mark completed items as done.
+5. Confirm project plan, epic, and story status reflect actual progress. Update `.cadet/state.json` to reflect completion. In `"markdown"` mode, also update the story and epic markdown files. In `"github"` mode, update the corresponding GitHub issue.
 6. Confirm no production code depends on spike/example assets.
 7. Provide prioritized findings with clear remediation steps.
 8. Recommend the user optionally review in a separate chat with a different AI model for independent second opinion.
