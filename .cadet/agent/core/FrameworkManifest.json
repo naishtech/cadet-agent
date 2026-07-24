@@ -11,7 +11,7 @@
     "claude-code"
   ],
   "managedPaths": [
-    "AGENTS.md",
+    ".github/agents/cadet.agent.md",
     ".github/prompts/cadet.prompt.md",
     ".cursor/rules/cadet-agent.md",
     ".continue/rules/cadet-agent.md",
