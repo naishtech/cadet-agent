@@ -6,27 +6,25 @@ Cross-IDE agent framework for Unity/C# game-development. Cadet guides users thro
 
 These rules apply to all work, regardless of learner tier, operating mode, or workflow path.
 
-- TDD is mandatory where testing is valid. "Valid testing" means the code has testable logic verifiable in isolation. Only skip test-first when testing cannot logically apply (e.g., pure asset setup, input-only handler setup).
-- For Unity projects, use Unity Test Framework (UTF) for unit tests. Do not recommend external test frameworks like NUnit or xUnit for Unity code.
-- Reproduce defects before fixing them, then keep regression tests.
 - Never commit sensitive data (secrets, tokens, keys, credentials). Surface security concerns immediately.
-- Break large work into small, focused diffs — one requirement or test objective per change.
-- When a refactor or major design change replaces or removes existing functionality (e.g., switching APIs, replacing a subsystem, retiring a pattern), identify any obsolete code, interfaces, integrations, or assets that should be decommissioned. Ask the user whether cleanup and decommissioning should be included in the plan before proceeding with implementation.
-- When uncertain, ask. If both sides are uncertain, get permission before searching online.
+- Never run `git commit`, `git push`, or `gh pr merge` without explicit user approval. Present a summary of changes and ask "May I commit/push/merge?" before executing any git write operation. This applies to ALL branches, not just main.
+- License obligations must be followed for all framework usage and derivatives.
 - All changes must be developed on branches. Never push directly to `main`. Prefer squash merge unless the user specifies otherwise.
-- **Never run `git commit`, `git push`, or `gh pr merge` without explicit user approval.** Present a summary of changes and ask "May I commit/push/merge?" before executing any git write operation. This applies to ALL branches, not just main.
-- For new tech: check familiarity, explain if unfamiliar, confirm consent before adoption.
-- When an active repository policy defines technology defaults, state the policy default before recommending alternatives. Do not silently substitute a different technology.
+- TDD is mandatory where testing is valid. "Valid testing" means the code has testable logic verifiable in isolation. Only skip test-first when testing cannot logically apply (e.g., pure asset setup, input-only handler setup).
+- Reproduce defects before fixing them, then keep regression tests.
+- Break large work into small, focused diffs — one requirement or test objective per change.
+- Implementation work is scoped to stories, not epics. Epics are grouping containers for related stories. Only stories are worked on individually, reviewed, and committed. After epics are created, each epic must be broken down into small, independently implementable stories before any code is written.
+- When a refactor or major design change replaces or removes existing functionality (e.g., switching APIs, replacing a subsystem, retiring a pattern), identify any obsolete code, interfaces, integrations, or assets that should be decommissioned. Ask the user whether cleanup and decommissioning should be included in the plan before proceeding with implementation.
 - Interface-first and mock-first patterns are required for service-style architecture and testing seams.
 - Do not skip required large-change artifacts (requirements, technical design, project plan, epics) unless the user explicitly directs that exception. If they do, state the skipped artifact and the reason before continuing.
-- **Implementation work is scoped to stories, not epics.** Epics are grouping containers for related stories. Only stories are worked on individually, reviewed, and committed. After epics are created, each epic must be broken down into small, independently implementable stories before any code is written.
+- When uncertain, ask. If both sides are uncertain, get permission before searching online.
+- For new tech: check familiarity, explain if unfamiliar, confirm consent before adoption.
+- When an active repository policy defines technology defaults, state the policy default before recommending alternatives. Do not silently substitute a different technology.
+- For Unity projects, use Unity Test Framework (UTF) for unit tests. Do not recommend external test frameworks like NUnit or xUnit for Unity code.
 - Apply guidance as preferred heuristics and lessons learned, not as a substitute for standards or policy. In all outputs, distinguish guidance recommendations from mandatory requirements.
 - Place reusable shared infrastructure in the repository's designated shared-code location when one exists. Confirm extraction scope with the user before moving shared code.
-- License obligations must be followed for all framework usage and derivatives.
 
-## Orchestrator Integration
-
-Use `cadet-orchestrator` for workflow routing, artifact tracking, and validation gates. The agent determines the workflow path and executes dispatched skills.
+## Workflow Routing
 
 ### Determining the Workflow Path
 
@@ -34,16 +32,16 @@ Before any substantive work, ask the user ONE question:
 
 > "Is this a small, focused change to a single component, or a larger feature that spans multiple systems? (If it's purely documentation/config, say so.)"
 
-Then based on the answer, run:
-- `cadet-orchestrator classify large` — multi-component feature, system, refactor, architecture change
-- `cadet-orchestrator classify small` — single-component feature, bug fix
-- `cadet-orchestrator classify no_test_required` — documentation, config, comments, README
+Based on the answer, classify the change:
+- **large** — multi-component feature, system, refactor, architecture change
+- **small** — single-component feature, bug fix
+- **no_test_required** — documentation, config, comments, README
 
-After classification, the orchestrator determines the skill dispatch sequence. Follow it.
+The classification determines which skills are dispatched and in what sequence. Follow the skill dispatch order below.
 
 ### Context Resolution
 
-Before the first substantive action, run `cadet-orchestrator init <workspace>` to initialize state. The orchestrator detects the active policy (`.cadet/agent/policies`), available guidance, and standards automatically.
+Before the first substantive action, detect the active policy (`.cadet/agent/policies`), available guidance, and standards automatically.
 
 ### Determining Operating Mode
 

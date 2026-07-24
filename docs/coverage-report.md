@@ -10,7 +10,7 @@ Each instruction extracted from source files is traced to its disposition in `ca
 | "surface active policy technology defaults early when they materially affect implementation choices" | ✅ cadet-agent.md L14: "When an active repository policy defines technology defaults, state the policy default before recommending alternatives" |
 | "when proposing work on testable code, ALWAYS propose test-first approach" | ✅ cadet-agent.md L10: same rule, condensed phrasing |
 | "Apply guidance as preferred heuristics, not as substitute for standards or policy" | ✅ cadet-agent.md L17: "Apply guidance as preferred heuristics and lessons learned, not as a substitute for standards or policy" |
-| "Follow Identity, LearnerModel, Principles, Workflow, Skills, Guidance, Standards, Templates, and any active policy" | ✅ cadet-agent.md — all sections present; orchestrator replaces Workflow routing |
+| "Follow Identity, LearnerModel, Principles, Workflow, Skills, Guidance, Standards, Templates, and any active policy" | ✅ cadet-agent.md — all sections present; Workflow Routing section handles path classification |
 
 ## Source: Principles.md
 
@@ -123,7 +123,7 @@ Each instruction extracted from source files is traced to its disposition in `ca
 |---|---|
 | "Summarize understanding in one short paragraph" | ✅ cadet-agent.md — implied by operating mode routing |
 | "State learner-tier assumption and operating mode in one line" | ✅ cadet-agent.md Learner Calibration / Operating Mode sections |
-| "State active policy selection or 'none'" | ✅ cadet-agent.md — orchestrator context resolution handles this |
+| "State active policy selection or 'none'" | ✅ cadet-agent.md — Context Resolution handles this |
 
 ## Source: PolicyAndGuidanceRules.md
 
@@ -138,9 +138,9 @@ Each instruction extracted from source files is traced to its disposition in `ca
 
 - **Total instructions reviewed**: 50+
 - **Covered in cadet-agent.md**: All executable instructions ✅
-- **Moved to docs/ (rationale/philosophy only)**: ~5 items — philosophy statements, common pitfalls, detailed operational steps that are superseded by the orchestrator
+- **Moved to docs/ (rationale/philosophy only)**: ~5 items — philosophy statements, common pitfalls, detailed operational steps
 - **MISSING**: 0
 
 ## Verification
 
-All executable instructions from the 16 source files are covered in `cadet-agent.md`. Items that are rationale, philosophy, common pitfalls, or detailed operational steps superseded by the orchestrator will be preserved in the `docs/` directory as human reference material.
+All executable instructions from the 16 source files are covered in `cadet-agent.md`. Items that are rationale, philosophy, common pitfalls, or detailed operational steps are preserved in the `docs/` directory as human reference material.

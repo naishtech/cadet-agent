@@ -8,7 +8,7 @@ You are Cadet, a cross-IDE agent framework for Unity/C# game-development. Guide 
 
 ## Primary Instruction File
 
-Read `.cadet/agent/core/cadet-agent.md` as the single condensed instruction file. It contains all non-negotiable rules, orchestrator integration, skill instructions, Unity-specific rules, document rules, Git workflow, framework sync, and context management. Follow every rule in that file.
+Read `.cadet/agent/core/cadet-agent.md` as the single condensed instruction file. It contains all non-negotiable rules, workflow routing, skill instructions, Unity-specific rules, document rules, Git workflow, framework sync, and context management. Follow every rule in that file.
 
 ## Kickoff Flow (first interaction in a session)
 

@@ -16,8 +16,7 @@
     ".cursor/rules/cadet-agent.md",
     ".continue/rules/cadet-agent.md",
     ".claude/skills/cadet-agent.md",
-    ".cadet/agent/core",
-    ".cadet/orchestrator"
+    ".cadet/agent/core"
   ],
   "preservedPaths": [
     ".cadet/agent/policies",

@@ -2,7 +2,6 @@
 # Packages the Cadet-Agent universal bootstrap package into a zip archive.
 # Extract the zip at any Unity project root and files will land at:
 #   .cadet\agent\core\
-#   .cadet\orchestrator\
 #   .github\agents\cadet.agent.md (Copilot agent mode)
 #   .github\prompts\cadet.prompt.md (slash-command fallback)
 #   .cursor\rules\cadet-agent.md
@@ -11,13 +10,11 @@
 # The core folder contains cadet-agent.md (condensed agent instructions) and
 # FrameworkManifest.json. Full rationale, guidance, standards, and templates
 # are in the docs/ directory (GitHub Pages).
-# The orchestrator folder contains the bash-based workflow state machine.
 
 $ErrorActionPreference = "Stop"
 
 $scriptDir    = $PSScriptRoot
 $coreSource   = Join-Path $scriptDir ".cadet\agent\core"
-$orchSource   = Join-Path $scriptDir ".cadet\orchestrator"
 $githubSource = Join-Path $scriptDir ".github"
 $cursorSource = Join-Path $scriptDir ".cursor"
 $continueSource = Join-Path $scriptDir ".continue"
@@ -59,7 +56,7 @@ if (-not (Test-Path $coreSource)) {
     exit 1
 }
 
-foreach ($path in @($githubSource, $cursorSource, $continueSource, $claudeSource, $orchSource)) {
+foreach ($path in @($githubSource, $cursorSource, $continueSource, $claudeSource)) {
     if (-not (Test-Path $path)) {
         Write-Error "Adapter source not found at: $path"
         exit 1
@@ -147,7 +144,7 @@ if (Test-Path $staging) {
 }
 
 Copy-TreeIntoStaging -SourceRoot $coreSource -StagingRoot $staging -TargetRoot ".cadet\agent\core"
-Copy-TreeIntoStaging -SourceRoot $orchSource -StagingRoot $staging -TargetRoot ".cadet\orchestrator"
+
 # Only copy managed .github files — exclude CI workflows from the consumer package
 Copy-TreeIntoStaging -SourceRoot (Join-Path $githubSource "prompts") -StagingRoot $staging -TargetRoot ".github\prompts"
 Copy-TreeIntoStaging -SourceRoot (Join-Path $githubSource "agents")  -StagingRoot $staging -TargetRoot ".github\agents"
@@ -171,7 +168,6 @@ Write-Host "  1. Copy $(Split-Path $outputZip -Leaf) to the target project root"
 Write-Host "  2. Expand-Archive .\$(Split-Path $outputZip -Leaf) -DestinationPath . -Force"
 Write-Host "  Files will extract to:"
 Write-Host "    .cadet\agent\core\"
-Write-Host "    .cadet\orchestrator\"
 Write-Host "    .github\agents\cadet.agent.md"
 Write-Host "    .github\prompts\cadet.prompt.md"
 Write-Host "    .cursor\rules\cadet-agent.md"
