@@ -104,3 +104,29 @@ AssetDatabase.CreateAsset(myAsset, path);
 
 **Example:**
 > "Story 2 (jump and gravity) is blocked — the current design assumes `Rigidbody`-based physics, but the jump mechanic requires a custom kinematic controller. I need to update the technical design to add a `CharacterMotor` component, which will add a new story for the motor implementation and modify Story 2 to integrate with it. The old `Rigidbody` movement code in Story 1 will also need decommissioning. Should I update the design and revise the stories?"
+
+---
+
+## Assumption Validation and Spikes
+
+**Rule:** During planning (requirements and architecture), explicitly list every assumption about technology capabilities, integration behavior, performance characteristics, or platform constraints. Classify each as verified, reasonable, or unverified. For unverified assumptions, recommend a spike to answer the open question before the assumption becomes a design dependency. Spike results must inform epics and stories.
+
+**Why:** Unverified assumptions are the most common source of late-stage rework. A design built on "EOS probably supports host migration" or "this API likely returns data in under 100ms" is a design built on hope. When that assumption fails mid-implementation, the cost of change is 10x higher than catching it during planning. Spikes are the mechanism to convert unverified assumptions into verified knowledge before committing to epics and stories.
+
+**When it applies:** During Requirements and Architecture skills for all large changes. Before StoryBreakdown begins, all unverified assumptions must either be resolved by spikes or explicitly accepted as risk by the user.
+
+**Example:**
+> "The multiplayer design assumes EOS supports host migration on Xbox. This is unverified — I recommend a spike to research EOS host migration capabilities. The spike will answer: does it support host migration, what are the platform limitations, and is there a fallback pattern we should design for? The answer will determine whether Epic 2 (Multiplayer Session Management) needs a host-migration story or a different approach entirely."
+
+---
+
+## State Management and Tracking Modes
+
+**Rule:** The agent maintains `.cadet/state.json` conforming to `.cadet/state.schema.json` as the canonical workflow state. Two tracking modes are supported: `"markdown"` (default, epics/stories as markdown files) and `"github"` (epics/stories tracked via GitHub Projects/Issues). The mode is chosen once during initialization and persisted.
+
+**Why:** Different teams have different preferences. Some want visible markdown planning artifacts they can browse locally; others use GitHub Projects/Issues for team visibility and sprint tracking. The state.json provides a structured, versioned schema that the agent can reliably read and write regardless of mode, while the tracking mode flag gives teams control over where their workflow artifacts live.
+
+**When it applies:** On first substantive action, the agent asks the user which tracking mode to use and writes the choice to state.json. The mode applies for the lifetime of the project.
+
+**Example:**
+> "I'll track progress using state.json. Which tracking mode would you prefer? **Markdown** (epic/story files in directories, default) or **GitHub** (stories as GitHub Issues with project tracking)?"

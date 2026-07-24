@@ -6,7 +6,6 @@ Cadet-Agent is a cross-IDE agent framework for game-development workflows, with 
 - `.cadet/agent/core/` contains the shared Cadet-Agent framework documents.
 - `.cadet/agent/docs/` contains setup guides for each supported IDE.
 - `.github/agents/` contains the Copilot custom agent definition (agent mode).
-- `.github/prompts/` contains the Copilot slash-command prompt (fallback).
 - `.cursor/` contains Cursor-specific authored files.
 - `.continue/` contains Continue-specific authored files.
 - `.claude/` contains Claude Code-specific authored files.
@@ -88,5 +87,6 @@ Running `./package-agent.ps1` produces `cadet-agent.zip` with this layout:
 
 ## Notes
 - `.cadet/agent/core/FrameworkManifest.json` defines the managed and preserved paths for packaged installs.
+- Workflow progress is tracked in `.cadet/state.json` with two modes: **markdown** (epic/story files) or **GitHub** (Projects/Issues).
 - Repository-specific policy overlays belong in `.cadet/agent/policies`.
 - Planning artifacts belong in `.cadet/agent/project-plans` unless an active policy says otherwise.
