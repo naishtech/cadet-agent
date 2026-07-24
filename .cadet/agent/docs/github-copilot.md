@@ -1,27 +1,25 @@
 # GitHub Copilot Setup
 
-Use this guide when installing Cadet-Agent into a repository that will use GitHub Copilot in VS Code or GitHub-hosted Copilot surfaces.
+Use this guide when installing Cadet-Agent into a repository that will use GitHub Copilot in VS Code.
 
 ## Installed Files
 Cadet-Agent installs these GitHub Copilot-facing files:
-- `.github/prompts/cadet.prompt.md`
-- `AGENTS.md`
+- `.github/agents/cadet.agent.md`
 - `.cadet/agent/core/`
 
 ## What Each File Does
-- `.github/prompts/cadet.prompt.md` is the Cadet `/cadet` slash-command prompt entrypoint.
-- `AGENTS.md` provides generic agent instructions that nearby tools can also consume.
-- `.cadet/agent/core/` contains the shared Cadet framework that the adapter points at.
+- `.github/agents/cadet.agent.md` defines the **Cadet** custom agent. Select it from the agent picker in Copilot Chat.
+- `.cadet/agent/core/` contains the shared Cadet framework instructions.
 
 ## Installation
 1. Copy `cadet-agent.zip` to the target repository root.
 2. Extract it into the repository root.
-3. Confirm these paths exist: `.cadet/agent/core/`, `.github/prompts/cadet.prompt.md`, and `AGENTS.md`.
+3. Confirm these paths exist: `.cadet/agent/core/` and `.github/agents/cadet.agent.md`.
 4. Open the repository in VS Code with GitHub Copilot enabled.
-5. Start the Cadet flow: type `/cadet <your objective>` in the Copilot chat.
+5. Select the **Cadet** agent from the agent picker in Copilot Chat and describe your task.
 
 ## Expected Behavior
-- The `/cadet` slash command loads `.github/prompts/cadet.prompt.md` which routes behavior through `.cadet/agent/core/Workflow.md`, `.cadet/agent/core/LearnerModel.md`, and the relevant documents under `.cadet/agent/core/Skills`, `.cadet/agent/core/Guidance`, `.cadet/agent/core/Standards`, and `.cadet/agent/core/Templates`.
+The Cadet agent reads `.cadet/agent/core/cadet-agent.md` which routes behavior through workflow classification, skill dispatch, and all non-negotiable rules.
 
 ## Repository-Specific Extensions
 - Add repository policy overlays under `.cadet/agent/policies`.

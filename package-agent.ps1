@@ -3,7 +3,6 @@
 # Extract the zip at any Unity project root and files will land at:
 #   .cadet\agent\core\
 #   .github\agents\cadet.agent.md (Copilot agent mode)
-#   .github\prompts\cadet.prompt.md (slash-command fallback)
 #   .cursor\rules\cadet-agent.md
 #   .continue\rules\cadet-agent.md
 #   .claude\skills\cadet-agent.md
@@ -146,7 +145,6 @@ if (Test-Path $staging) {
 Copy-TreeIntoStaging -SourceRoot $coreSource -StagingRoot $staging -TargetRoot ".cadet\agent\core"
 
 # Only copy managed .github files — exclude CI workflows from the consumer package
-Copy-TreeIntoStaging -SourceRoot (Join-Path $githubSource "prompts") -StagingRoot $staging -TargetRoot ".github\prompts"
 Copy-TreeIntoStaging -SourceRoot (Join-Path $githubSource "agents")  -StagingRoot $staging -TargetRoot ".github\agents"
 
 Copy-TreeIntoStaging -SourceRoot $cursorSource -StagingRoot $staging -TargetRoot ".cursor"
@@ -169,7 +167,6 @@ Write-Host "  2. Expand-Archive .\$(Split-Path $outputZip -Leaf) -DestinationPat
 Write-Host "  Files will extract to:"
 Write-Host "    .cadet\agent\core\"
 Write-Host "    .github\agents\cadet.agent.md"
-Write-Host "    .github\prompts\cadet.prompt.md"
 Write-Host "    .cursor\rules\cadet-agent.md"
 Write-Host "    .continue\rules\cadet-agent.md"
 Write-Host "    .claude\skills\cadet-agent.md"

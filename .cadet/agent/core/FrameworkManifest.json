@@ -12,7 +12,6 @@
   ],
   "managedPaths": [
     ".github/agents/cadet.agent.md",
-    ".github/prompts/cadet.prompt.md",
     ".cursor/rules/cadet-agent.md",
     ".continue/rules/cadet-agent.md",
     ".claude/skills/cadet-agent.md",
@@ -24,7 +23,7 @@
   ],
   "notes": [
     "Use this manifest to decide which packaged files Cadet may update during bootstrap sync.",
-    "If managed framework files are updated, require a fresh /cadet chat before continuing.",
+    "If managed framework files are updated, require a fresh chat before continuing.",
     "Treat the packaged zip as a universal bootstrap package rather than the long-term source of truth.",
     "As of v0.5.0, the agent instruction set is condensed into cadet-agent.md. Full rationale, guidance, standards, and templates are in the docs/ directory (GitHub Pages)."
   ]
