@@ -22,7 +22,6 @@ For the condensed agent instruction set, see [cadet-agent.md](https://github.com
 - [TDD](core/skills/TDD.md)
 - [Debugging](core/skills/Debugging.md)
 - [Code Review](core/skills/CodeReview.md)
-- [Orchestrator](core/skills/Orchestrator.md)
 
 ## Guidance
 

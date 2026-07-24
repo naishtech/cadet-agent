@@ -83,7 +83,6 @@ If a specific game repository needs local conventions, add a policy file under `
 ## Package Output
 Running `./package-agent.ps1` produces `cadet-agent.zip` with this layout:
 - `.cadet/agent/core/`
-- `.cadet/orchestrator/`
 - `.github/agents/cadet.agent.md`
 - `.github/prompts/cadet.prompt.md`
 - `.cursor/rules/cadet-agent.md`

@@ -65,3 +65,16 @@ AssetDatabase.CreateAsset(myAsset, path);
 
 **Example:**
 > "This change replaces the old `ILegacyPaymentGateway` with `IPaymentService`. I've identified the following that should be decommissioned: the `LegacyPaymentGateway` implementation class, the `PaymentGatewayFactory` that only creates legacy instances, and the `LegacyGatewayConfig` asset. Should I include cleanup and removal of these in the implementation plan?"
+
+---
+
+## Story Breakdown Rule
+
+**Rule:** Implementation work is scoped to stories, not epics. Epics are grouping containers for related stories. After epics are created, each epic must be broken down into small, independently implementable stories before any code is written. Only stories are worked on individually, reviewed, and committed.
+
+**Why:** Epics are too large for effective review and safe commits. Working at the epic level produces big-bang code drops that are hard to review, risky to merge, and painful to roll back. Breaking epics into stories creates natural checkpoints: each story is a small, reviewable increment with its own code review, compile check, and commit. This reduces review fatigue, catches issues earlier, and keeps the codebase always in a buildable state.
+
+**When it applies:** All large-change workflows. After epics are decomposed, the agent must break each epic into stories before writing any implementation code.
+
+**Example:**
+> "Epic 1 (Player Movement) contains three stories: 1) basic horizontal movement with input, 2) jump and gravity, 3) collision response. Let's start with Story 1. After it's implemented, tested, and reviewed, we'll move to Story 2."

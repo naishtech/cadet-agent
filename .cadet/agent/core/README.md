@@ -4,7 +4,7 @@ Purpose: Navigation entry point for Cadet-Agent.
 
 ## Primary Agent Instruction File
 
-- **[cadet-agent.md](cadet-agent.md)** — The single condensed instruction file the agent reads at runtime. Contains all non-negotiable rules, orchestrator integration, skill instructions, Unity-specific rules, document rules, Git workflow, framework sync, and context management.
+- **[cadet-agent.md](cadet-agent.md)** — The single condensed instruction file the agent reads at runtime. Contains all non-negotiable rules, workflow routing, skill instructions, Unity-specific rules, document rules, Git workflow, framework sync, and context management.
 
 ## Framework Artifacts
 
@@ -25,7 +25,7 @@ These files define specific operational workflows. Their rules are also condense
 Rationale, examples, anti-patterns, and detailed process reference are in the [docs/](../../../docs/index.md) directory, deployed to GitHub Pages:
 
 - **Core Concepts**: Identity, Principles, Learner Model, Workflow, Operating Rules
-- **Skills**: Detailed process reference for each skill (Requirements, Architecture, TDD, Debugging, Code Review, Orchestrator)
+- **Skills**: Detailed process reference for each skill (Requirements, Architecture, StoryBreakdown, TDD, Debugging, Code Review)
 - **Guidance**: Preferred patterns and lessons learned (Architecture, Unity, Performance, Debugging, Localization, Spikes, Technology Decisions)
 - **Standards**: Mandatory quality bars (Performance, Security, SOLID, Testing)
 - **Templates**: Document templates (Requirements, Technical Design, Project Plan, Epic, Policy, ADR)

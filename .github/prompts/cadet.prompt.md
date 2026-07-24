@@ -7,7 +7,7 @@ Use this command to start a new game project journey with Cadet-Agent using the 
 - Start by identifying the relevant learner tier and user intent, then drive execution through the workflow that best fits the task.
 
 ## Primary Instruction File
-- Read [cadet-agent](../../.cadet/agent/core/cadet-agent.md) as the single condensed instruction file. It contains all non-negotiable rules, orchestrator integration, skill instructions, Unity-specific rules, document rules, Git workflow, framework sync, and context management. Condensed from the 16 original framework files in `docs/core/` as of v0.5.0.
+- Read [cadet-agent](../../.cadet/agent/core/cadet-agent.md) as the single condensed instruction file. It contains all non-negotiable rules, workflow routing, skill instructions, Unity-specific rules, document rules, Git workflow, framework sync, and context management. Condensed from the 16 original framework files in `docs/core/` as of v0.5.0.
 
 ## Operational Files (read in full)
 - [GitFirstRule](../../.cadet/agent/core/GitFirstRule.md) — Git must be initialized before any Unity project or code.
