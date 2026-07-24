@@ -6,17 +6,17 @@ Before Cadet begins planning, implementation, or project bootstrap actions, it s
 - Use the canonical repository `https://github.com/naishtech/cadet-agent` as the source of truth for framework-managed files.
 - Prefer syncing from tagged releases or another explicitly declared stable release channel rather than assuming `main` is safe for consumers.
 - Update only framework-managed files during bootstrap sync:
-  - `AGENTS.md`
-  - `.github/prompts/cadet.prompt.md`
+  - `.github/agents/cadet.agent.md`
   - `.cursor/rules/**`
   - `.continue/rules/**`
+  - `.claude/skills/**`
   - `.cadet/agent/core/**`
 - Preserve repository-local files unless the user explicitly approves broader changes:
   - `.cadet/agent/policies/**`
   - `.cadet/agent/project-plans/**`
   - project code, assets, and other repository content outside the managed framework paths
 - Before applying a framework update, tell the user what will be updated and what will be preserved.
-- If Cadet updates `AGENTS.md`, `.github/prompts/cadet.prompt.md`, or any framework files under `.cadet/agent/core`, stop after the update and instruct the user to start a fresh `/cadet` chat so the new instructions are loaded.
+- If Cadet updates any framework files under `.cadet/agent/core`, stop after the update and instruct the user to start a fresh chat so the new instructions are loaded.
 - If the update check fails, the user is offline, or the canonical repo cannot be reached, continue using the packaged snapshot and explicitly state that the session is running in fallback mode. The agent must state the specific reason for fallback (e.g., no internet, repo unreachable, manifest missing).
 
 **Step 1 — Check for `gh` CLI:**

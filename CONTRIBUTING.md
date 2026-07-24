@@ -19,8 +19,7 @@ All changes must happen on a feature branch. Direct commits to `main` are not pe
 
 **Managed paths** (owned by Cadet-Agent, overwritten on sync):
 - `.cadet/agent/core/`
-- `AGENTS.md`
-- `.github/prompts/cadet.prompt.md`
+- `.github/agents/cadet.agent.md`
 - `.cursor/rules/cadet-agent.md`
 - `.continue/rules/cadet-agent.md`
 - `.claude/skills/cadet-agent.md`

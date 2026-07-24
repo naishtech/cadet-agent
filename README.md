@@ -46,12 +46,10 @@ Expand-Archive .\cadet-agent.zip -DestinationPath . -Force
 ### GitHub Copilot
 Run `npx cadet-agent@latest init` in your Unity project root, then open the repo in VS Code.
 
-**Agent mode (recommended):** Select the **Cadet** agent from the agent picker in Copilot Chat. The agent definition at `.github/agents/cadet.agent.md` provides focused instructions and tool configuration.
-
-**Slash command (fallback):** Use `/cadet` in Copilot Chat to invoke the prompt-based path:
+**Agent mode:** Select the **Cadet** agent from the agent picker in Copilot Chat. The agent definition at `.github/agents/cadet.agent.md` provides focused instructions and tool configuration.
 
 ```text
-/cadet Help me bootstrap a beginner-friendly 2D racing prototype in Unity with AI opponents and a career progression loop.
+[Describe your game dev task...]
 ```
 
 Cadet will use the shared framework in `.cadet/agent/core` to route the conversation through learner calibration, bootstrap checks, and planning.
@@ -84,7 +82,6 @@ If a specific game repository needs local conventions, add a policy file under `
 Running `./package-agent.ps1` produces `cadet-agent.zip` with this layout:
 - `.cadet/agent/core/`
 - `.github/agents/cadet.agent.md`
-- `.github/prompts/cadet.prompt.md`
 - `.cursor/rules/cadet-agent.md`
 - `.continue/rules/cadet-agent.md`
 - `.claude/skills/cadet-agent.md`

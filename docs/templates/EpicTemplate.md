@@ -1,72 +1,39 @@
 # Epic Template
 
-Purpose: Define a single epic as a testable slice of valuable work with approximately 10 to 12 small tasks and full traceability to requirements and design.
+Purpose: Minimal container for an epic — just enough to understand what it delivers and navigate to its stories. Epics live in their own directory alongside their stories.
 
-## Backlinks
-- Identity: [Identity](../core/Identity.md)
-- Learner model: [LearnerModel](../core/LearnerModel.md)
-- Principles: [Principles](../core/Principles.md)
-- Workflow: [Workflow](../core/Workflow.md)
-- Requirements document: [TODO]
-- Technical design document: [TODO]
-- Project plan document: [TODO]
+## Directory Layout
+```
+epic-1-player-movement/
+  epic.md              ← this file
+  story-1-basic-movement.md
+  story-2-jump-gravity.md
+  story-3-collision-response.md
+```
 
-## Document Control
-- Epic ID: [TODO]
-- Epic Name: [TODO]
-- Owner: [TODO]
-- Status: Planned | In Progress | Blocked | Complete
-- Version: [TODO]
-- Last Updated: [TODO]
+---
 
-## Learner Context
-- Relevant learner dimension: [TODO]
-- Assumed learner tier: [TODO]
-- Operating mode during execution: Instruction-first | Implementation-first | Hybrid
-- Handoff notes: [TODO]
+# Epic: [Name]
 
-## Epic Outcome
-- User or Business Value: [TODO]
-- Testable Slice Definition: [TODO]
-- Acceptance Criteria Coverage: [TODO]
+- **Epic ID:** [EPIC-1]
+- **Status:** Planned | In Progress | Complete
+- **Requirements:** [link to requirements.md]
+- **Technical Design:** [link to technical-design.md]
 
-## Scope
-- In Scope: [TODO]
-- Out of Scope: [TODO]
-- Dependencies: [TODO]
-- Risks: [TODO]
+## Summary
 
-## Task Breakdown (Target: 10-12 small tasks)
-| Task ID | Task Description | Linked Requirement ID | Linked Design Section | Test Strategy | Status |
-|---|---|---|---|---|---|
-| [TODO] | [TODO] | [TODO] | [TODO] | [TODO] | [TODO] |
-| [TODO] | [TODO] | [TODO] | [TODO] | [TODO] | [TODO] |
-| [TODO] | [TODO] | [TODO] | [TODO] | [TODO] | [TODO] |
-| [TODO] | [TODO] | [TODO] | [TODO] | [TODO] | [TODO] |
-| [TODO] | [TODO] | [TODO] | [TODO] | [TODO] | [TODO] |
-| [TODO] | [TODO] | [TODO] | [TODO] | [TODO] | [TODO] |
-| [TODO] | [TODO] | [TODO] | [TODO] | [TODO] | [TODO] |
-| [TODO] | [TODO] | [TODO] | [TODO] | [TODO] | [TODO] |
-| [TODO] | [TODO] | [TODO] | [TODO] | [TODO] | [TODO] |
-| [TODO] | [TODO] | [TODO] | [TODO] | [TODO] | [TODO] |
-| [TODO] | [TODO] | [TODO] | [TODO] | [TODO] | [TODO] |
-| [TODO] | [TODO] | [TODO] | [TODO] | [TODO] | [TODO] |
+[One paragraph — what user value this epic delivers and why it exists]
 
-## Validation Plan
-- Red/Green test checkpoints: [TODO]
-- Integration validation checkpoints: [TODO]
-- Manual verification steps if needed: [TODO]
+## Stories
 
-## Completion Checklist
-- All epic tasks complete or formally descoped: [TODO]
-- Requirements, design, and project plan synchronized: [TODO]
-- Change history updated with scope and implementation deltas: [TODO]
-- User asked to check token count after epic completion: [TODO]
-- If context is over 100k tokens, new-chat recommendation recorded: [TODO]
+- [ ] [Story 1: Name](./story-1-name.md) — [One-line summary]
+- [ ] [Story 2: Name](./story-2-name.md) — [One-line summary]
+- [ ] [Story 3: Name](./story-3-name.md) — [One-line summary]
 
 ## Change History
-| Date | Version | Change Summary | Reason | Impacted Tasks | Updated By |
-|---|---|---|---|---|---|
-| [TODO] | [TODO] | [TODO] | [TODO] | [TODO] | [TODO] |
+
+| Date | Change | Reason |
+|---|---|---|
+| [TODO] | [TODO] | [TODO] |
 
 ---

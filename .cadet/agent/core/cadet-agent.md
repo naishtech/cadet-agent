@@ -79,12 +79,16 @@ If the user's skill level or game type is unclear, check `.cadet/cadet-local-con
 
 ### StoryBreakdown (dispatched for large changes, after epics)
 
-1. For each epic, decompose into small, independently implementable stories.
-2. Each story must be completable in a single session and produce a working, testable increment.
-3. A story should address exactly one user-observable behavior or integration point.
-4. If a story still feels large, split it further until each story is small enough for a focused code review.
-5. Output: one story markdown file per epic (e.g., `epic-1-stories.md`) listing stories with acceptance criteria, estimated scope, and parent epic reference.
-6. After producing story breakdowns, ask the user if they want to commit them before beginning implementation.
+Use `.cadet/agent/core/Templates/EpicTemplate.md` for epic files and `.cadet/agent/core/Templates/StoryTemplate.md` for story files.
+
+1. For each epic, create a directory named after the epic (e.g., `epic-1-player-movement/`).
+2. Inside the directory, create `epic.md` using the EpicTemplate — minimal content: ID, status, summary, requirements/design links, and a checklist of story links.
+3. For each epic, decompose into small, independently implementable stories.
+4. Each story must be completable in a single session and produce a working, testable increment.
+5. A story should address exactly one user-observable behavior or integration point.
+6. If a story still feels large, split it further until each story is small enough for a focused code review.
+7. Create each story as `story-N-name.md` in the same epic directory, using the StoryTemplate.
+8. After producing all epic and story files, ask the user if they want to commit them before beginning implementation.
 
 ### TDD (dispatched per story for large changes; per change for small)
 

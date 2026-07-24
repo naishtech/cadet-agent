@@ -48,7 +48,5 @@ Rationale, examples, anti-patterns, and detailed process reference are in the [d
 
 Update `FrameworkManifest.json → frameworkVersion` when publishing.
 
-## Slash Command
 
-- Project-wide kickoff command: [cadet](../../../.github/prompts/cadet.prompt.md)
 
