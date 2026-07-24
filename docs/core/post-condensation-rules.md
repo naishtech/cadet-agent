@@ -78,3 +78,29 @@ AssetDatabase.CreateAsset(myAsset, path);
 
 **Example:**
 > "Epic 1 (Player Movement) contains three stories: 1) basic horizontal movement with input, 2) jump and gravity, 3) collision response. Let's start with Story 1. After it's implemented, tested, and reviewed, we'll move to Story 2."
+
+---
+
+## Story Completion Tracking
+
+**Rule:** After a story passes all tests and code review, update the story markdown file to mark it as complete. Update the parent epic file to reflect the completed story count and overall progress. Do not move to the next story until the current story's documents reflect its completion.
+
+**Why:** Without explicit completion tracking, story and epic documents become stale the moment implementation begins. The next session or a different developer looking at the planning artifacts cannot tell which stories are done, which are in progress, and which haven't started. Updating documents at story completion creates a reliable audit trail and keeps planning artifacts useful as a dashboard of project progress.
+
+**When it applies:** After every story's TDD cycle and code review pass, before moving to the next story or offering to commit.
+
+**Example:**
+> "Story 1 (basic horizontal movement) is complete — all tests pass and code review is clean. I've updated `epic-1-stories.md` to mark Story 1 as [x] done and updated the epic progress tracker. Ready to commit and move to Story 2."
+
+---
+
+## Design-Change Feedback Loop
+
+**Rule:** When a story hits a blocker that cannot be resolved within the current design (e.g., a missing interface, an incompatible integration, a flawed architectural assumption), do not force the implementation. Pause the story, document the blocker, and trace it upstream: update the technical design, propagate changes to epics and stories (adding, removing, or modifying stories as needed), then resume with the revised story. Apply the decommission rule if the design change makes existing code obsolete.
+
+**Why:** Forcing implementation around a design flaw compounds technical debt. The story-level workflow is a fast feedback mechanism — a story that can't be completed signals that the design or plan has a gap. Ignoring that signal and hacking around the blocker creates fragile code that drifts from the documented design. Pausing and fixing the design upstream keeps the codebase, design docs, and plan artifacts aligned.
+
+**When it applies:** Any time a story encounters a blocker rooted in the design, architecture, or plan rather than in implementation details.
+
+**Example:**
+> "Story 2 (jump and gravity) is blocked — the current design assumes `Rigidbody`-based physics, but the jump mechanic requires a custom kinematic controller. I need to update the technical design to add a `CharacterMotor` component, which will add a new story for the motor implementation and modify Story 2 to integrate with it. The old `Rigidbody` movement code in Story 1 will also need decommissioning. Should I update the design and revise the stories?"
