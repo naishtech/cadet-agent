@@ -3,7 +3,7 @@
 Define how Cadet-Agent executes work across large, small, and manual-validation changes while teaching the user through each SDLC stage.
 
 ## Index
-- Framework index: [README](README.md)
+- Docs index: [index](../index.md)
 
 ## Backlinks
 - Identity reference: [Identity](Identity.md)
@@ -67,14 +67,14 @@ Classify the requested change.
 - Determine whether the work is large, small, or no-test-required.
 - Keep the learner tier and operating mode fixed unless new evidence justifies updating them.
 - For large work, identify impacted components, integration points, and end-to-end test implications.
-- When architectural or design decisions are made during classification, create an ADR using [ADRDecisionTemplate](Templates/ADRDecisionTemplate.md) and store under `.cadet/agent/project-plans/adr/`.
+- When architectural or design decisions are made during classification, create an ADR using [ADRDecisionTemplate](../templates/ADRDecisionTemplate.md) and store under `.cadet/agent/project-plans/adr/`.
 - Confirm whether the user wants step-by-step guidance or one full draft for final review.
 - Confirm project-plan storage path.
 - Resolve the active policy using the README policy-system rules before applying any repository-specific convention.
 - If a local policy defines a default planning directory, recommend it.
 - Otherwise, ask the user for the preferred artifact location and use it.
 - If a new technology is introduced, follow the identity protocol: check familiarity, explain if needed, and request approval or equivalent alternative.
-- **Technology evaluation:** When a technology choice has multiple viable options, apply the [TechnologyDecisionFramework](Guidance/TechnologyDecisionFramework.md): identify viable options, ask the user with a clear default recommendation, and record the decision as an ADR.
+- **Technology evaluation:** When a technology choice has multiple viable options, apply the [TechnologyDecisionFramework](../guidance/TechnologyDecisionFramework.md): identify viable options, ask the user with a clear default recommendation, and record the decision as an ADR.
 - If an active policy prefers a specific technology stack, do not silently recommend a different stack; state the policy default and the concrete reason for any exception first.
 - If implementation details are uncertain, explicitly state what is unknown, ask whether the user knows, and if neither side is certain ask permission before online research.
 - Identify which guidance documents are relevant to the task so their preferred patterns can inform the approach.
@@ -82,7 +82,7 @@ Classify the requested change.
 - Identify whether any planned code is shared infrastructure and whether the active workspace defines a specific shared-code location.
 - Before creating or moving shared code into a shared location, explicitly tell the user and confirm the extraction boundary.
 - Confirm branch strategy before implementation: create or use a feature branch and keep `main` protected from direct local pushes.
-- **ADR recording:** When a significant architectural or design decision is made (technology choice, pattern adoption, structural tradeoff, deferral with rationale), create an Architecture Decision Record using [ADRDecisionTemplate](Templates/ADRDecisionTemplate.md). Store ADRs under `.cadet/agent/project-plans/adr/` using the naming convention `NNNN-lowercase-title.md` (e.g., `0001-use-legacy-input-manager-for-prototype.md`). ADRs are immutable once accepted — supersede, don't edit.
+- **ADR recording:** When a significant architectural or design decision is made (technology choice, pattern adoption, structural tradeoff, deferral with rationale), create an Architecture Decision Record using [ADRDecisionTemplate](../templates/ADRDecisionTemplate.md). Store ADRs under `.cadet/agent/project-plans/adr/` using the naming convention `NNNN-lowercase-title.md` (e.g., `0001-use-legacy-input-manager-for-prototype.md`). ADRs are immutable once accepted — supersede, don't edit.
 - Before the first substantive action, include a short rule-trace that names the resolved policy, guidance, standards, and workflow path when they materially affect the decision.
 
 ## Step 2
@@ -103,7 +103,7 @@ Create the plan artifacts and tests according to change type.
 - Ensure each epic delivers a testable slice of valuable work.
 - Ensure task breakdown in epic files traces back to acceptance criteria and technical design decisions.
 - Prefer prefab-based implementation slices where practical so tests can instantiate consistent runtime objects.
-- If a spike is needed, define the exact feasibility question first. See [SpikePatterns](Guidance/SpikePatterns.md) for the full spike lifecycle rules.
+- If a spike is needed, define the exact feasibility question first. See [SpikePatterns](../guidance/SpikePatterns.md) for the full spike lifecycle rules.
 - For UI/editor-facing changes, identify localization impact early and include localization tasks in requirements/design/epics.
 - For localization key additions, include tasks to update all locale message sources and follow serialization-safe enum key append rules.
 - Small changes:
@@ -128,7 +128,7 @@ Implement in small, reviewable increments.
 - If Unity test validation is needed, tell the user exactly which tests to run and why.
 - Do not run Unity tests directly unless the user explicitly asks for it.
 - Use user-reported test outcomes to drive the next implementation or fix step.
-- Treat spikes as reference-only once their question is answered and keep production code paths separate. See [SpikePatterns](Guidance/SpikePatterns.md).
+- Treat spikes as reference-only once their question is answered and keep production code paths separate. See [SpikePatterns](../guidance/SpikePatterns.md).
 - Keep game-specific logic in domain folders and shared logic in the repository's designated shared-code location when one exists.
 - Keep work on the active feature branch, rebase as needed to stay current, and use force-push with lease only when rewriting branch history intentionally.
 - Prepare changes for PR-based integration and prefer squash merge unless the user specifies a different merge policy.
@@ -139,7 +139,7 @@ Implement in small, reviewable increments.
 
 ## Step 3.5 — Review Gate (mandatory after epic completion)
 
-After completing an epic and before moving to the next or marking work as done, run the review skill in [CodeReview](Skills/CodeReview.md).
+After completing an epic and before moving to the next or marking work as done, run the review skill in [CodeReview](skills/CodeReview.md).
 
 - Apply the full 17-step review process against the completed epic's changes.
 - File prioritized findings with clear remediation steps.
@@ -196,7 +196,7 @@ Work is complete when all applicable conditions are met.
 - The user received an explanation depth appropriate to their learner tier and stated preference.
 - Unity recompilation was requested from the user when necessary.
 - The user has reviewed and accepted results or requested next iteration steps.
-- If spikes were used, the user was asked whether the spike should be removed after production completion. See [SpikePatterns](Guidance/SpikePatterns.md).
+- If spikes were used, the user was asked whether the spike should be removed after production completion. See [SpikePatterns](../guidance/SpikePatterns.md).
 - Shared-code extraction decisions were communicated to the user before implementation and applied consistently.
 - Localization updates (when applicable) were included and validated with fallback-safe behavior.
 - Localization key and font asset update rules were followed for multilingual changes.

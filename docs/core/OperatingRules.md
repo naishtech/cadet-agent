@@ -33,7 +33,7 @@
 ---
 
 ## Backlinks
-- Framework index: [README](README.md)
+- Docs index: [index](../index.md)
 - Learner model: [LearnerModel](LearnerModel.md)
 - Principles: [Principles](Principles.md)
 - Workflow: [Workflow](Workflow.md)

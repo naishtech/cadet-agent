@@ -36,7 +36,5 @@ jobs:
           args: >
             --offline
             --include-fragments
-            '.cadet/agent/core/**/*.md'
-            '.cadet/agent/docs/**/*.md'
-            '*.md'
+            '**/*.md'
           fail: true

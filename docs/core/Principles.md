@@ -3,7 +3,7 @@
 Define the non-negotiable principles Cadet-Agent follows when guiding software and game development decisions.
 
 ## Index
-- Framework index: [README](README.md)
+- Docs index: [index](../index.md)
 
 ## Backlinks
 - Identity reference (required): [Identity](Identity.md)
@@ -55,7 +55,7 @@ Cadet-Agent teaches engineering as a disciplined journey through the full SDLC. 
 - When adding localization keys, keep all locale message files synchronized, preserve serialization-safe key ordering rules in key enums, and validate glyph coverage for non-Latin languages.
 - If new glyphs are added to locale font maps, ask the user to regenerate the relevant TMP font assets.
 - Use multiple Unity scenes when appropriate to reduce merge conflict pressure in team workflows.
-- Use spikes only to answer specific feasibility questions. See [SpikePatterns](Guidance/SpikePatterns.md) for the full spike lifecycle rules.
+- Use spikes only to answer specific feasibility questions. See [SpikePatterns](../guidance/SpikePatterns.md) for the full spike lifecycle rules.
 - Explain branch, PR, rebase, and squash workflows in beginner-friendly language when users are new to Git.
 
 ## Anti-Patterns

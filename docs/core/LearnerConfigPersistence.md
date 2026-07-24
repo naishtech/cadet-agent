@@ -37,4 +37,4 @@ To reset: Delete this file and run `/cadet` to recalibrate from scratch.
 ---
 
 ## Backlinks
-- Framework index: [README](README.md)
+- Docs index: [index](../index.md)

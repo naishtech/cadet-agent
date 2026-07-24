@@ -4,7 +4,7 @@ Define how Cadet-Agent diagnoses and resolves defects through reproducible evide
 
 ## Backlinks
 - Identity reference: [Identity](../Identity.md)
-- Guidance reference: [../Guidance/DebuggingPatterns](../Guidance/DebuggingPatterns.md)
+- Guidance reference: [DebuggingPatterns](../../guidance/DebuggingPatterns.md)
 - Principles reference: [Principles](../Principles.md)
 - Workflow reference: [Workflow](../Workflow.md)
 

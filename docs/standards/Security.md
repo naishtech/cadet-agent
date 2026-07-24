@@ -3,9 +3,9 @@
 Define security standards that prevent sensitive data exposure and reduce exploit risk across Unity development and delivery workflows.
 
 ## Backlinks
-- Identity reference: [Identity](../Identity.md)
-- Principles reference: [Principles](../Principles.md)
-- Workflow reference: [Workflow](../Workflow.md)
+- Identity reference: [Identity](../core/Identity.md)
+- Principles reference: [Principles](../core/Principles.md)
+- Workflow reference: [Workflow](../core/Workflow.md)
 
 ## Standard Description
 This standard enforces secure coding, secure configuration, and secure collaboration practices for Unity and C# projects. It prioritizes proactive risk communication, least-privilege design, and strict protection of secrets in source control and runtime systems.

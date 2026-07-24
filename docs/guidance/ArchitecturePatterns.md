@@ -3,11 +3,11 @@
 Capture preferred architecture patterns and design heuristics that have worked well in Unity production so Cadet can favor them by default without treating them as mandatory standards.
 
 ## Backlinks
-- Identity reference: [../Identity](../Identity.md)
-- Learner model reference: [../LearnerModel](../LearnerModel.md)
-- Principles reference: [../Principles](../Principles.md)
-- Workflow reference: [../Workflow](../Workflow.md)
-- Architecture skill: [../Skills/Architecture](../Skills/Architecture.md)
+- Identity reference: [Identity](../core/Identity.md)
+- Learner model reference: [LearnerModel](../core/LearnerModel.md)
+- Principles reference: [Principles](../core/Principles.md)
+- Workflow reference: [Workflow](../core/Workflow.md)
+- Architecture skill: [Architecture](../core/skills/Architecture.md)
 
 ## Guidance Role
 - This document records preferred architectural defaults, not hard requirements.

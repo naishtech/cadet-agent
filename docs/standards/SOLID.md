@@ -3,9 +3,9 @@
 Define how SOLID principles are applied in Unity and C# codebases to improve maintainability, testability, and safe iteration.
 
 ## Backlinks
-- Identity reference: [Identity](../Identity.md)
-- Principles reference: [Principles](../Principles.md)
-- Workflow reference: [Workflow](../Workflow.md)
+- Identity reference: [Identity](../core/Identity.md)
+- Principles reference: [Principles](../core/Principles.md)
+- Workflow reference: [Workflow](../core/Workflow.md)
 
 ## Standard Description
 This standard adapts SOLID for Unity workflows, where MonoBehaviours, ScriptableObjects, services, and runtime systems must remain modular and testable. It emphasizes small responsibilities, explicit dependencies, and clear extension points over tightly coupled scene logic. Preferred Unity idioms and implementation patterns live in the guidance layer, not in this standard.

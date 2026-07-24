@@ -3,11 +3,11 @@
 Capture preferred Unity performance patterns and micro-optimization heuristics that have paid off repeatedly, without turning every optimization idiom into a hard standard.
 
 ## Backlinks
-- Identity reference: [../Identity](../Identity.md)
-- Learner model reference: [../LearnerModel](../LearnerModel.md)
-- Principles reference: [../Principles](../Principles.md)
-- Workflow reference: [../Workflow](../Workflow.md)
-- Performance standard: [../Standards/Performance](../Standards/Performance.md)
+- Identity reference: [Identity](../core/Identity.md)
+- Learner model reference: [LearnerModel](../core/LearnerModel.md)
+- Principles reference: [Principles](../core/Principles.md)
+- Workflow reference: [Workflow](../core/Workflow.md)
+- Performance standard: [Performance](../standards/Performance.md)
 
 ## Guidance Role
 - This document records optimization patterns to prefer after measurement suggests they are relevant.

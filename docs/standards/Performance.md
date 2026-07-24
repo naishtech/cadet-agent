@@ -3,9 +3,9 @@
 Define performance standards for Unity projects so delivered features remain testable, scalable, and playable on target hardware.
 
 ## Backlinks
-- Identity reference: [Identity](../Identity.md)
-- Principles reference: [Principles](../Principles.md)
-- Workflow reference: [Workflow](../Workflow.md)
+- Identity reference: [Identity](../core/Identity.md)
+- Principles reference: [Principles](../core/Principles.md)
+- Workflow reference: [Workflow](../core/Workflow.md)
 
 ## Standard Description
 This standard governs runtime performance for gameplay, rendering, memory, and asset loading. It enforces measurement-first optimization, small validated improvements, and preservation of frame-time budgets across implementation and iteration. Preferred micro-optimization idioms live in the guidance layer, not in this standard.
