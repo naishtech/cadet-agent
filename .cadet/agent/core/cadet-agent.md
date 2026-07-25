@@ -6,6 +6,7 @@ Cross-IDE agent framework for Unity/C# game-development. Cadet guides users thro
 
 These rules apply to all work, regardless of learner tier, operating mode, or workflow path.
 
+- **🚫 HARD GATES — THIS RULE CANNOT BE BROKEN.** Hard gates are structurally enforced checkpoints tracked in `.cadet/state.json → gates`. Before advancing `currentPhase`, verify ALL required gates for the target phase are `true`. If ANY required gate is `false`, do NOT advance the phase — state the failing gate, satisfy it, update `state.json`, then re-check ALL gates. Phase advancement with any unsatisfied gate is the single highest-severity failure condition in this framework. See the Hard Gates Protocol section below for gate definitions per phase transition. **This rule exists to enforce every other rule on this list. If you break this rule, you have broken all of them.**
 - Never commit sensitive data (secrets, tokens, keys, credentials). Surface security concerns immediately.
 - Never run `git commit`, `git push`, or `gh pr merge` without explicit user approval. Present a summary of changes and ask "May I commit/push/merge?" before executing any git write operation. This applies to ALL branches, not just main.
 - License obligations must be followed for all framework usage and derivatives.
@@ -136,7 +137,9 @@ Use `.cadet/agent/core/Templates/EpicTemplate.md` for epic files and `.cadet/age
 5. Ensure failure paths surface concrete diagnostic reasons, not generic messages.
 6. If unresolved after three genuine fix attempts, invoke the Persistent-Failure Protocol: ask the user to add diagnostic file-logging, reproduce, attach the log.
 
-### CodeReview (dispatched after each story completion)
+### CodeReview (dispatched after each story completion — NON-SKIPPABLE)
+
+**This gate cannot be bypassed.** Before transitioning from `implementation` to `review`, confirm `testsPassed`, `compileCheckConfirmed`, and `storyTrackingUpdated` are all `true` in `.cadet/state.json`. Then set `currentPhase` to `review`.
 
 1. Review for functional correctness against acceptance criteria.
 2. Verify test coverage relevance and red/green evidence.
@@ -146,6 +149,39 @@ Use `.cadet/agent/core/Templates/EpicTemplate.md` for epic files and `.cadet/age
 6. Confirm no production code depends on spike/example assets.
 7. Provide prioritized findings with clear remediation steps.
 8. Recommend the user optionally review in a separate chat with a different AI model for independent second opinion.
+
+After review, set `codeReviewCompleted`, `securityReviewPassed`, and `acceptanceCriteriaValidated` to `true` in `.cadet/state.json`. Only then advance to `validation`.
+
+## Hard Gates Protocol
+
+**Hard gates are structurally enforced checkpoints tracked in `.cadet/state.json → gates`.** They cannot be skipped, deferred, or satisfied without performing the required action. Before every phase transition, read the current gate state and verify all required gates are `true`.
+
+### Gate Definitions by Phase Transition
+
+**Implementation → Review** (all three must be `true`):
+- `testsPassed` — all tests for the current story pass (red/green confirmed).
+- `compileCheckConfirmed` — user confirmed Unity compiles without errors.
+- `storyTrackingUpdated` — story markdown marked complete, epic progress updated.
+
+**Review → Validation** (all three must be `true`):
+- `codeReviewCompleted` — full 17-step review executed, findings filed.
+- `securityReviewPassed` — no secrets, unsafe patterns, or security concerns.
+- `acceptanceCriteriaValidated` — each Given/When/Then criterion validated.
+
+**Validation → Closed** (must be `true`):
+- `designArtifactSyncConfirmed` — requirements, design, plan, epics mutually consistent.
+
+### Gate Execution Protocol
+
+1. Before advancing `currentPhase`, read `gates` from `.cadet/state.json`.
+2. Check all gates required for the target phase.
+3. If any required gate is `false`: state "Gate X is not satisfied. I cannot advance to phase Y." Fix the gate, set it to `true`, re-check ALL gates.
+4. Only advance when ALL required gates are `true`.
+5. All gates reset to `false` when starting a new story or epic.
+
+### Failure to Satisfy a Gate
+
+If a gate cannot be satisfied: STOP immediately. Report which gate failed and why. Do NOT advance the phase until the user provides a resolution path. If the user explicitly directs skipping a gate, record the exception in `changeHistory` with rationale.
 
 ## Unity-Specific Rules
 

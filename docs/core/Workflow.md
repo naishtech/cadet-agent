@@ -9,6 +9,7 @@ Define how Cadet-Agent executes work across large, small, and manual-validation 
 - Identity reference: [Identity](Identity.md)
 - Learner model reference: [LearnerModel](LearnerModel.md)
 - Principles reference: [Principles](Principles.md)
+- Hard gates reference: [HardGates](HardGates.md)
 
 ## Workflow Overview
 Cadet-Agent routes work using three inputs in priority order: learner tier, user intent, and change size.
@@ -138,14 +139,33 @@ Implement in small, reviewable increments.
 - After relevant code changes, prompt the user to recompile in Unity when needed.
 - Unity-specific rule: ask the user to focus the Unity window so compilation can run.
 
-## Step 3.5 — Review Gate (mandatory after epic completion)
+**Hard Gates (Step 3):** Before transitioning from `implementation` to `review`, the following gates in `.cadet/state.json` must ALL be `true`. See [HardGates](HardGates.md) for the full gate protocol.
 
-After completing an epic and before moving to the next or marking work as done, run the review skill in [CodeReview](skills/CodeReview.md).
+- `testsPassed` — all tests for the current story pass.
+- `compileCheckConfirmed` — user confirmed Unity compiles without errors.
+- `storyTrackingUpdated` — story/epic markdown files updated to reflect completion.
 
+If any gate is `false`, do NOT advance to the review phase. Fix the failing gate first. Update `.cadet/state.json` to set each gate to `true` as it is satisfied.
+
+## Step 3.5 — Review Gate (mandatory after epic/story completion)
+
+**This gate is non-skippable.** After completing implementation and before moving to validation, the agent MUST transition through the `review` phase. See [HardGates](HardGates.md) for the full gate execution protocol.
+
+After completing an epic (or story for small/no-test changes) and before moving to the next or marking work as done, run the review skill in [CodeReview](skills/CodeReview.md).
+
+- Set `currentPhase` to `review` in `.cadet/state.json`.
 - Apply the full 17-step review process against the completed epic's changes.
 - File prioritized findings with clear remediation steps.
 - Do not proceed to the next epic or PR merge until critical/high-risk findings are resolved.
 - After completing the review, **recommend the user optionally review the output in a separate chat instance with a different AI model.** A fresh context window avoids bias from the conversation history, and a different model provides an independent second opinion. This is especially valuable for technical designs, architecture decisions, and security-sensitive changes.
+
+**Hard Gates (Step 3.5):** Before transitioning from `review` to `validation`, the following gates in `.cadet/state.json` must ALL be `true`:
+
+- `codeReviewCompleted` — full 17-step review executed and findings filed.
+- `securityReviewPassed` — no secrets, unsafe patterns, or security concerns.
+- `acceptanceCriteriaValidated` — each Given/When/Then criterion validated.
+
+Set each gate to `true` in `.cadet/state.json` as it is satisfied. Only advance to `validation` when ALL three are `true`.
 
 ## Step 4
 Validate the completed work against the workflow path criteria before closing.
@@ -177,6 +197,12 @@ Security and quality gates apply to all paths:
 - Confirm no sensitive data is introduced into version-controlled files.
 - Surface any security concerns immediately.
 
+**Hard Gates (Step 4):** Before transitioning from `validation` to `closed`, the following gate in `.cadet/state.json` must be `true`:
+
+- `designArtifactSyncConfirmed` — all planning artifacts (requirements, technical design, project plan, epics) are mutually consistent.
+
+Set the gate to `true` in `.cadet/state.json` before advancing to `closed`.
+
 ## Completion Criteria
 Work is complete when all applicable conditions are met.
 
@@ -198,6 +224,8 @@ Work is complete when all applicable conditions are met.
 - Unity recompilation was requested from the user when necessary.
 - The user has reviewed and accepted results or requested next iteration steps.
 - If spikes were used, the user was asked whether the spike should be removed after production completion. See [SpikePatterns](../guidance/SpikePatterns.md).
+- **All hard gates for the workflow path are satisfied** in `.cadet/state.json` (see [HardGates](HardGates.md)). No phase was advanced with any required gate set to `false`.
+- The `review` phase was entered and completed before `validation` — it was never skipped.
 - Shared-code extraction decisions were communicated to the user before implementation and applied consistently.
 - Localization updates (when applicable) were included and validated with fallback-safe behavior.
 - Localization key and font asset update rules were followed for multilingual changes.
