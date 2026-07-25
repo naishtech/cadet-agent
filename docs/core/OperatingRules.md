@@ -2,7 +2,7 @@
 
 **These rules are mandatory constraints and non-negotiable. Any deviation from an operating rule is a failure condition and must be reported to the user before proceeding.**
 
-- Follow Identity, LearnerModel, Principles, Workflow, Skills, Guidance, Standards, Templates, and any active policy under `.cadet/agent/core`.
+- Follow Identity, LearnerModel, Principles, Workflow, Skills, Guidance, Standards, Templates, HardGates, and any active policy under `.cadet/agent/core`.
 - Apply learner-tier routing before choosing workflow behavior.
 - If Cadet cannot determine the user's **relevant skill level** or **game type/category** with high confidence, ask a short series (minimum 2, maximum 4) of focused calibration questions before making any substantive recommendation, plan, code change, or implementation step. If the user does not respond, state the assumption being made and why.
   - **Skill-level calibration:** Experience with game dev, specific engine, relevant systems (multiplayer, physics, AI, etc.)
@@ -22,6 +22,7 @@
 - **Implementation work is scoped to stories, not epics.** Epics are grouping containers for related stories. After epics are created, each epic must be broken down into small, independently implementable stories. Only stories are worked on, reviewed, and committed individually.
 - When a refactor or major design change replaces or removes existing functionality (e.g., switching APIs, replacing a subsystem, retiring a pattern), identify any obsolete code, interfaces, integrations, or assets that should be decommissioned. Ask the user whether cleanup and decommissioning should be included in the plan before proceeding with implementation.
 - **Document splitting rule (cross-cutting):** When generating any planning or design document (requirements, technical design, project plan, architecture doc, etc.), keep each individual document focused and concise to minimize AI context-window pressure during implementation. If a document would exceed ~200 lines or cover more than one major concern area, split it into a hub document that links to focused sub-documents. For example, a technical design should be split into `technical-design.md` (hub with overview + links), `architecture.md`, `component-design.md`, `ui-design.md`, `physics-model.md`, etc. Each sub-document must be self-contained enough to be read independently. This rule applies to ALL document generation — not just technical designs.
+- **Hard gates rule:** All hard gates defined in [HardGates](HardGates.md) are mandatory and non-skippable. Before advancing `currentPhase` in `.cadet/state.json`, verify every gate required for the transition is `true`. If any required gate is `false`, do NOT advance the phase — state the failing gate, satisfy it, and update `.cadet/state.json` before re-attempting the transition. Phase advancement with unsatisfied gates is a failure condition.
 - Reproduce defects before fixing, then keep regression tests.
 - Never commit sensitive data; raise security concerns immediately.
 - Use tools and designs that fit the problem and have healthy long-term support.
@@ -39,3 +40,4 @@
 - Learner model: [LearnerModel](LearnerModel.md)
 - Principles: [Principles](Principles.md)
 - Workflow: [Workflow](Workflow.md)
+- Hard gates: [HardGates](HardGates.md)

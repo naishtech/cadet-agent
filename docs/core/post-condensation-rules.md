@@ -130,3 +130,20 @@ AssetDatabase.CreateAsset(myAsset, path);
 
 **Example:**
 > "I'll track progress using state.json. Which tracking mode would you prefer? **Markdown** (epic/story files in directories, default) or **GitHub** (stories as GitHub Issues with project tracking)?"
+
+---
+
+## Hard Gates Protocol
+
+**Rule:** All hard gates defined in `.cadet/state.json → gates` are non-skippable. Before advancing `currentPhase`, every gate required for the transition must be `true`. If any required gate is `false`, do NOT advance the phase — state the failing gate, satisfy it, update `state.json`, then re-check. Phase advancement with unsatisfied gates is a failure condition. The `review` phase was added to the phase enum between `implementation` and `validation` — it cannot be bypassed.
+
+**Why:** Prose rules saying "mandatory" are not enough — the AI can skip them because there's no structural enforcement. Without gate tracking, code reviews, compile checks, test validation, and artifact synchronization are frequently forgotten during implementation momentum. The Hard Gates system provides structural enforcement: gates are tracked as boolean flags in `state.json`, a `review` phase creates an explicit state transition that cannot be accidentally skipped, and the gate execution protocol requires the AI to check and satisfy each gate before advancing. This converts "you should" into "you cannot proceed without."
+
+**When it applies:** Every phase transition in every workflow path. All workflow paths (large, small, no-test-required) have applicable gates.
+
+**What changed structurally:**
+- `state.schema.json`: Added `review` to `currentPhase` enum, added `gates` object with 7 tracked gates.
+- `cadet-agent.md`: Added Hard Gates Protocol section with gate definitions, execution protocol, and failure handling.
+- `docs/core/HardGates.md`: Full reference document with gate tables, state diagram, and anti-patterns.
+- `Workflow.md`: Steps 3, 3.5, and 4 now include explicit gate check requirements.
+- `OperatingRules.md`: Added hard gates rule as mandatory constraint.
