@@ -9,7 +9,7 @@ import { Buffer } from 'node:buffer';
 // ── Import actual functions from install.mjs ────────────────────────────────
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
-const { findManagedPathsInZip, deleteRemovedManagedPaths } = await import(
+const { findManagedPathsInZip, deleteRemovedManagedPaths, deleteRetiredPaths } = await import(
   `file://${join(__dirname, '..', 'src', 'install.mjs')}`
 );
 
@@ -204,5 +204,48 @@ describe('deleteRemovedManagedPaths', () => {
       ['nothing-removed']
     );
     assert.deepEqual(deleted, []);
+  });
+});
+
+// ── deleteRetiredPaths with temp dir ────────────────────────────────────────
+
+describe('deleteRetiredPaths', () => {
+  let tmpDir;
+
+  before(() => {
+    tmpDir = join(tmpdir(), `cadet-retired-${Date.now()}`);
+    mkdirSync(tmpDir, { recursive: true });
+  });
+
+  after(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('deletes retired directory with files', () => {
+    const orchDir = join(tmpDir, '.cadet', 'orchestrator', 'lib');
+    mkdirSync(orchDir, { recursive: true });
+    writeFileSync(join(orchDir, 'state.sh'), 'echo old');
+    writeFileSync(join(orchDir, 'classify.sh'), 'echo old');
+
+    const deleted = deleteRetiredPaths(tmpDir, ['.cadet/orchestrator']);
+
+    assert.ok(deleted.length >= 2, 'should delete orchestrator files');
+    assert.equal(existsSync(join(orchDir, 'state.sh')), false);
+  });
+
+  it('skips paths that do not exist', () => {
+    const deleted = deleteRetiredPaths(tmpDir, ['.cadet/nonexistent']);
+    assert.deepEqual(deleted, []);
+  });
+
+  it('deletes retired single file', () => {
+    const dir = join(tmpDir, '.github', 'prompts');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'old.prompt.md'), '# old');
+
+    const deleted = deleteRetiredPaths(tmpDir, ['.github/prompts/old.prompt.md']);
+
+    assert.equal(deleted.length, 1);
+    assert.equal(existsSync(join(dir, 'old.prompt.md')), false);
   });
 });

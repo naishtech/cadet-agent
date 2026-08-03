@@ -26,6 +26,9 @@
     ".cadet/agent/policies",
     ".cadet/agent/project-plans"
   ],
+  "retiredPaths": [
+    ".cadet/orchestrator"
+  ],
   "notes": [
     "Use this manifest to decide which packaged files Cadet may update during bootstrap sync.",
     "If managed framework files are updated, require a fresh chat before continuing.",

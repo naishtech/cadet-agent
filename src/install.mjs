@@ -397,6 +397,27 @@ export function deleteRemovedManagedPaths(targetDir, oldManaged, newManaged) {
   return deleted;
 }
 
+// ── Retired-path cleanup ────────────────────────────────────────────────────
+
+export function deleteRetiredPaths(targetDir, retiredPaths) {
+  const deleted = [];
+  for (const retired of retiredPaths) {
+    const norm = retired.replace(/^\.\//, '').replace(/\\/g, '/');
+    const fullPath = join(targetDir, norm);
+    const st = (() => { try { return statSync(fullPath); } catch { return null; } })();
+    if (!st) continue;
+
+    if (st.isFile()) {
+      try { unlinkSync(fullPath); deleted.push(fullPath); } catch {}
+    } else if (st.isDirectory()) {
+      walkDir(fullPath, (filePath) => {
+        try { unlinkSync(filePath); deleted.push(filePath); } catch {}
+      });
+    }
+  }
+  return deleted;
+}
+
 // ── Public sync entry ───────────────────────────────────────────────────────
 
 export async function sync(targetDir, opts = {}) {
@@ -447,6 +468,17 @@ export async function sync(targetDir, opts = {}) {
   );
   if (removedDeleted.length > 0) {
     result.deleted.push(...removedDeleted);
+  }
+
+  // 4c. Delete retired paths (once-distributed paths now removed, e.g. .cadet/orchestrator)
+  try {
+    const newManifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+    const retiredDeleted = deleteRetiredPaths(targetDir, newManifest.retiredPaths || []);
+    if (retiredDeleted.length > 0) {
+      result.deleted.push(...retiredDeleted);
+    }
+  } catch {
+    // New manifest may not have retiredPaths yet — skip
   }
 
   // 5. Report
