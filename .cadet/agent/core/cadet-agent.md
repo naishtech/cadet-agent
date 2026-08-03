@@ -172,6 +172,7 @@ After review, set `codeReviewCompleted`, `securityReviewPassed`, and `acceptance
   <transition from="implementation" to="review">
     <gate id="testsPassed">All tests for the current story pass — red/green confirmed.</gate>
     <gate id="compileCheckConfirmed">User confirmed Unity compiles without errors.</gate>
+    <gate id="unityAnalyzerClean">Zero Unity analyzer diagnostics (UNT*) in changed files. Use `get_errors` tool to verify.</gate>
     <gate id="storyTrackingUpdated">Story markdown marked complete, epic progress updated.</gate>
   </transition>
   <transition from="review" to="validation">
@@ -188,7 +189,8 @@ After review, set `codeReviewCompleted`, `securityReviewPassed`, and `acceptance
 
 1. Read `gates` from `.cadet/state.json` before phase transition.
 2. Check required gates for the target transition; if any is `false`, block transition and report the failing gate(s).
-3. Apply reset semantics exactly as current rules define (gates reset to `false` on new story/epic), then re-check before transition.
+3. **For `compileCheckConfirmed` and `unityAnalyzerClean`:** use the `get_errors` tool on the changed files to automatically verify. If `get_errors` returns Unity analyzer diagnostics (UNT*) or compile errors, the gate is not satisfied — fix the issues before proceeding.
+4. Apply reset semantics exactly as current rules define (gates reset to `false` on new story/epic), then re-check before transition.
 
 ### Failure to Satisfy a Gate
 
@@ -207,6 +209,7 @@ If a gate cannot be satisfied: STOP immediately. Report which gate failed and wh
 - Public serialized fields in production runtime components are an anti-pattern.
 - Event subscription in `OnEnable`/`OnDisable`, not `Awake`, when lifecycle-safe patterns are expected.
 - Never hand-craft GUIDs/UUIDs in Unity asset files. Generate proper UUIDs via the OS: `uuidgen` (macOS/Linux) or `powershell -Command "[guid]::NewGuid()"` (Windows).
+- **Unity analyzer diagnostics act as a hard gate.** The IDE's Unity Roslyn analyzers (UNT* rules) detect common pitfalls including null propagation on Unity objects, inefficient tag comparisons, incorrect coroutine signatures, and more. Do not enumerate these rules individually — enforce them through the `unityAnalyzerClean` gate. When the gate is checked, use the `get_errors` tool on changed files and flag any Unity analyzer warnings as blocking.
 
 ## Document Rules
 

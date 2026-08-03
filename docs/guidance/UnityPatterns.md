@@ -43,5 +43,6 @@ Capture preferred Unity engineering patterns that have worked well in practice a
 - Applying a pattern from this document when a repository policy explicitly requires a different approach.
 - Lowering code quality because a preferred pattern was omitted in one specific case.
 - Replacing clear authored scene or prefab configuration with hidden hardcoded values for no practical gain.
+- Writing code that triggers Unity Roslyn analyzer diagnostics (UNT* rules). These include null propagation on Unity objects, inefficient tag comparisons, incorrect coroutine signatures, and more. Rely on the `unityAnalyzerClean` hard gate rather than memorizing individual rules.
 
 ---
