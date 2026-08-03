@@ -1,9 +1,6 @@
-import { createWriteStream, mkdirSync, existsSync, readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { pipeline } from 'node:stream/promises';
-import { createGunzip } from 'node:zlib';
+import { createWriteStream, mkdirSync, readFileSync, unlinkSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { join, dirname, relative } from 'node:path';
 import { inflateRawSync } from 'node:zlib';
-import { tmpdir } from 'node:os';
 import { Readable } from 'node:stream';
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -13,6 +10,22 @@ const USER_AGENT = 'cadet-agent-cli';
 
 function resolveApiUrl(override) {
   return override || process.env.CADET_AGENT_RELEASE_URL || DEFAULT_API;
+}
+
+function normalizeVersion(v) {
+  return (v || '').replace(/^v/, '');
+}
+
+function buildHeaders(extra = {}) {
+  const headers = {
+    'User-Agent': USER_AGENT,
+    ...extra,
+  };
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
 }
 
 // ── ZIP parser (zero-dependency, handles store + deflate) ───────────────────
@@ -84,13 +97,18 @@ function extractFile(buf, entry, targetDir) {
 
   const outPath = join(targetDir, filename);
   mkdirSync(dirname(outPath), { recursive: true });
-  const ws = createWriteStream(outPath);
-  Readable.from(data).pipe(ws);
 
-  return outPath;
+  return new Promise((resolve, reject) => {
+    const rs = Readable.from(data);
+    const ws = createWriteStream(outPath);
+    rs.pipe(ws);
+    ws.on('finish', () => resolve(outPath));
+    ws.on('error', (err) => reject(new Error(`Write failed for ${filename}: ${err.message}`)));
+    rs.on('error', (err) => reject(new Error(`Read failed for ${filename}: ${err.message}`)));
+  });
 }
 
-function extractZip(buf, targetDir) {
+async function extractZip(buf, targetDir) {
   const eocdOff = findEocd(buf);
   const cdSize  = read32(buf, eocdOff + 12);
   const cdOff   = read32(buf, eocdOff + 16);
@@ -106,7 +124,7 @@ function extractZip(buf, targetDir) {
 
   const paths = [];
   for (const entry of centralDirectoryEntries(buf, cdOff, cdSize)) {
-    const outPath = extractFile(buf, entry, targetDir);
+    const outPath = await extractFile(buf, entry, targetDir);
     paths.push(outPath);
   }
   return paths;
@@ -119,17 +137,14 @@ async function fetchLatestRelease(apiUrl) {
   console.log('🔍 Fetching latest Cadet-Agent release...');
 
   const res = await fetch(url, {
-    headers: {
-      'User-Agent': USER_AGENT,
-      'Accept': 'application/vnd.github+json',
-    },
+    headers: buildHeaders({ 'Accept': 'application/vnd.github+json' }),
   });
 
   if (!res.ok) {
     if (res.status === 403 || res.status === 429) {
       throw new Error(
         `GitHub API rate-limited (${res.status}). ` +
-        'Set GITHUB_TOKEN env var for higher limits, or try again later.'
+        'Set GITHUB_TOKEN or GH_TOKEN env var for authenticated requests, or try again later.'
       );
     }
     throw new Error(`GitHub API returned ${res.status}: ${res.statusText}`);
@@ -153,10 +168,7 @@ async function downloadZip(url) {
   console.log('⬇️  Downloading cadet-agent.zip...');
 
   const res = await fetch(url, {
-    headers: {
-      'User-Agent': USER_AGENT,
-      'Accept': 'application/octet-stream',
-    },
+    headers: buildHeaders({ 'Accept': 'application/octet-stream' }),
   });
 
   if (!res.ok) {
@@ -193,7 +205,8 @@ export async function install(targetDir, opts = {}) {
 
   // 1. Fetch release metadata
   const release = await fetchLatestRelease(opts.sourceUrl);
-  console.log(`   Latest: ${release.tag_name} (published ${release.published_at})\n`);
+  const releaseVersion = normalizeVersion(release.tag_name);
+  console.log(`   Latest: v${releaseVersion} (published ${release.published_at})\n`);
 
   // 2. Find zip asset
   const asset = findZipAsset(release);
@@ -204,15 +217,15 @@ export async function install(targetDir, opts = {}) {
 
   // 4. Extract
   console.log('📂 Extracting...');
-  const extracted = extractZip(zipBuf, targetDir);
+  const extracted = await extractZip(zipBuf, targetDir);
 
   // 5. Report
-  console.log(`\n✅ Cadet-Agent ${release.tag_name} installed! Extracted ${extracted.length} files.\n`);
+  console.log(`\n✅ Cadet-Agent v${releaseVersion} installed! Extracted ${extracted.length} files.\n`);
 
   // Print per-IDE next steps
   console.log('── Next steps ──');
   console.log('  GitHub Copilot:');
-  console.log('    Start a chat: /cadet');
+  console.log('    Select "Cadet Agent" from the agent picker in Copilot Chat');
   console.log('  Cursor:');
   console.log('    Already active — .cursor\\rules\\cadet-agent.md loads automatically');
   console.log('  Continue:');
@@ -236,7 +249,63 @@ function matchesPreservedPath(filename, preservedPaths) {
   return false;
 }
 
-function extractZipWithManifest(buf, targetDir, { preserved, managed }) {
+function matchesManagedPath(filename, managedPaths) {
+  const normalized = filename.replace(/^\.?\/?/, '').replace(/\\/g, '/');
+  for (const m of managedPaths) {
+    const mn = m.replace(/^\.?\/?/, '').replace(/\\/g, '/');
+    if (normalized === mn || normalized.startsWith(mn + '/')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function walkDir(dir, fn) {
+  const entries = readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      walkDir(fullPath, fn);
+    } else {
+      fn(fullPath, relative(dir, fullPath));
+    }
+  }
+}
+
+function deleteObsoleteManagedFiles(targetDir, managedPaths, zipFilenames) {
+  const normalizedZip = new Set(
+    zipFilenames.map(f => f.replace(/^\.?\/?/, '').replace(/\\/g, '/'))
+  );
+  const deleted = [];
+
+  for (const managed of managedPaths) {
+    const mn = managed.replace(/^\.?\/?/, '').replace(/\\/g, '/');
+    const managedPath = join(targetDir, managed.replace(/^\.?\/?/, ''));
+    const stat = (() => { try { return statSync(managedPath); } catch { return null; } })();
+    if (!stat) continue;
+
+    if (stat.isFile()) {
+      // Single-file managed path — check if it's in the zip
+      if (!normalizedZip.has(mn)) continue;
+    } else if (stat.isDirectory()) {
+      walkDir(managedPath, (filePath, rel) => {
+        const relNorm = rel.replace(/\\/g, '/');
+        const fullRel = mn + '/' + relNorm;
+        if (!normalizedZip.has(fullRel)) {
+          try {
+            unlinkSync(filePath);
+            deleted.push(filePath);
+          } catch {
+            // File may already be gone or locked — skip
+          }
+        }
+      });
+    }
+  }
+  return deleted;
+}
+
+async function extractZipWithManifest(buf, targetDir, { preserved, managed }) {
   const eocdOff = findEocd(buf);
   const cdSize  = read32(buf, eocdOff + 12);
   const cdOff   = read32(buf, eocdOff + 16);
@@ -252,29 +321,26 @@ function extractZipWithManifest(buf, targetDir, { preserved, managed }) {
   const updated = [];
   const preserved_list = [];
   const added = [];
+  const zipFilenames = [];
 
   for (const entry of centralDirectoryEntries(buf, cdOff, cdSize)) {
+    zipFilenames.push(entry.filename);
     if (matchesPreservedPath(entry.filename, preserved)) {
       preserved_list.push(entry.filename);
       continue;
     }
-    const outPath = extractFile(buf, entry, targetDir);
-    // Check if this file already existed (updated vs added)
-    // We can't easily tell without checking before extraction, so approximate:
-    // If it's under a managed path, call it updated; otherwise added
-    const isManaged = managed.some(m => {
-      const mn = m.replace(/^\.?\/?/, '');
-      const fn = entry.filename.replace(/^\.?\/?/, '');
-      return fn === mn || fn.startsWith(mn + '/') || fn.startsWith(mn + '\\');
-    });
-    if (isManaged) {
+    const outPath = await extractFile(buf, entry, targetDir);
+    if (matchesManagedPath(entry.filename, managed)) {
       updated.push(outPath);
     } else {
       added.push(outPath);
     }
   }
 
-  return { updated, preserved: preserved_list, added };
+  // Delete obsolete managed files no longer in the zip (renamed/removed managed paths)
+  const deleted = deleteObsoleteManagedFiles(targetDir, managed, zipFilenames);
+
+  return { updated, preserved: preserved_list, added, deleted };
 }
 
 // ── Public sync entry ───────────────────────────────────────────────────────
@@ -289,7 +355,7 @@ export async function sync(targetDir, opts = {}) {
   try {
     existingManifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
     oldVersion = existingManifest.frameworkVersion || 'unknown';
-    console.log(`   Existing install: v${oldVersion}`);
+    console.log(`   Existing install: v${normalizeVersion(oldVersion)}`);
   } catch {
     console.log('   No existing install found — performing full install.\n');
     return install(targetDir, opts);
@@ -297,11 +363,12 @@ export async function sync(targetDir, opts = {}) {
 
   // 2. Fetch release metadata
   const release = await fetchLatestRelease(opts.sourceUrl);
-  const newVersion = release.tag_name;
-  console.log(`   Latest: ${newVersion} (published ${release.published_at})\n`);
+  const newVersion = normalizeVersion(release.tag_name);
+  const oldVersionNorm = normalizeVersion(oldVersion);
+  console.log(`   Latest: v${newVersion} (published ${release.published_at})\n`);
 
-  if (oldVersion === newVersion) {
-    console.log(`✅ Already up to date (v${oldVersion}). Nothing to sync.\n`);
+  if (oldVersionNorm === newVersion) {
+    console.log(`✅ Already up to date (v${oldVersionNorm}). Nothing to sync.\n`);
     return;
   }
 
@@ -312,14 +379,14 @@ export async function sync(targetDir, opts = {}) {
 
   // 4. Extract with manifest awareness
   console.log('📂 Extracting (preserving local policies and plans)...');
-  const result = extractZipWithManifest(zipBuf, targetDir, {
+  const result = await extractZipWithManifest(zipBuf, targetDir, {
     preserved: existingManifest.preservedPaths || [],
     managed: existingManifest.managedPaths || [],
   });
 
   // 5. Report
   console.log('');
-  console.log(`✅ Cadet-Agent synced: v${oldVersion} → ${newVersion}`);
+  console.log(`✅ Cadet-Agent synced: v${oldVersionNorm} → v${newVersion}`);
   console.log(`   Updated:  ${result.updated.length} files`);
   if (result.preserved.length > 0) {
     console.log(`   Preserved: ${result.preserved.length} files (local policies/plans)`);
@@ -327,11 +394,14 @@ export async function sync(targetDir, opts = {}) {
   if (result.added.length > 0) {
     console.log(`   New:      ${result.added.length} files`);
   }
+  if (result.deleted.length > 0) {
+    console.log(`   Removed:  ${result.deleted.length} files (no longer managed)`);
+  }
   console.log('');
 
   // Print per-IDE next steps
   console.log('── Next steps ──');
   console.log('  Framework files updated. Start a fresh chat for changes to take effect:');
-  console.log('    /cadet');
+  console.log('    Select "Cadet Agent" from the agent picker in Copilot Chat');
   console.log('');
 }

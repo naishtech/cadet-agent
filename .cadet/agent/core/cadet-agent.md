@@ -149,7 +149,7 @@ Spike results must be incorporated — unverified assumptions that were resolved
 
 ### CodeReview (dispatched after each story completion — NON-SKIPPABLE)
 
-**This gate cannot be bypassed.** Before transitioning from `implementation` to `review`, confirm `testsPassed`, `compileCheckConfirmed`, and `storyTrackingUpdated` are all `true` in `.cadet/state.json`. Then set `currentPhase` to `review`.
+**This gate cannot be bypassed.** Before transitioning from `implementation` to `review`, confirm `testsPassed`, `compileCheckConfirmed`, `unityAnalyzerClean`, and `storyTrackingUpdated` are all `true` in `.cadet/state.json`. Then set `currentPhase` to `review`.
 
 1. Review for functional correctness against acceptance criteria.
 2. Verify test coverage relevance and red/green evidence.
@@ -240,4 +240,4 @@ Before substantive work, treat the packaged framework as a bootstrap snapshot:
 
 ## Sources
 
-Condensed from the 16 original core framework files in docs/core/. Post-condensation additions (rationale: docs/core/post-condensation-rules.md): artifact-commit prompt, pre-commit compile check, GUID generation rule, decommission-on-refactor rule, story-breakdown rule. Full rationale, examples, and anti-patterns: docs/.
+Condensed from the 16 original core framework files. Post-condensation additions: artifact-commit prompt, pre-commit compile check, GUID generation rule, decommission-on-refactor rule, story-breakdown rule. Full rationale, examples, and anti-patterns are in the docs/ directory at the canonical repository (GitHub Pages).

@@ -20,6 +20,10 @@ All changes must happen on a feature branch. Direct commits to `main` are not pe
 **Managed paths** (owned by Cadet-Agent, overwritten on sync):
 - `.cadet/agent/core/`
 - `.github/agents/cadet.agent.md`
+- `.github/agents/cadet-agent-reviewer.agent.md`
+- `.github/hooks/git-guard.json`
+- `.github/hooks/scripts/git-guard.sh`
+- `.github/hooks/scripts/git-guard.ps1`
 - `.cursor/rules/cadet-agent.md`
 - `.continue/rules/cadet-agent.md`
 - `.claude/skills/cadet-agent.md`
@@ -58,7 +62,7 @@ Confirm all expected paths are present and no unexpected files were included.
 The CI `links` job uses [lychee](https://github.com/lycheeverse/lychee) in offline mode to verify all internal markdown links are valid. You can run a local equivalent:
 ```powershell
 # Using lychee if installed
-lychee --offline --include-fragments '.cadet/agent/core/**/*.md' '.cadet/agent/docs/**/*.md' '*.md'
+lychee --offline --include-fragments '.cadet/agent/core/**/*.md' 'docs/**/*.md' '*.md'
 ```
 Fix any broken links before pushing.
 
@@ -69,7 +73,7 @@ Fix any broken links before pushing.
 | IDE-specific adapter (Copilot, Cursor, Continue) | IDE-specific root path (e.g. `.github/`, `.cursor/`) |
 | Repository-specific conventions | `.cadet/agent/policies/{RepoName}Policy.md` (not in this repo) |
 | Planning artifacts | `.cadet/agent/project-plans/` (not in this repo) |
-| Setup documentation | `.cadet/agent/docs/` |
+| Setup documentation | [canonical repository docs/](https://github.com/naishtech/cadet-agent) (GitHub Pages) |
 
 ## Questions
 Open a GitHub Discussion or an issue on the [canonical repository](https://github.com/naishtech/cadet-agent) before starting large structural changes so the direction can be agreed before implementation.

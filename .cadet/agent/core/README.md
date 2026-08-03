@@ -20,9 +20,9 @@ These files define specific operational workflows. Their rules are also condense
 - [KickoffFlow](KickoffFlow.md) — Step-by-step kickoff sequence.
 - [FirstResponseFormat](FirstResponseFormat.md) — Required format for first response.
 
-## Full Documentation (GitHub Pages)
+## Full Documentation
 
-Rationale, examples, anti-patterns, and detailed process reference are in the [docs/](../../../docs/index.md) directory, deployed to GitHub Pages:
+Full rationale, examples, anti-patterns, and detailed process reference are available at the canonical repository (GitHub Pages): https://github.com/naishtech/cadet-agent
 
 - **Core Concepts**: Identity, Principles, Learner Model, Workflow, Operating Rules
 - **Skills**: Detailed process reference for each skill (Requirements, Architecture, StoryBreakdown, TDD, Debugging, Code Review)
@@ -34,7 +34,7 @@ Rationale, examples, anti-patterns, and detailed process reference are in the [d
 
 - Repository-specific policy files live in `.cadet/agent/policies`.
 - Create policy files only when the user explicitly requests one.
-- Use the Policy Template from docs/ to create new policies.
+- Use the Policy Template from `.cadet/agent/core/templates/PolicyTemplate.md` to create new policies.
 - Name policy files using `{RepoName}Policy.md`.
 - When exactly one policy file exists, treat it as the active policy.
 - When multiple exist, choose the best match for the active workspace.

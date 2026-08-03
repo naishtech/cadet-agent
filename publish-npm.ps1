@@ -55,16 +55,15 @@ catch {
 Write-Host "📦 Publishing cadet-agent to npm..." -ForegroundColor Cyan
 
 try {
-  # Authenticate
-  npm config set "//registry.npmjs.org/:_authToken=$token" 2>&1 | Out-Null
-  if ($LASTEXITCODE -ne 0) { throw "Failed to set auth token" }
-
-  $user = npm whoami 2>&1
+  # Authenticate and publish in one step (token is not persisted to npm config)
+  $user = npm whoami --//registry.npmjs.org/:_authToken=$token 2>&1
   Write-Host "   Authenticated as $user" -ForegroundColor Gray
 
-  # Publish
-  npm publish 2>&1 | Out-Host
+  npm publish --//registry.npmjs.org/:_authToken=$token 2>&1 | Out-Host
   if ($LASTEXITCODE -ne 0) { throw "npm publish failed (exit $LASTEXITCODE)" }
+
+  # Clean up any previously persisted token from older versions of this script
+  npm config delete "//registry.npmjs.org/:_authToken" 2>&1 | Out-Null
 
   Write-Host "`n✅ cadet-agent published successfully!" -ForegroundColor Green
 }

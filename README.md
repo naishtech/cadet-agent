@@ -50,12 +50,8 @@ Expand-Archive .\cadet-agent.zip -DestinationPath . -Force
 ```
 
 ## Getting Started
-- For repository setup and package contents, see [.cadet/agent/README.md](.cadet/agent/README.md).
-- For framework navigation, see [.cadet/agent/core/README.md](.cadet/agent/core/README.md).
-- For GitHub Copilot setup, see [.cadet/agent/docs/github-copilot.md](.cadet/agent/docs/github-copilot.md).
-- For Cursor setup, see [.cadet/agent/docs/cursor.md](.cadet/agent/docs/cursor.md).
-- For Continue setup, see [.cadet/agent/docs/continue.md](.cadet/agent/docs/continue.md).
-- For Claude Code setup, see [.cadet/agent/docs/claude-code.md](.cadet/agent/docs/claude-code.md).
+- For framework navigation after install, see `.cadet/agent/core/README.md`.
+- IDE setup guides and full documentation are at the [canonical repository](https://github.com/naishtech/cadet-agent) (GitHub Pages).
 
 ## Examples
 
