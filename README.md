@@ -6,8 +6,12 @@ Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished g
 
 ## Repository Layout
 - `.cadet/agent/core/` contains the shared Cadet-Agent framework documents.
+  - `cadet-agent.md` is the thin global directive: identity, non-negotiable rules, workflow routing, hard-gate protocol, and skill dispatch.
+  - `skills/` contains scoped workflow-phase skills (Requirements, Architecture, Spike, StoryBreakdown, TDD, Debugging, CodeReview).
+  - `templates/` contains runtime templates for planning artifacts.
 - `.cadet/agent/docs/` contains setup guides for each supported IDE.
 - `.github/agents/` contains the Copilot custom agent definitions (Cadet Agent + Cadet Agent Reviewer).
+- `.github/prompts/` contains Copilot slash-command skill prompts (`/cadet-review`, `/cadet-tdd`, etc.).
 - `.cursor/` contains Cursor-specific authored files.
 - `.continue/` contains Continue-specific authored files.
 - `.claude/` contains Claude Code-specific authored files.
@@ -58,13 +62,25 @@ Expand-Archive .\cadet-agent.zip -DestinationPath . -Force
 ### GitHub Copilot
 Run `npx cadet-agent@latest init` in your Unity project root, then open the repo in VS Code.
 
-**Agent mode:** Select the **Cadet Agent** agent from the agent picker in Copilot Chat. The agent definition at `.github/agents/cadet.agent.md` provides focused instructions and tool configuration.
+**Agent mode:** Select the **Cadet Agent** agent from the agent picker in Copilot Chat. The agent definition at `.github/agents/cadet.agent.md` loads the thin directive in `.cadet/agent/core/cadet-agent.md` and dispatches scoped skills.
 
 ```text
 [Describe your game dev task...]
 ```
 
-Cadet Agent will use the shared framework in `.cadet/agent/core` to route the conversation through learner calibration, bootstrap checks, and planning.
+Cadet Agent will classify the change, check `.cadet/state.json` for blocking gates, and invoke the appropriate skill.
+
+**Skill mode:** For a specific workflow phase, use the matching slash command so the skill becomes the primary instruction context:
+
+```text
+/cadet-requirements
+create a requirements doc for a kart handling prototype
+```
+
+```text
+/cadet-review
+review the PR at https://github.com/... or review story-1 in epic-1-player-movement
+```
 
 **Review mode:** After the Cadet Agent completes a task, select the **Cadet Agent Reviewer** from the agent picker. Provide the task, story, or PR to review:
 
@@ -101,8 +117,12 @@ If a specific game repository needs local conventions, add a policy file under `
 ## Package Output
 Running `./package-agent.ps1` produces `cadet-agent.zip` with this layout:
 - `.cadet/agent/core/`
+- `.cadet/agent/core/skills/`
+- `.cadet/agent/core/templates/`
 - `.github/agents/cadet.agent.md`
 - `.github/agents/cadet-agent-reviewer.agent.md`
+- `.github/prompts/cadet-*.prompt.md`
+- `.github/hooks/`
 - `.cursor/rules/cadet-agent.md`
 - `.continue/rules/cadet-agent.md`
 - `.claude/skills/cadet-agent.md`

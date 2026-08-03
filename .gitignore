@@ -4,3 +4,7 @@ cadet-agent-updated.zip
 
 # Node (CLI tool)
 node_modules/
+
+# User-reserved Cadet runtime files (policies and plans are preserved on sync)
+.cadet/agent/project-plans/
+.cadet/cadet-local-config.md

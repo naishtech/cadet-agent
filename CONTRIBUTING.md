@@ -19,11 +19,20 @@ All changes must happen on a feature branch. Direct commits to `main` are not pe
 
 **Managed paths** (owned by Cadet-Agent, overwritten on sync):
 - `.cadet/agent/core/`
+- `.cadet/agent/core/skills/`
+- `.cadet/agent/core/templates/`
 - `.github/agents/cadet.agent.md`
 - `.github/agents/cadet-agent-reviewer.agent.md`
 - `.github/hooks/git-guard.json`
 - `.github/hooks/scripts/git-guard.sh`
 - `.github/hooks/scripts/git-guard.ps1`
+- `.github/prompts/cadet-requirements.prompt.md`
+- `.github/prompts/cadet-architecture.prompt.md`
+- `.github/prompts/cadet-spike.prompt.md`
+- `.github/prompts/cadet-breakdown.prompt.md`
+- `.github/prompts/cadet-tdd.prompt.md`
+- `.github/prompts/cadet-debug.prompt.md`
+- `.github/prompts/cadet-review.prompt.md`
 - `.cursor/rules/cadet-agent.md`
 - `.continue/rules/cadet-agent.md`
 - `.claude/skills/cadet-agent.md`
@@ -37,7 +46,7 @@ If you add a new managed path, update `FrameworkManifest.json → managedPaths` 
 ## Version bump rules
 Follow the policy defined in [.cadet/agent/core/README.md](.cadet/agent/core/README.md#version-bump-policy):
 - **Patch**: wording correction, broken-link fix, or doc-only clarification.
-- **Minor**: new skill, standard, template, or guidance document; structural reorganization.
+- **Minor**: new skill, standard, template, guidance document, or structural reorganization that adds capability without breaking consumer installs.
 - **Major**: breaking change to managed paths, removal of an existing skill or standard, or a workflow routing change that invalidates prior planning artifacts.
 
 Update `.cadet/agent/core/FrameworkManifest.json → frameworkVersion` in the same PR as your content change. Update `CHANGELOG.md` with an entry under the new version number.

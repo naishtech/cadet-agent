@@ -16,13 +16,19 @@ For the condensed agent instruction set, see [cadet-agent.md](https://github.com
 - [Policy & Guidance Rules](core/PolicyAndGuidanceRules.md) — How policies and guidance interact
 - [Technology Introduction Rule](core/TechnologyIntroductionRule.md) — Rules for introducing new tech
 
-## Skills (detailed process reference)
+## Skills (scoped workflow phase instructions)
+
+Cadet skills are phase-scoped instruction files. When invoked (via `/cadet-<skill>` in Copilot or by reading the skill file directly), the skill becomes the primary instruction context for that turn, making hard gates and workflow steps unavoidable.
 
 - [Requirements](core/skills/Requirements.md)
 - [Architecture](core/skills/Architecture.md)
+- [Spike](core/skills/Spike.md)
+- [Story Breakdown](core/skills/StoryBreakdown.md)
 - [TDD](core/skills/TDD.md)
 - [Debugging](core/skills/Debugging.md)
 - [Code Review](core/skills/CodeReview.md)
+
+## Detailed process reference
 
 ## Guidance
 

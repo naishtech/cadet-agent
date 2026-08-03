@@ -151,7 +151,7 @@ If any gate is `false`, do NOT advance to the review phase. Fix the failing gate
 
 **This gate is non-skippable.** After completing implementation and before moving to validation, the agent MUST transition through the `review` phase. See [HardGates](HardGates.md) for the full gate execution protocol.
 
-After completing an epic (or story for small/no-test changes) and before moving to the next or marking work as done, run the review skill in [CodeReview](skills/CodeReview.md).
+After completing an epic (or story for small/no-test changes) and before moving to the next or marking work as done, invoke the review skill (`/cadet-review` in Copilot, or read `.cadet/agent/core/skills/CodeReview.md` as the primary context) and follow the full review process.
 
 - Set `currentPhase` to `review` in `.cadet/state.json`.
 - Apply the full 17-step review process against the completed epic's changes.
