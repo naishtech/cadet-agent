@@ -5,18 +5,16 @@ Use this guide when installing Cadet-Agent into a repository that will use Curso
 ## Installed Files
 Cadet-Agent installs these Cursor-facing files:
 - `.cursor/rules/cadet-agent.md`
-- `AGENTS.md`
 - `.cadet/agent/core/`
 
 ## What Each File Does
 - `.cursor/rules/cadet-agent.md` is the always-apply Cursor rule that anchors the framework.
-- `AGENTS.md` supplies shared agent instructions that Cursor can also use.
 - `.cadet/agent/core/` contains the shared Cadet framework documents referenced by the rule.
 
 ## Installation
-1. Copy `cadet-agent.zip` to the target repository root.
-2. Extract it into the repository root.
-3. Confirm these paths exist: `.cadet/agent/core/`, `.cursor/rules/cadet-agent.md`, and `AGENTS.md`.
+1. From the target repository root, run `npx cadet-agent@latest init`.
+2. If you want to install into a different folder, use `npx cadet-agent@latest init --target <path>`.
+3. Confirm these paths exist: `.cadet/agent/core/` and `.cursor/rules/cadet-agent.md`.
 4. Open the repository in Cursor.
 5. Verify the project rule appears under Cursor project rules.
 
@@ -30,5 +28,5 @@ Cadet-Agent installs these Cursor-facing files:
 - Keep IDE-specific customization thin; extend the shared framework first when the behavior should apply across IDEs.
 
 ## Updating
-- Replace `.cursor/rules/cadet-agent.md`, `AGENTS.md`, and `.cadet/agent/core` from a new package version.
+- Replace `.cursor/rules/cadet-agent.md` and `.cadet/agent/core` from a new package version.
 - Preserve `.cadet/agent/policies`, `.cadet/agent/project-plans`, and the rest of the repository.

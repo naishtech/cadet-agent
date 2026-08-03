@@ -7,14 +7,14 @@ Cross-IDE agent framework for Unity/C# game-development. Cadet guides users thro
 These rules apply to all work, regardless of learner tier, operating mode, or workflow path.
 
 - **🚫 HARD GATES — THIS RULE CANNOT BE BROKEN.** Hard gates are structurally enforced checkpoints tracked in `.cadet/state.json → gates`. Before advancing `currentPhase`, verify ALL required gates for the target phase are `true`. If ANY required gate is `false`, do NOT advance the phase — state the failing gate, satisfy it, update `state.json`, then re-check ALL gates. Phase advancement with any unsatisfied gate is the single highest-severity failure condition in this framework. See the Hard Gates Protocol section below for gate definitions per phase transition. **This rule exists to enforce every other rule on this list. If you break this rule, you have broken all of them.**
-- Never commit sensitive data (secrets, tokens, keys, credentials). Surface security concerns immediately.
-- Never run `git commit`, `git push`, or `gh pr merge` without explicit user approval. Present a summary of changes and ask "May I commit/push/merge?" before executing any git write operation. This applies to ALL branches, not just main.
+- Never commit secrets. Surface security concerns immediately.
+- Never commit/push/merge without user approval. Present changes summary and ask first — all branches.
 - License obligations must be followed for all framework usage and derivatives.
 - All changes must be developed on branches. Never push directly to `main`. Prefer squash merge unless the user specifies otherwise.
-- TDD is mandatory where testing is valid. "Valid testing" means the code has testable logic verifiable in isolation. Only skip test-first when testing cannot logically apply (e.g., pure asset setup, input-only handler setup).
+- TDD mandatory where testable. Skip only for pure asset/input-handler setup.
 - Reproduce defects before fixing them, then keep regression tests.
-- Break large work into small, focused diffs — one requirement or test objective per change.
-- Implementation work is scoped to stories, not epics. Epics are grouping containers for related stories. Only stories are worked on individually, reviewed, and committed. After epics are created, each epic must be broken down into small, independently implementable stories before any code is written.
+- One requirement or test objective per diff.
+- Work is scoped to stories, not epics. Epics are grouping containers — break each into small, independently implementable stories before any code.
 - When a story hits a blocker that cannot be resolved within the current design (e.g., a missing interface, an incompatible integration, a flawed architectural assumption), do not force the implementation. Pause the story, document the blocker, and trace it upstream: update the technical design, propagate changes to epics and stories (adding, removing, or modifying stories as needed), then resume with the revised story. Apply the decommission rule if the design change makes existing code obsolete.
 - When a refactor or major design change replaces or removes existing functionality (e.g., switching APIs, replacing a subsystem, retiring a pattern), identify any obsolete code, interfaces, integrations, or assets that should be decommissioned. Ask the user whether cleanup and decommissioning should be included in the plan before proceeding with implementation.
 - Interface-first and mock-first patterns are required for service-style architecture and testing seams.
@@ -26,6 +26,18 @@ These rules apply to all work, regardless of learner tier, operating mode, or wo
 - For Unity projects, use Unity Test Framework (UTF) for unit tests. Do not recommend external test frameworks like NUnit or xUnit for Unity code.
 - Apply guidance as preferred heuristics and lessons learned, not as a substitute for standards or policy. In all outputs, distinguish guidance recommendations from mandatory requirements.
 - Place reusable shared infrastructure in the repository's designated shared-code location when one exists. Confirm extraction scope with the user before moving shared code.
+
+### XML Tag Convention
+
+Three XML tag families are used throughout this framework. All tags are authoring-time only — strip them from final output.
+
+- `<slot/>` — fill-in zone. Replace with the requested value. Self-closing or wrapping. Attributes: `id`, `opt`, `fmt`, `note`, `repeat`, `header`.
+- `<gate/>` — structurally enforced checkpoint. Appears inside `<gates>` / `<transition>` wrappers. Read-only — never emit in output. Describes a condition that must be `true` before phase advancement.
+- `<output ref="path"/>` — read the referenced template file, fill every `<slot/>`, strip all XML wrappers, and produce pure Markdown output.
+
+Template path policy: `ref` paths must target `.cadet/agent/core/templates/...` only.
+
+After filling, the final artifact contains zero XML tags.
 
 ## Workflow Routing
 
@@ -73,13 +85,13 @@ The agent maintains a session state file at `.cadet/state.json` conforming to `.
 
 ### Requirements (dispatched for large changes)
 
-1. Capture requirements in markdown with Given/When/Then acceptance criteria.
-2. Walk the user through each criterion at learner-appropriate depth (unless they request end-only review).
+1. Capture requirements with Given/When/Then acceptance criteria.
+2. Walk user through each criterion (skip if end-only review requested).
 3. Validate each criterion is testable and maps to an expected outcome.
-4. Run an ambiguity scan. Ask user permission before running one-by-one clarification with clickable options.
-5. **Assumption audit:** List every assumption the requirements depend on (technology capabilities, integration behavior, platform constraints, user behavior). Classify each as verified, reasonable, or unverified. For unverified assumptions, recommend a spike to answer the open question. Include the assumption audit in the requirements document.
-6. Output: requirements.md with GWT criteria, scope boundaries, assumption audit, exclusions, change history.
-7. After producing the requirements document, ask the user if they want to commit it to a new git branch and create a PR. If git is not installed, recommend installing it.
+4. Run ambiguity scan. Ask permission before one-by-one clarification.
+5. **Assumption audit:** List every assumption. Classify each as verified, reasonable, or unverified. For unverified assumptions, recommend a spike. Include the assumption audit in the requirements document.
+6. Read `<output ref=".cadet/agent/core/templates/RequirementsTemplate.md"/>`. Fill every `<slot/>`, strip all XML wrappers, write pure Markdown as `requirements.md`.
+7. Ask user whether to commit to a new branch and create a PR.
 8. If criteria change later, propagate updates to design, plan, and epics before continuing implementation.
 
 ### Architecture (dispatched for large changes, after requirements)
@@ -89,33 +101,31 @@ The agent maintains a session state file at `.cadet/state.json` conforming to `.
 3. Evaluate technology options using the TechnologyDecisionFramework. Record decisions as ADRs under `.cadet/agent/project-plans/adr/`.
 4. Include an explicit TDD red/green test strategy tied to acceptance criteria.
 5. Identify architectural seams and test boundaries.
-6. **Assumption audit:** List every design assumption (API capabilities, service behavior, latency bounds, platform support, third-party limitations). Classify each as verified, reasonable, or unverified. For unverified assumptions, recommend a spike. Cross-reference with the requirements assumption audit — any unverified assumption that survives into the design must be resolved by a spike before epics and stories are finalized.
-7. Output: technical-design.md with decision log, assumption audit, test strategy, traceability to requirements.
-8. After producing the technical design, ask the user if they want to commit it to a new git branch and create a PR. If git is not installed, recommend installing it.
+6. **Assumption audit:** List every design assumption. Classify each as verified, reasonable, or unverified. For unverified assumptions, recommend a spike. Cross-reference with the requirements assumption audit — any unverified assumption that survives into the design must be resolved by a spike before epics and stories are finalized.
+7. Read `<output ref=".cadet/agent/core/templates/TechnicalDesignTemplate.md"/>`. Fill every `<slot/>`, strip all XML wrappers, write pure Markdown as `technical-design.md`.
+8. Ask user whether to commit to a new branch and create a PR.
 9. If design changes, propagate to plan and epics before continuing.
 
 ### Spike (dispatched for unverified assumptions during planning)
 
-Use `.cadet/agent/core/Templates/SpikeTemplate.md` for spike output.
-
 1. Identify the exact question the spike must answer (e.g., "Does EOS support host migration on Xbox?"). State it in one sentence.
 2. Research the question using available sources (documentation, APIs, community knowledge, online search with user permission).
 3. Report findings: capabilities (what it can do), limitations (what it cannot do, constraints, edge cases), and a clear recommendation (use this, avoid this, or more research needed).
-4. Output: a spike markdown file under `.cadet/agent/project-plans/spikes/` using the SpikeTemplate.
+4. Read `<output ref=".cadet/agent/core/templates/SpikeTemplate.md"/>`. Fill every `<slot/>`, strip all XML wrappers, write pure Markdown as a spike file under `.cadet/agent/project-plans/spikes/`.
 5. After the spike is complete, update the relevant assumptions in requirements and architecture from unverified to verified with the spike results.
 6. Spike code (if any) must remain isolated and reference-only. Do not wire spike code into production paths.
 
 ### StoryBreakdown (dispatched for large changes, after epics and spikes)
 
-Use `.cadet/agent/core/Templates/EpicTemplate.md` for epic files and `.cadet/agent/core/Templates/StoryTemplate.md` for story files. Spike results must be incorporated — unverified assumptions that were resolved by spikes should direct which stories are created and what they contain.
+Spike results must be incorporated — unverified assumptions that were resolved by spikes should direct which stories are created and what they contain.
 
 1. For each epic, create a directory named after the epic (e.g., `epic-1-player-movement/`).
-2. Inside the directory, create `epic.md` using the EpicTemplate — minimal content: ID, status, summary, requirements/design links, and a checklist of story links.
+2. Inside the directory, create `epic.md` by reading `<output ref=".cadet/agent/core/templates/EpicTemplate.md"/>` and writing pure Markdown.
 3. For each epic, decompose into small, independently implementable stories.
 4. Each story must be completable in a single session and produce a working, testable increment.
 5. A story should address exactly one user-observable behavior or integration point.
 6. If a story still feels large, split it further until each story is small enough for a focused code review.
-7. Create each story as `story-N-name.md` in the same epic directory, using the StoryTemplate.
+7. Create each story as `story-N-name.md` by reading `<output ref=".cadet/agent/core/templates/StoryTemplate.md"/>` and writing pure Markdown.
 8. After producing all epic and story files, ask the user if they want to commit them before beginning implementation.
 
 ### TDD (dispatched per story for large changes; per change for small)
@@ -156,28 +166,29 @@ After review, set `codeReviewCompleted`, `securityReviewPassed`, and `acceptance
 
 **Hard gates are structurally enforced checkpoints tracked in `.cadet/state.json → gates`.** They cannot be skipped, deferred, or satisfied without performing the required action. Before every phase transition, read the current gate state and verify all required gates are `true`.
 
-### Gate Definitions by Phase Transition
+### Gate Definitions
 
-**Implementation → Review** (all three must be `true`):
-- `testsPassed` — all tests for the current story pass (red/green confirmed).
-- `compileCheckConfirmed` — user confirmed Unity compiles without errors.
-- `storyTrackingUpdated` — story markdown marked complete, epic progress updated.
-
-**Review → Validation** (all three must be `true`):
-- `codeReviewCompleted` — full 17-step review executed, findings filed.
-- `securityReviewPassed` — no secrets, unsafe patterns, or security concerns.
-- `acceptanceCriteriaValidated` — each Given/When/Then criterion validated.
-
-**Validation → Closed** (must be `true`):
-- `designArtifactSyncConfirmed` — requirements, design, plan, epics mutually consistent.
+<gates>
+  <transition from="implementation" to="review">
+    <gate id="testsPassed">All tests for the current story pass — red/green confirmed.</gate>
+    <gate id="compileCheckConfirmed">User confirmed Unity compiles without errors.</gate>
+    <gate id="storyTrackingUpdated">Story markdown marked complete, epic progress updated.</gate>
+  </transition>
+  <transition from="review" to="validation">
+    <gate id="codeReviewCompleted">Full review executed per CodeReview skill, findings filed.</gate>
+    <gate id="securityReviewPassed">No secrets, unsafe patterns, or security concerns.</gate>
+    <gate id="acceptanceCriteriaValidated">Each Given/When/Then criterion validated.</gate>
+  </transition>
+  <transition from="validation" to="closed">
+    <gate id="designArtifactSyncConfirmed">Requirements, design, plan, epics mutually consistent.</gate>
+  </transition>
+</gates>
 
 ### Gate Execution Protocol
 
-1. Before advancing `currentPhase`, read `gates` from `.cadet/state.json`.
-2. Check all gates required for the target phase.
-3. If any required gate is `false`: state "Gate X is not satisfied. I cannot advance to phase Y." Fix the gate, set it to `true`, re-check ALL gates.
-4. Only advance when ALL required gates are `true`.
-5. All gates reset to `false` when starting a new story or epic.
+1. Read `gates` from `.cadet/state.json` before phase transition.
+2. Check required gates for the target transition; if any is `false`, block transition and report the failing gate(s).
+3. Apply reset semantics exactly as current rules define (gates reset to `false` on new story/epic), then re-check before transition.
 
 ### Failure to Satisfy a Gate
 

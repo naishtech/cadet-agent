@@ -9,6 +9,7 @@ Cadet-Agent is a cross-IDE agent framework for game-development workflows, with 
 - `.cursor/` contains Cursor-specific authored files.
 - `.continue/` contains Continue-specific authored files.
 - `.claude/` contains Claude Code-specific authored files.
+- These IDE folders hold thin integration shims; the core framework logic still lives in `.cadet/agent/core/`.
 - `package-agent.ps1` builds the distributable `cadet-agent.zip` package.
 - `publish-npm.ps1` publishes the CLI to npm using a token from `~/.npm_token`.
 
@@ -24,9 +25,9 @@ This downloads the latest framework release and extracts it into your current di
 npx cadet-agent@latest init --target ./my-unity-project
 ```
 
-## Manual Install
+## Manual Install (fallback)
 
-Download `cadet-agent.zip` from [GitHub Releases](https://github.com/naishtech/cadet-agent/releases) and extract it into your Unity project root:
+If you prefer to install from a packaged release artifact, download `cadet-agent.zip` from [GitHub Releases](https://github.com/naishtech/cadet-agent/releases) and extract it into your Unity project root:
 
 ```powershell
 Expand-Archive .\cadet-agent.zip -DestinationPath . -Force

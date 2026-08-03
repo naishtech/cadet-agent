@@ -11,7 +11,7 @@ The packaged Cadet bootstrap files extracted from `cadet-agent.zip` are the one 
 
 **Prerequisites — what the user does before using the Cadet agent:**
 1. Create a project folder, e.g. `C:\dev\MyGame`.
-2. Copy `cadet-agent.zip` into that folder and extract it — this installs a bootstrap snapshot at `.cadet\agent\core\`, `.github\agents\cadet.agent.md`, `.cursor\rules\cadet-agent.md`, `.continue\rules\cadet-agent.md`, and `.claude\skills\cadet-agent.md`.
+2. Run `npx cadet-agent@latest init --target .` from that folder — this installs a bootstrap snapshot at `.cadet\agent\core\`, `.github\agents\cadet.agent.md`, `.cursor\rules\cadet-agent.md`, `.continue\rules\cadet-agent.md`, and `.claude\skills\cadet-agent.md`.
 3. Open VS Code with that folder as the workspace root.
 4. Select the **Cadet** agent from the agent picker in Copilot Chat and describe your objective to begin the framework sync gate before substantive work starts.
 
