@@ -37,7 +37,7 @@ function deletePath(targetDir, relativePath) {
 
 // Add upgrade entries when removing/renaming managed paths.
 // Key = FROM version. Example:
-//   '0.16.0': (targetDir) => [
+//   '0.17.0': (targetDir) => [
 //     ...deletePath(targetDir, '.cadet/some-old-dir'),
 //     ...deletePath(targetDir, '.github/old-agent.agent.md'),
 //   ],

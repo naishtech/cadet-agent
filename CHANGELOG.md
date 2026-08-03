@@ -11,6 +11,13 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ---
 
+## [0.17.0] — 2026-08-03
+
+### Added
+- `/cadet-resume` slash-command prompt: inspects `.cadet/state.json`, cross-validates git history and epic/story files for discrepancies, then routes to the correct phase skill.
+- Workflow diagram in `README.md` (Mermaid flowchart) showing the full SDLC, resume flow, hard-gate transitions, and phase-gating table.
+- `docs/core/skills/Spike.md` and `docs/core/skills/StoryBreakdown.md` reference documentation.
+
 ## [0.16.0] — 2026-08-03
 
 ### Added
