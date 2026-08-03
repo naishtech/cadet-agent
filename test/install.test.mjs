@@ -186,6 +186,48 @@ describe('buildHeaders', () => {
   });
 });
 
+// ── Removed managed path detection ──────────────────────────────────────────
+
+function findRemovedManagedPaths(oldManaged, newManaged) {
+  const newSet = new Set(newManaged.map(p => p.replace(/^\.\//, '').replace(/\\/g, '/')));
+  const removed = [];
+  for (const old of oldManaged) {
+    const oldNorm = old.replace(/^\.\//, '').replace(/\\/g, '/');
+    if (!newSet.has(oldNorm)) {
+      removed.push(old);
+    }
+  }
+  return removed;
+}
+
+describe('removed managed paths', () => {
+  it('detects paths removed from managedPaths', () => {
+    const old = ['.cadet/orchestrator', '.cadet/agent/core', '.github/agents/cadet.agent.md'];
+    const nue = ['.cadet/agent/core', '.github/agents/cadet.agent.md'];
+    const removed = findRemovedManagedPaths(old, nue);
+    assert.deepEqual(removed, ['.cadet/orchestrator']);
+  });
+
+  it('returns empty when nothing removed', () => {
+    const old = ['.cadet/agent/core', '.github/agents/cadet.agent.md'];
+    const nue = ['.cadet/agent/core', '.github/agents/cadet.agent.md'];
+    assert.deepEqual(findRemovedManagedPaths(old, nue), []);
+  });
+
+  it('detects multiple removals', () => {
+    const old = ['.cadet/orchestrator', '.cadet/agent/docs', '.cadet/agent/core'];
+    const nue = ['.cadet/agent/core'];
+    const removed = findRemovedManagedPaths(old, nue);
+    assert.equal(removed.length, 2);
+    assert.ok(removed.includes('.cadet/orchestrator'));
+    assert.ok(removed.includes('.cadet/agent/docs'));
+  });
+
+  it('handles empty old list', () => {
+    assert.deepEqual(findRemovedManagedPaths([], ['.cadet/agent/core']), []);
+  });
+});
+
 // ── ZIP parser: findEocd (reconstructed for unit test isolation) ────────────
 
 const SIG_EOCD = 0x06054b50;
