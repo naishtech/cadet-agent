@@ -18,7 +18,7 @@ Read `.cadet/agent/core/cadet-agent.md` in full. This is the single source of tr
 - **Non-Negotiable Rules** — Every bullet under that section is mandatory.
 - **Hard Gates Protocol** — Check `.cadet/state.json → gates` for gate completion status.
 - **Workflow Routing** — Was the change classified (large/small/no_test_required)? Was the appropriate skill sequence followed?
-- **Skill Instructions** — For the given task type, were all skill steps executed?
+- **Skill Dispatch and Skills** — For the given task type, was the correct skill invoked (via `/cadet-<skill>` or by reading `.cadet/agent/core/skills/<SkillName>.md` as the primary context), and were all skill steps executed?
 - **Unity-Specific Rules** — Does the code comply?
 - **Document Rules** — Are planning artifacts consistent and up to date?
 - **Git Workflow** — Was work done on a branch? Was user approval obtained?

@@ -4,6 +4,7 @@
 #   .cadet\agent\core\
 #   .github\agents\cadet.agent.md (Copilot agent mode)
 #   .github\agents\cadet-agent-reviewer.agent.md (Copilot reviewer agent)
+#   .github\prompts\cadet-*.prompt.md (Copilot slash-command skills)
 #   .cursor\rules\cadet-agent.md
 #   .continue\rules\cadet-agent.md
 #   .claude\skills\cadet-agent.md
@@ -17,6 +18,7 @@ $ErrorActionPreference = "Stop"
 $scriptDir    = $PSScriptRoot
 $coreSource   = Join-Path $scriptDir ".cadet\agent\core"
 $githubSource = Join-Path $scriptDir ".github"
+$promptsSource  = Join-Path $githubSource "prompts"
 $cursorSource = Join-Path $scriptDir ".cursor"
 $continueSource = Join-Path $scriptDir ".continue"
 $claudeSource  = Join-Path $scriptDir ".claude"
@@ -57,7 +59,7 @@ if (-not (Test-Path $coreSource)) {
     exit 1
 }
 
-foreach ($path in @($githubSource, $cursorSource, $continueSource, $claudeSource)) {
+foreach ($path in @($githubSource, $promptsSource, $cursorSource, $continueSource, $claudeSource)) {
     if (-not (Test-Path $path)) {
         Write-Error "Adapter source not found at: $path"
         exit 1
@@ -132,8 +134,9 @@ if (Test-Path $staging) {
 Copy-TreeIntoStaging -SourceRoot $coreSource -StagingRoot $staging -TargetRoot ".cadet\agent\core"
 
 # Only copy managed .github files — exclude CI workflows from the consumer package
-Copy-TreeIntoStaging -SourceRoot (Join-Path $githubSource "agents")  -StagingRoot $staging -TargetRoot ".github\agents"
-Copy-TreeIntoStaging -SourceRoot (Join-Path $githubSource "hooks")   -StagingRoot $staging -TargetRoot ".github\hooks"
+Copy-TreeIntoStaging -SourceRoot (Join-Path $githubSource "agents")   -StagingRoot $staging -TargetRoot ".github\agents"
+Copy-TreeIntoStaging -SourceRoot (Join-Path $githubSource "hooks")    -StagingRoot $staging -TargetRoot ".github\hooks"
+Copy-TreeIntoStaging -SourceRoot $promptsSource                        -StagingRoot $staging -TargetRoot ".github\prompts"
 
 Copy-TreeIntoStaging -SourceRoot $cursorSource -StagingRoot $staging -TargetRoot ".cursor"
 Copy-TreeIntoStaging -SourceRoot $continueSource -StagingRoot $staging -TargetRoot ".continue"
@@ -159,6 +162,7 @@ Write-Host "    .github\agents\cadet-agent-reviewer.agent.md"
 Write-Host "    .github\hooks\git-guard.json"
 Write-Host "    .github\hooks\scripts\git-guard.sh"
 Write-Host "    .github\hooks\scripts\git-guard.ps1"
+Write-Host "    .github\prompts\cadet-*.prompt.md"
 Write-Host "    .cursor\rules\cadet-agent.md"
 Write-Host "    .continue\rules\cadet-agent.md"
 Write-Host "    .claude\skills\cadet-agent.md"

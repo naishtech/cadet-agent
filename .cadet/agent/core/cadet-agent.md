@@ -81,86 +81,36 @@ The agent maintains a session state file at `.cadet/state.json` conforming to `.
 - **Read state** on session start: if `state.json` exists, resume from the last recorded phase, active story, and tracking mode.
 - **Never lose state**: if a state update fails, retry or ask the user for help before continuing work. The state file is the single source of truth for what has been completed.
 
-## Skill Instructions
+## Skill Dispatch
 
-### Requirements (dispatched for large changes)
+Cadet workflows are implemented as scoped skills. The global directive decides **which skill to invoke**; the skill file provides the **detailed process** and becomes the primary instruction context for that workflow phase. This prevents default model behaviors from overriding Cadet hard gates and checkpoints.
 
-1. Capture requirements with Given/When/Then acceptance criteria.
-2. Walk user through each criterion (skip if end-only review requested).
-3. Validate each criterion is testable and maps to an expected outcome.
-4. Run ambiguity scan. Ask permission before one-by-one clarification.
-5. **Assumption audit:** List every assumption. Classify each as verified, reasonable, or unverified. For unverified assumptions, recommend a spike. Include the assumption audit in the requirements document.
-6. Read `<output ref=".cadet/agent/core/templates/RequirementsTemplate.md"/>`. Fill every `<slot/>`, strip all XML wrappers, write pure Markdown as `requirements.md`.
-7. Ask user whether to commit to a new branch and create a PR.
-8. If criteria change later, propagate updates to design, plan, and epics before continuing implementation.
+### Skill Inventory
 
-### Architecture (dispatched for large changes, after requirements)
+| Skill | Invocation | When to dispatch |
+|---|---|---|
+| **Requirements** | `/cadet-requirements` | Large changes, after workflow classification. |
+| **Architecture** | `/cadet-architecture` | Large changes, after requirements are finalized. |
+| **Spike** | `/cadet-spike` | When requirements or design contain unverified assumptions. |
+| **Story Breakdown** | `/cadet-breakdown` | Large changes, after architecture and any spikes. |
+| **TDD** | `/cadet-tdd` | Per story for large changes; per change for small changes. |
+| **Debugging** | `/cadet-debug` | On defect reports or unexpected behavior. |
+| **Code Review** | `/cadet-review` | After each completed story or change — **non-skippable**. |
 
-1. Derive design decisions directly from approved acceptance criteria.
-2. Define components, interfaces, data flow, and integration boundaries.
-3. Evaluate technology options using the TechnologyDecisionFramework. Record decisions as ADRs under `.cadet/agent/project-plans/adr/`.
-4. Include an explicit TDD red/green test strategy tied to acceptance criteria.
-5. Identify architectural seams and test boundaries.
-6. **Assumption audit:** List every design assumption. Classify each as verified, reasonable, or unverified. For unverified assumptions, recommend a spike. Cross-reference with the requirements assumption audit — any unverified assumption that survives into the design must be resolved by a spike before epics and stories are finalized.
-7. Read `<output ref=".cadet/agent/core/templates/TechnicalDesignTemplate.md"/>`. Fill every `<slot/>`, strip all XML wrappers, write pure Markdown as `technical-design.md`.
-8. Ask user whether to commit to a new branch and create a PR.
-9. If design changes, propagate to plan and epics before continuing.
+### Dispatch Rules
 
-### Spike (dispatched for unverified assumptions during planning)
+1. After classifying the workflow path, announce which skill you are invoking and why.
+2. Before invoking a skill, read `.cadet/state.json` and report any gate that blocks the target phase.
+3. Invoke the skill by loading its file as the primary instruction context:
+   - Read `.cadet/agent/core/skills/<SkillName>.md` for the canonical process.
+   - For GitHub Copilot, use the `/cadet-<skill>` slash-command prompt when available.
+4. Do not mix skill instructions with unrelated tasks in the same turn.
+5. After the skill completes, update `.cadet/state.json` before dispatching the next skill or ending the session.
 
-1. Identify the exact question the spike must answer (e.g., "Does EOS support host migration on Xbox?"). State it in one sentence.
-2. Research the question using available sources (documentation, APIs, community knowledge, online search with user permission).
-3. Report findings: capabilities (what it can do), limitations (what it cannot do, constraints, edge cases), and a clear recommendation (use this, avoid this, or more research needed).
-4. Read `<output ref=".cadet/agent/core/templates/SpikeTemplate.md"/>`. Fill every `<slot/>`, strip all XML wrappers, write pure Markdown as a spike file under `.cadet/agent/project-plans/spikes/`.
-5. After the spike is complete, update the relevant assumptions in requirements and architecture from unverified to verified with the spike results.
-6. Spike code (if any) must remain isolated and reference-only. Do not wire spike code into production paths.
+### Skill Gate Checks
 
-### StoryBreakdown (dispatched for large changes, after epics and spikes)
+Each skill is responsible for verifying the gates relevant to its phase. The directive must still enforce the global rule: **no phase transition while any required gate is `false`.**
 
-Spike results must be incorporated — unverified assumptions that were resolved by spikes should direct which stories are created and what they contain.
-
-1. For each epic, create a directory named after the epic (e.g., `epic-1-player-movement/`).
-2. Inside the directory, create `epic.md` by reading `<output ref=".cadet/agent/core/templates/EpicTemplate.md"/>` and writing pure Markdown.
-3. For each epic, decompose into small, independently implementable stories.
-4. Each story must be completable in a single session and produce a working, testable increment.
-5. A story should address exactly one user-observable behavior or integration point.
-6. If a story still feels large, split it further until each story is small enough for a focused code review.
-7. Create each story as `story-N-name.md` by reading `<output ref=".cadet/agent/core/templates/StoryTemplate.md"/>` and writing pure Markdown.
-8. After producing all epic and story files, ask the user if they want to commit them before beginning implementation.
-
-### TDD (dispatched per story for large changes; per change for small)
-
-1. Define expected behavior in test form at confirmed seams.
-2. Write a failing test first (red).
-3. Implement minimal code to pass (green).
-4. For bug fixes: reproduce the bug via failing test first, then implement the fix.
-5. Keep regression tests for all fixed defects.
-6. Output: test evidence (failing-to-passing), updated tests mapping to acceptance criteria.
-7. After all tests pass and code review is complete, update `.cadet/state.json` to mark the story as done. In `"markdown"` mode, also update the story markdown file and parent epic. In `"github"` mode, close the corresponding GitHub issue. In either mode, do not move to the next story until the state reflects completion.
-
-### Debugging (dispatched on defect reports)
-
-1. Reproduce the issue using either a failing test or explicit user instructions.
-2. Define the failure boundary and isolate likely root cause.
-3. Create or update a failing test when valid.
-4. Implement the smallest safe fix.
-5. Ensure failure paths surface concrete diagnostic reasons, not generic messages.
-6. If unresolved after three genuine fix attempts, invoke the Persistent-Failure Protocol: ask the user to add diagnostic file-logging, reproduce, attach the log.
-
-### CodeReview (dispatched after each story completion — NON-SKIPPABLE)
-
-**This gate cannot be bypassed.** Before transitioning from `implementation` to `review`, confirm `testsPassed`, `compileCheckConfirmed`, `unityAnalyzerClean`, and `storyTrackingUpdated` are all `true` in `.cadet/state.json`. Then set `currentPhase` to `review`.
-
-1. Review for functional correctness against acceptance criteria.
-2. Verify test coverage relevance and red/green evidence.
-3. Check for regressions, edge-case risks, security concerns, secrets exposure.
-4. Confirm implementation matches technical design intent.
-5. Confirm project plan, epic, and story status reflect actual progress. Update `.cadet/state.json` to reflect completion. In `"markdown"` mode, also update the story and epic markdown files. In `"github"` mode, update the corresponding GitHub issue.
-6. Confirm no production code depends on spike/example assets.
-7. Provide prioritized findings with clear remediation steps.
-8. Recommend the user optionally review in a separate chat with a different AI model for independent second opinion. Also explicitly recommend invoking the Cadet Agent Reviewer for a framework-compliance audit before considering the task complete.
-
-After review, set `codeReviewCompleted`, `securityReviewPassed`, and `acceptanceCriteriaValidated` to `true` in `.cadet/state.json`. Only then advance to `validation`.
 
 ## Hard Gates Protocol
 

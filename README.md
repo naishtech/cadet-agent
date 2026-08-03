@@ -6,8 +6,12 @@ Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished g
 
 ## Repository Layout
 - `.cadet/agent/core/` contains the shared Cadet-Agent framework documents.
+  - `cadet-agent.md` is the thin global directive: identity, non-negotiable rules, workflow routing, hard-gate protocol, and skill dispatch.
+  - `skills/` contains scoped workflow-phase skills (Requirements, Architecture, Spike, StoryBreakdown, TDD, Debugging, CodeReview).
+  - `templates/` contains runtime templates for planning artifacts.
 - `.cadet/agent/docs/` contains setup guides for each supported IDE.
 - `.github/agents/` contains the Copilot custom agent definitions (Cadet Agent + Cadet Agent Reviewer).
+- `.github/prompts/` contains Copilot slash-command skill prompts (`/cadet-review`, `/cadet-tdd`, etc.).
 - `.cursor/` contains Cursor-specific authored files.
 - `.continue/` contains Continue-specific authored files.
 - `.claude/` contains Claude Code-specific authored files.
@@ -53,18 +57,92 @@ Expand-Archive .\cadet-agent.zip -DestinationPath . -Force
 - For framework navigation after install, see `.cadet/agent/core/README.md`.
 - IDE setup guides and full documentation are at the [canonical repository](https://github.com/naishtech/cadet-agent) (GitHub Pages).
 
+## Workflow
+
+Cadet-Agent follows a structured SDLC with hard gates between phases. The workflow path adapts to change size: **large** changes go through the full pipeline, **small** changes skip planning artifacts, and **no_test_required** changes (docs, config) skip TDD.
+
+```mermaid
+flowchart TD
+    START(["🚀 User starts session"])
+    RESUME{"state.json<br/>exists?"}
+    INIT["Initialize state.json<br/>phase: context-resolution"]
+    REPORT["Report current phase,<br/>epics, stories & gates"]
+    CR["🔍 Context Resolution<br/>classify change size,<br/>calibrate learner,<br/>detect policy"]
+    REQ["📋 Requirements<br/>Given/When/Then criteria<br/>assumption audit"]
+    ARCH["🏗️ Architecture<br/>technical design,<br/>ADR decisions"]
+    SPIKE["🧪 Spikes<br/>resolve unverified<br/>assumptions"]
+    BREAKDOWN["📐 Story Breakdown<br/>epics → testable stories"]
+    IMPL["🔨 Implementation<br/>TDD per story,<br/>red → green → refactor"]
+    REVIEW["✅ Review<br/>hard gate: 17-step<br/>code review, security"]
+    VALIDATE["✔️ Validation<br/>acceptance criteria,<br/>design artifact sync"]
+    CLOSED(["🎉 Closed"])
+    NEXT_STORY{"More stories<br/>in epic?"}
+
+    START --> RESUME
+    RESUME -->|"no"| INIT --> CR
+    RESUME -->|"yes"| REPORT --> CR
+
+    CR -->|"large change"| REQ
+    CR -->|"small / no_test_required"| IMPL
+
+    REQ --> ARCH
+    ARCH -->|"unverified assumptions"| SPIKE
+    ARCH -->|"all assumptions resolved"| BREAKDOWN
+    SPIKE -->|"spike complete"| ARCH
+
+    BREAKDOWN --> IMPL
+
+    IMPL -->|"story complete"| REVIEW
+    REVIEW -->|"gate: codeReviewCompleted ✅<br/>gate: securityReviewPassed ✅"| VALIDATE
+    VALIDATE -->|"gate: designArtifactSyncConfirmed ✅"| NEXT_STORY
+    NEXT_STORY -->|"yes"| IMPL
+    NEXT_STORY -->|"no"| CLOSED
+
+    style START fill:#4a9,stroke:#333,color:#fff
+    style CLOSED fill:#4a9,stroke:#333,color:#fff
+    style RESUME fill:#e8a840,stroke:#333,color:#000
+    style REVIEW fill:#e87440,stroke:#333,color:#fff
+    style VALIDATE fill:#e87440,stroke:#333,color:#fff
+```
+
+### Resuming a Session
+
+Use the `/cadet-resume` slash command to pick up where you left off. It reads `.cadet/state.json` and reports the current phase, epic/story progress, and outstanding gates — then dispatches the right skill for the next step. If no state file exists, it initializes a fresh session from `context-resolution`.
+
+### Phase Gating
+
+Hard gates are enforced at every phase transition. The agent reads `.cadet/state.json → gates` before advancing and **blocks** the transition if any required gate is `false`. Gates cannot be skipped without an explicit user-directed exception recorded in `changeHistory`.
+
+| Transition | Required Gates |
+|---|---|
+| implementation → review | `testsPassed`, `compileCheckConfirmed`, `unityAnalyzerClean`, `storyTrackingUpdated` |
+| review → validation | `codeReviewCompleted`, `securityReviewPassed`, `acceptanceCriteriaValidated` |
+| validation → closed | `designArtifactSyncConfirmed` |
+
 ## Examples
 
 ### GitHub Copilot
 Run `npx cadet-agent@latest init` in your Unity project root, then open the repo in VS Code.
 
-**Agent mode:** Select the **Cadet Agent** agent from the agent picker in Copilot Chat. The agent definition at `.github/agents/cadet.agent.md` provides focused instructions and tool configuration.
+**Agent mode:** Select the **Cadet Agent** agent from the agent picker in Copilot Chat. The agent definition at `.github/agents/cadet.agent.md` loads the thin directive in `.cadet/agent/core/cadet-agent.md` and dispatches scoped skills.
 
 ```text
 [Describe your game dev task...]
 ```
 
-Cadet Agent will use the shared framework in `.cadet/agent/core` to route the conversation through learner calibration, bootstrap checks, and planning.
+Cadet Agent will classify the change, check `.cadet/state.json` for blocking gates, and invoke the appropriate skill.
+
+**Skill mode:** For a specific workflow phase, use the matching slash command so the skill becomes the primary instruction context:
+
+```text
+/cadet-requirements
+create a requirements doc for a kart handling prototype
+```
+
+```text
+/cadet-review
+review the PR at https://github.com/... or review story-1 in epic-1-player-movement
+```
 
 **Review mode:** After the Cadet Agent completes a task, select the **Cadet Agent Reviewer** from the agent picker. Provide the task, story, or PR to review:
 
@@ -101,8 +179,12 @@ If a specific game repository needs local conventions, add a policy file under `
 ## Package Output
 Running `./package-agent.ps1` produces `cadet-agent.zip` with this layout:
 - `.cadet/agent/core/`
+- `.cadet/agent/core/skills/`
+- `.cadet/agent/core/templates/`
 - `.github/agents/cadet.agent.md`
 - `.github/agents/cadet-agent-reviewer.agent.md`
+- `.github/prompts/cadet-*.prompt.md`
+- `.github/hooks/`
 - `.cursor/rules/cadet-agent.md`
 - `.continue/rules/cadet-agent.md`
 - `.claude/skills/cadet-agent.md`

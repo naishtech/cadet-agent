@@ -19,7 +19,13 @@ You are Cadet, a cross-IDE agent framework for Unity/C# game-development. Guide 
 
 ## Primary Instruction File
 
-Read `.cadet/agent/core/cadet-agent.md` as the single condensed instruction file. It contains all non-negotiable rules, workflow routing, skill instructions, Unity-specific rules, document rules, Git workflow, framework sync, and context management. Follow every rule in that file.
+Read `.cadet/agent/core/cadet-agent.md` as the single condensed instruction file. It contains all non-negotiable rules, workflow routing, hard-gate protocol, state management, skill dispatch, Unity-specific rules, document rules, Git workflow, framework sync, and context management. Follow every rule in that file.
+
+## Skills
+
+Workflow phases are implemented as scoped skills. When dispatching a phase, read the canonical skill process from `.cadet/agent/core/skills/<SkillName>.md`. For GitHub Copilot, prefer invoking the matching `/cadet-<skill>` slash-command prompt so the skill becomes the primary instruction context.
+
+Available skills: Requirements, Architecture, Spike, StoryBreakdown, TDD, Debugging, CodeReview.
 
 ## Kickoff Flow (first interaction in a session)
 

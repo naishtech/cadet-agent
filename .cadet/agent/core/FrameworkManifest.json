@@ -1,6 +1,6 @@
 {
   "frameworkName": "Cadet-Agent",
-  "frameworkVersion": "0.15.5",
+  "frameworkVersion": "0.16.0",
   "distributionMode": "cross-ide-universal-package",
   "canonicalRepository": "https://github.com/naishtech/cadet-agent",
   "preferredUpdateChannel": "releases",
@@ -16,15 +16,25 @@
     ".github/hooks/git-guard.json",
     ".github/hooks/scripts/git-guard.sh",
     ".github/hooks/scripts/git-guard.ps1",
+    ".github/prompts/cadet-requirements.prompt.md",
+    ".github/prompts/cadet-architecture.prompt.md",
+    ".github/prompts/cadet-spike.prompt.md",
+    ".github/prompts/cadet-breakdown.prompt.md",
+    ".github/prompts/cadet-tdd.prompt.md",
+    ".github/prompts/cadet-debug.prompt.md",
+    ".github/prompts/cadet-review.prompt.md",
     ".cursor/rules/cadet-agent.md",
     ".continue/rules/cadet-agent.md",
     ".claude/skills/cadet-agent.md",
     ".cadet/agent/core",
-    ".cadet/agent/core/templates"
+    ".cadet/agent/core/templates",
+    ".cadet/agent/core/skills",
+    ".cadet/agent/core/state.schema.json"
   ],
   "preservedPaths": [
     ".cadet/agent/policies",
-    ".cadet/agent/project-plans"
+    ".cadet/agent/project-plans",
+    ".cadet/state.json"
   ],
   "notes": [
     "Use this manifest to decide which packaged files Cadet may update during bootstrap sync.",

@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cadet-agent.dev/state-v1.json",
+  "title": "Cadet-Agent Session State",
+  "description": "Tracks workflow progress across a session. Updated via git commits at each story completion checkpoint.",
+  "type": "object",
+  "required": ["version", "session", "epics"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Schema version. Increment on breaking changes."
+    },
+    "session": {
+      "type": "object",
+      "required": ["workflowPath", "currentPhase", "trackingMode"],
+      "properties": {
+        "trackingMode": {
+          "type": "string",
+          "enum": ["markdown", "github"],
+          "default": "markdown",
+          "description": "How work is tracked. markdown: epic/story markdown files in directories. github: GitHub Projects/Issues for story tracking."
+        },
+        "learnerTier": {
+          "type": "string",
+          "enum": ["beginner", "intermediate", "advanced", "guided"],
+          "description": "Resolved learner tier for this session"
+        },
+        "operatingMode": {
+          "type": "string",
+          "enum": ["instruction-first", "implementation-first", "hybrid"],
+          "description": "Operating mode for this session"
+        },
+        "workflowPath": {
+          "type": "string",
+          "enum": ["large", "small", "no_test_required"],
+          "description": "Classified change size"
+        },
+        "currentPhase": {
+          "type": "string",
+          "enum": [
+            "context-resolution",
+            "requirements",
+            "requirementsComplete",
+            "architecture",
+            "architectureComplete",
+            "spikes",
+            "story-breakdown",
+            "implementation",
+            "review",
+            "validation",
+            "closed"
+          ],
+          "description": "Current SDLC phase. The review phase is a mandatory gate between implementation and validation — it cannot be skipped."
+        }
+      }
+    },
+    "epics": {
+      "type": "object",
+      "description": "Epic status keyed by epic directory name",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["status", "stories"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["planned", "in-progress", "complete"]
+          },
+          "stories": {
+            "type": "object",
+            "description": "Story status keyed by story filename",
+            "additionalProperties": {
+              "type": "string",
+              "enum": ["planned", "in-progress", "done"]
+            }
+          }
+        }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "description": "Mandatory hard gates that must be explicitly satisfied before phase transitions. Reset when moving to a new work item (story/epic). Gates are non-skippable — the agent must confirm each gate before advancing the phase.",
+      "properties": {
+        "codeReviewCompleted": {
+          "type": "boolean",
+          "default": false,
+          "description": "Full 17-step code review per CodeReview.md completed for the current story/epic"
+        },
+        "testsPassed": {
+          "type": "boolean",
+          "default": false,
+          "description": "All tests for the current work item pass (red/green cycle confirmed)"
+        },
+        "storyTrackingUpdated": {
+          "type": "boolean",
+          "default": false,
+          "description": "Story and epic markdown files updated to reflect completion"
+        },
+        "compileCheckConfirmed": {
+          "type": "boolean",
+          "default": false,
+          "description": "User confirmed Unity project compiles without errors"
+        },
+        "unityAnalyzerClean": {
+          "type": "boolean",
+          "default": false,
+          "description": "Zero Unity analyzer diagnostics (UNT*) in changed files"
+        },
+        "acceptanceCriteriaValidated": {
+          "type": "boolean",
+          "default": false,
+          "description": "Each Given/When/Then criterion validated against implementation"
+        },
+        "securityReviewPassed": {
+          "type": "boolean",
+          "default": false,
+          "description": "No sensitive data, secrets, or security concerns identified"
+        },
+        "designArtifactSyncConfirmed": {
+          "type": "boolean",
+          "default": false,
+          "description": "Requirements, technical design, project plan, and epics are mutually consistent"
+        }
+      }
+    },
+    "spikes": {
+      "type": "object",
+      "description": "Spike status keyed by spike ID",
+      "additionalProperties": {
+        "type": "string",
+        "enum": ["planned", "in-progress", "complete"]
+      }
+    },
+    "changeHistory": {
+      "type": "array",
+      "description": "Audit trail of state changes",
+      "items": {
+        "type": "object",
+        "required": ["date", "change"],
+        "properties": {
+          "date": { "type": "string", "format": "date-time" },
+          "change": { "type": "string" },
+          "phase": { "type": "string" }
+        }
+      }
+    }
+  }
+}
