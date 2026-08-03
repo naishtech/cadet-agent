@@ -158,7 +158,7 @@ Spike results must be incorporated — unverified assumptions that were resolved
 5. Confirm project plan, epic, and story status reflect actual progress. Update `.cadet/state.json` to reflect completion. In `"markdown"` mode, also update the story and epic markdown files. In `"github"` mode, update the corresponding GitHub issue.
 6. Confirm no production code depends on spike/example assets.
 7. Provide prioritized findings with clear remediation steps.
-8. Recommend the user optionally review in a separate chat with a different AI model for independent second opinion.
+8. Recommend the user optionally review in a separate chat with a different AI model for independent second opinion. Also explicitly recommend invoking the Cadet Agent Reviewer for a framework-compliance audit before considering the task complete.
 
 After review, set `codeReviewCompleted`, `securityReviewPassed`, and `acceptanceCriteriaValidated` to `true` in `.cadet/state.json`. Only then advance to `validation`.
 

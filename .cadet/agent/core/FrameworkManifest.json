@@ -12,6 +12,7 @@
   ],
   "managedPaths": [
     ".github/agents/cadet.agent.md",
+    ".github/agents/cadet-agent-reviewer.agent.md",
     ".github/hooks/git-guard.json",
     ".github/hooks/scripts/git-guard.sh",
     ".github/hooks/scripts/git-guard.ps1",

@@ -7,7 +7,7 @@ Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished g
 ## Repository Layout
 - `.cadet/agent/core/` contains the shared Cadet-Agent framework documents.
 - `.cadet/agent/docs/` contains setup guides for each supported IDE.
-- `.github/agents/` contains the Copilot custom agent definition (agent mode).
+- `.github/agents/` contains the Copilot custom agent definitions (Cadet Agent + Cadet Agent Reviewer).
 - `.cursor/` contains Cursor-specific authored files.
 - `.continue/` contains Continue-specific authored files.
 - `.claude/` contains Claude Code-specific authored files.
@@ -25,6 +25,20 @@ This downloads the latest framework release and extracts it into your current di
 
 ```bash
 npx cadet-agent@latest init --target ./my-unity-project
+```
+
+### Keeping the Framework Updated
+
+```bash
+npx cadet-agent@latest sync
+```
+
+When a new release is available, `sync` downloads the updated framework and replaces managed files (`.cadet/agent/core/`, IDE integration shims, agent definitions). Your local policies (`.cadet/agent/policies/`) and project plans (`.cadet/agent/project-plans/`) are automatically preserved. After syncing, start a fresh chat for the changes to take effect.
+
+To sync a specific directory:
+
+```bash
+npx cadet-agent@latest sync --target ./my-unity-project
 ```
 
 ## Manual Install (fallback)
@@ -48,13 +62,21 @@ Expand-Archive .\cadet-agent.zip -DestinationPath . -Force
 ### GitHub Copilot
 Run `npx cadet-agent@latest init` in your Unity project root, then open the repo in VS Code.
 
-**Agent mode:** Select the **Cadet** agent from the agent picker in Copilot Chat. The agent definition at `.github/agents/cadet.agent.md` provides focused instructions and tool configuration.
+**Agent mode:** Select the **Cadet Agent** agent from the agent picker in Copilot Chat. The agent definition at `.github/agents/cadet.agent.md` provides focused instructions and tool configuration.
 
 ```text
 [Describe your game dev task...]
 ```
 
-Cadet will use the shared framework in `.cadet/agent/core` to route the conversation through learner calibration, bootstrap checks, and planning.
+Cadet Agent will use the shared framework in `.cadet/agent/core` to route the conversation through learner calibration, bootstrap checks, and planning.
+
+**Review mode:** After the Cadet Agent completes a task, select the **Cadet Agent Reviewer** from the agent picker. Provide the task, story, or PR to review:
+
+```text
+Review the PR at https://github.com/... or Review story-1 in epic-1-player-movement
+```
+
+The reviewer will read `.cadet/agent/core/cadet-agent.md` as the rulebook, audit `.cadet/state.json` for gate compliance, and check the code and artifacts against every non-negotiable rule. It produces a structured report with a gate audit, process deviations, and recommendations — it does not edit code.
 
 ### Cursor feature request
 After opening the repository in Cursor, the always-apply rule in `.cursor/rules/cadet-agent.md` should load automatically. A typical request looks like this:
@@ -84,6 +106,7 @@ If a specific game repository needs local conventions, add a policy file under `
 Running `./package-agent.ps1` produces `cadet-agent.zip` with this layout:
 - `.cadet/agent/core/`
 - `.github/agents/cadet.agent.md`
+- `.github/agents/cadet-agent-reviewer.agent.md`
 - `.cursor/rules/cadet-agent.md`
 - `.continue/rules/cadet-agent.md`
 - `.claude/skills/cadet-agent.md`
