@@ -189,10 +189,10 @@ describe('buildHeaders', () => {
 // ── Removed managed path detection ──────────────────────────────────────────
 
 function findRemovedManagedPaths(oldManaged, newManaged) {
-  const newSet = new Set(newManaged.map(p => p.replace(/^\.?\/?/, '').replace(/\\/g, '/')));
+  const newSet = new Set(newManaged.map(p => p.replace(/^\.\//, '').replace(/\\/g, '/')));
   const removed = [];
   for (const old of oldManaged) {
-    const oldNorm = old.replace(/^\.?\/?/, '').replace(/\\/g, '/');
+    const oldNorm = old.replace(/^\.\//, '').replace(/\\/g, '/');
     if (!newSet.has(oldNorm)) {
       removed.push(old);
     }

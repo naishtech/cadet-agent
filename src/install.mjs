@@ -274,13 +274,13 @@ function walkDir(dir, fn) {
 
 function deleteObsoleteManagedFiles(targetDir, managedPaths, zipFilenames) {
   const normalizedZip = new Set(
-    zipFilenames.map(f => f.replace(/^\.?\/?/, '').replace(/\\/g, '/'))
+    zipFilenames.map(f => f.replace(/^\.\//, '').replace(/\\/g, '/'))
   );
   const deleted = [];
 
   for (const managed of managedPaths) {
-    const mn = managed.replace(/^\.?\/?/, '').replace(/\\/g, '/');
-    const managedPath = join(targetDir, managed.replace(/^\.?\/?/, ''));
+    const mn = managed.replace(/^\.\//, '').replace(/\\/g, '/');
+    const managedPath = join(targetDir, managed.replace(/^\.\//, ''));
     const stat = (() => { try { return statSync(managedPath); } catch { return null; } })();
     if (!stat) continue;
 
@@ -345,40 +345,44 @@ async function extractZipWithManifest(buf, targetDir, { preserved, managed }) {
 
 // ── Removed-managed-path cleanup ─────────────────────────────────────────────
 
-function findManagedPathsInZip(buf) {
-  const eocdOff = findEocd(buf);
-  const cdSize  = read32(buf, eocdOff + 12);
-  const cdOff   = read32(buf, eocdOff + 16);
+export function findManagedPathsInZip(buf) {
+  try {
+    const eocdOff = findEocd(buf);
+    const cdSize  = read32(buf, eocdOff + 12);
+    const cdOff   = read32(buf, eocdOff + 16);
 
-  for (const entry of centralDirectoryEntries(buf, cdOff, cdSize)) {
-    const fn = entry.filename.replace(/^\.?\/?/, '').replace(/\\/g, '/');
-    if (fn === '.cadet/agent/core/FrameworkManifest.json') {
-      // Extract just this one entry to read managedPaths
-      const lfhFilenameLen = read16(buf, entry.localHeaderOff + 26);
-      const lfhExtraLen    = read16(buf, entry.localHeaderOff + 28);
-      const dataStart = entry.localHeaderOff + 30 + lfhFilenameLen + lfhExtraLen;
-      const compressed = buf.subarray(dataStart, dataStart + entry.compressedSize);
-      let data;
-      if (entry.method === 0) data = compressed;
-      else if (entry.method === 8) data = inflateRawSync(compressed);
-      else break;
-      const manifest = JSON.parse(data.toString('utf-8'));
-      return manifest.managedPaths || [];
+    for (const entry of centralDirectoryEntries(buf, cdOff, cdSize)) {
+      const fn = entry.filename.replace(/^\.\//, '').replace(/\\/g, '/');
+      if (fn === '.cadet/agent/core/FrameworkManifest.json') {
+        // Extract just this one entry to read managedPaths
+        const lfhFilenameLen = read16(buf, entry.localHeaderOff + 26);
+        const lfhExtraLen    = read16(buf, entry.localHeaderOff + 28);
+        const dataStart = entry.localHeaderOff + 30 + lfhFilenameLen + lfhExtraLen;
+        const compressed = buf.subarray(dataStart, dataStart + entry.compressedSize);
+        let data;
+        if (entry.method === 0) data = compressed;
+        else if (entry.method === 8) data = inflateRawSync(compressed);
+        else break;
+        const manifest = JSON.parse(data.toString('utf-8'));
+        return manifest.managedPaths || [];
+      }
     }
+  } catch {
+    // Not a valid zip or manifest not found
   }
   return [];
 }
 
-function deleteRemovedManagedPaths(targetDir, oldManaged, newManaged) {
-  const newSet = new Set(newManaged.map(p => p.replace(/^\.?\/?/, '').replace(/\\/g, '/')));
+export function deleteRemovedManagedPaths(targetDir, oldManaged, newManaged) {
+  const newSet = new Set(newManaged.map(p => p.replace(/^\.\//, '').replace(/\\/g, '/')));
   const deleted = [];
 
   for (const old of oldManaged) {
-    const oldNorm = old.replace(/^\.?\/?/, '').replace(/\\/g, '/');
+    const oldNorm = old.replace(/^\.\//, '').replace(/\\/g, '/');
     if (newSet.has(oldNorm)) continue;
 
     // This path was in the old manifest but is absent from the new one — remove it
-    const fullPath = join(targetDir, old.replace(/^\.?\/?/, ''));
+    const fullPath = join(targetDir, old.replace(/^\.\//, ''));
     const st = (() => { try { return statSync(fullPath); } catch { return null; } })();
     if (!st) continue;
 
