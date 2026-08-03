@@ -1,6 +1,6 @@
 {
   "name": "cadet-agent",
-  "version": "0.15.2",
+  "version": "0.15.3",
   "description": "Cross-IDE agent framework for Unity/C# game-development — one-command install",
   "type": "module",
   "bin": {
