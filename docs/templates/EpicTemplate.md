@@ -26,9 +26,9 @@ epic-1-player-movement/
 
 ## Stories
 
-- [ ] [Story 1: Name](./story-1-name.md) — [One-line summary]
-- [ ] [Story 2: Name](./story-2-name.md) — [One-line summary]
-- [ ] [Story 3: Name](./story-3-name.md) — [One-line summary]
+- [ ] `Story 1: Name` — [One-line summary]
+- [ ] `Story 2: Name` — [One-line summary]
+- [ ] `Story 3: Name` — [One-line summary]
 
 ## Change History
 
