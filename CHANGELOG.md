@@ -11,6 +11,32 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ---
 
+## [0.15.0] — 2026-08-03
+
+### Added
+- npx-based CLI (`cadet-agent`) for one-command install and sync from GitHub Releases.
+- Cadet Agent Reviewer agent (`.github/agents/cadet-agent-reviewer.agent.md`).
+- Git guard hooks (`.github/hooks/`) for bash and PowerShell.
+- XML tag convention (`<slot/>`, `<gate/>`, `<output/>`) in `cadet-agent.md`.
+- Runtime templates under `.cadet/agent/core/templates/`.
+- `state.schema.json` for session state validation.
+- Smoke tests for version normalization, path matching, header building, and ZIP parsing.
+
+### Changed
+- Condensed `cadet-agent.md` updated with XML tag convention, hard gates protocol, and template path policy.
+- Framework version tracking moved to `FrameworkManifest.json`.
+- Post-install UX now directs Copilot users to the agent picker instead of `/cadet`.
+
+### Removed
+- `AGENTS.md`, `.github/cadet-copilot-instructions.md`, `.github/prompts/`, `.cadet/orchestrator/`, `verify-coverage.sh` (deprecated by condensation and CLI).
+
+### Fixed
+- Version comparison now normalizes `v` prefix from GitHub release tags.
+- ZIP extraction now awaits write stream completion.
+- `GITHUB_TOKEN`/`GH_TOKEN` now sent in API requests when present.
+
+---
+
 ## [0.5.0] — 2026-07-19
 
 ### Changed

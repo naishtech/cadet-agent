@@ -118,21 +118,6 @@ function Copy-TreeIntoStaging {
     }
 }
 
-function Copy-FileIntoStaging {
-    param(
-        [string]$SourceFile,
-        [string]$StagingRoot,
-        [string]$TargetPath
-    )
-
-    $destPath = Join-Path $StagingRoot $TargetPath
-    $destDir = Split-Path $destPath -Parent
-    if (-not (Test-Path $destDir)) {
-        New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-    }
-    Copy-Item -Path $SourceFile -Destination $destPath
-}
-
 # Remove existing zip so Compress-Archive doesn't append, or fall back if the
 # preferred output is locked by another process.
 $outputZip = Resolve-OutputZipPath -PreferredPath $outputZip
@@ -171,6 +156,9 @@ Write-Host "  Files will extract to:"
 Write-Host "    .cadet\agent\core\"
 Write-Host "    .github\agents\cadet.agent.md"
 Write-Host "    .github\agents\cadet-agent-reviewer.agent.md"
+Write-Host "    .github\hooks\git-guard.json"
+Write-Host "    .github\hooks\scripts\git-guard.sh"
+Write-Host "    .github\hooks\scripts\git-guard.ps1"
 Write-Host "    .cursor\rules\cadet-agent.md"
 Write-Host "    .continue\rules\cadet-agent.md"
 Write-Host "    .claude\skills\cadet-agent.md"

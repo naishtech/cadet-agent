@@ -99,6 +99,11 @@
           "default": false,
           "description": "User confirmed Unity project compiles without errors"
         },
+        "unityAnalyzerClean": {
+          "type": "boolean",
+          "default": false,
+          "description": "Zero Unity analyzer diagnostics (UNT*) in changed files"
+        },
         "acceptanceCriteriaValidated": {
           "type": "boolean",
           "default": false,
