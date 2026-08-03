@@ -6,8 +6,13 @@
 #   .github\agents\cadet-agent-reviewer.agent.md (Copilot reviewer agent)
 #   .github\prompts\cadet-*.prompt.md (Copilot slash-command skills)
 #   .cursor\rules\cadet-agent.md
+#   .cursor\rules\cadet-agent-reviewer.md (Cursor reviewer rule)
 #   .continue\rules\cadet-agent.md
-#   .claude\skills\cadet-agent.md
+#   .continue\rules\cadet-agent-reviewer.md (Continue reviewer rule)
+#   .continue\config.yaml (Continue custom slash commands)
+#   .claude\skills\cadet-agent\SKILL.md (Claude Code base skill)
+#   .claude\skills\cadet-agent-reviewer\SKILL.md (Claude Code reviewer)
+#   .claude\skills\cadet-*\SKILL.md (Claude Code per-phase skills)
 # The core folder contains cadet-agent.md (condensed agent instructions),
 # FrameworkManifest.json, and the runtime templates under .cadet/agent/core/templates.
 # Full rationale, guidance, standards, and templates are in the docs/ directory
@@ -164,8 +169,13 @@ Write-Host "    .github\hooks\scripts\git-guard.sh"
 Write-Host "    .github\hooks\scripts\git-guard.ps1"
 Write-Host "    .github\prompts\cadet-*.prompt.md"
 Write-Host "    .cursor\rules\cadet-agent.md"
+Write-Host "    .cursor\rules\cadet-agent-reviewer.md"
 Write-Host "    .continue\rules\cadet-agent.md"
-Write-Host "    .claude\skills\cadet-agent.md"
+Write-Host "    .continue\rules\cadet-agent-reviewer.md"
+Write-Host "    .continue\config.yaml"
+Write-Host "    .claude\skills\cadet-agent\SKILL.md"
+Write-Host "    .claude\skills\cadet-agent-reviewer\SKILL.md"
+Write-Host "    .claude\skills\cadet-*\SKILL.md"
 if ($outputZip -ne $preferredZip) {
     Write-Host ""
     Write-Host "Note: The primary output zip was in use, so a fallback filename was used for this package."

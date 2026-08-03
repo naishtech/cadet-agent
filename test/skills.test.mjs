@@ -21,6 +21,7 @@ const expectedSkills = [
   'TDD.md',
   'Debugging.md',
   'CodeReview.md',
+  'Resume.md',
 ];
 
 const expectedPrompts = [

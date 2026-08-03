@@ -15,7 +15,7 @@ Cadet workflow phases are implemented as scoped skills under `.claude/skills/`. 
 
 1. Read `.cadet/state.json` and report any gate that blocks the target phase.
 2. Read the canonical skill process from `.cadet/agent/core/skills/<SkillName>.md`.
-3. Invoke the matching Claude skill: `/cadet-<skill>`.
+3. Tell the user to invoke the matching Claude command (e.g., `/cadet-requirements`, `/cadet-tdd`). The user must type the slash command to activate the per-phase skill as primary context.
 
 Available skills:
 
@@ -28,7 +28,7 @@ Available skills:
 | `/cadet-tdd` | `.cadet/agent/core/skills/TDD.md` | Per story (large) or per change (small) |
 | `/cadet-debug` | `.cadet/agent/core/skills/Debugging.md` | Defect reports or unexpected behavior |
 | `/cadet-review` | `.cadet/agent/core/skills/CodeReview.md` | After each story — **non-skippable** |
-| `/cadet-resume` | (resume logic in cadet-agent.md) | Inspect state.json and resume workflow |
+| `/cadet-resume` | `.cadet/agent/core/skills/Resume.md` | Inspect state.json and resume workflow |
 
 ## Reviewer Mode
 
