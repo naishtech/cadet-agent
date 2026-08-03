@@ -340,7 +340,57 @@ async function extractZipWithManifest(buf, targetDir, { preserved, managed }) {
   // Delete obsolete managed files no longer in the zip (renamed/removed managed paths)
   const deleted = deleteObsoleteManagedFiles(targetDir, managed, zipFilenames);
 
-  return { updated, preserved: preserved_list, added, deleted };
+  return { updated, preserved: preserved_list, added, deleted, zipFilenames };
+}
+
+// ── Removed-managed-path cleanup ─────────────────────────────────────────────
+
+function findManagedPathsInZip(buf) {
+  const eocdOff = findEocd(buf);
+  const cdSize  = read32(buf, eocdOff + 12);
+  const cdOff   = read32(buf, eocdOff + 16);
+
+  for (const entry of centralDirectoryEntries(buf, cdOff, cdSize)) {
+    const fn = entry.filename.replace(/^\.?\/?/, '').replace(/\\/g, '/');
+    if (fn === '.cadet/agent/core/FrameworkManifest.json') {
+      // Extract just this one entry to read managedPaths
+      const lfhFilenameLen = read16(buf, entry.localHeaderOff + 26);
+      const lfhExtraLen    = read16(buf, entry.localHeaderOff + 28);
+      const dataStart = entry.localHeaderOff + 30 + lfhFilenameLen + lfhExtraLen;
+      const compressed = buf.subarray(dataStart, dataStart + entry.compressedSize);
+      let data;
+      if (entry.method === 0) data = compressed;
+      else if (entry.method === 8) data = inflateRawSync(compressed);
+      else break;
+      const manifest = JSON.parse(data.toString('utf-8'));
+      return manifest.managedPaths || [];
+    }
+  }
+  return [];
+}
+
+function deleteRemovedManagedPaths(targetDir, oldManaged, newManaged) {
+  const newSet = new Set(newManaged.map(p => p.replace(/^\.?\/?/, '').replace(/\\/g, '/')));
+  const deleted = [];
+
+  for (const old of oldManaged) {
+    const oldNorm = old.replace(/^\.?\/?/, '').replace(/\\/g, '/');
+    if (newSet.has(oldNorm)) continue;
+
+    // This path was in the old manifest but is absent from the new one — remove it
+    const fullPath = join(targetDir, old.replace(/^\.?\/?/, ''));
+    const st = (() => { try { return statSync(fullPath); } catch { return null; } })();
+    if (!st) continue;
+
+    if (st.isFile()) {
+      try { unlinkSync(fullPath); deleted.push(fullPath); } catch {}
+    } else if (st.isDirectory()) {
+      walkDir(fullPath, (filePath) => {
+        try { unlinkSync(filePath); deleted.push(filePath); } catch {}
+      });
+    }
+  }
+  return deleted;
 }
 
 // ── Public sync entry ───────────────────────────────────────────────────────
@@ -383,6 +433,17 @@ export async function sync(targetDir, opts = {}) {
     preserved: existingManifest.preservedPaths || [],
     managed: existingManifest.managedPaths || [],
   });
+
+  // 4b. Find new managed paths from the zip and delete any old paths that were removed
+  const newManagedPaths = findManagedPathsInZip(zipBuf);
+  const removedDeleted = deleteRemovedManagedPaths(
+    targetDir,
+    existingManifest.managedPaths || [],
+    newManagedPaths
+  );
+  if (removedDeleted.length > 0) {
+    result.deleted.push(...removedDeleted);
+  }
 
   // 5. Report
   console.log('');
