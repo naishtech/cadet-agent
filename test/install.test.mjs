@@ -1,15 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { Buffer } from 'node:buffer';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
-// ── Helper: load source as text to extract testable functions ────────────────
-
-const srcPath = join(import.meta.dirname, '..', 'src', 'install.mjs');
-const srcText = readFileSync(srcPath, 'utf-8');
-
-// ── normalizeVersion (reconstructed for unit test isolation) ─────────────────
+// ── Functions under test (reconstructed inline for unit test isolation) ──────
 
 function normalizeVersion(v) {
   return (v || '').replace(/^v/, '');
