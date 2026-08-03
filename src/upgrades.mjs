@@ -35,17 +35,14 @@ function deletePath(targetDir, relativePath) {
 
 // ── Upgrade registry ────────────────────────────────────────────────────────
 
-// Key = FROM version. Each upgrade runs when upgrading FROM a version
-// older than or equal to the key, TO a version newer than the key.
-// Upgrade functions receive (targetDir) and return string[] of deleted paths.
+// Add upgrade entries when removing/renaming managed paths.
+// Key = FROM version. Example:
+//   '0.16.0': (targetDir) => [
+//     ...deletePath(targetDir, '.cadet/some-old-dir'),
+//     ...deletePath(targetDir, '.github/old-agent.agent.md'),
+//   ],
 
-const upgrades = {
-  '0.15.3': (targetDir) => [
-    ...deletePath(targetDir, '.cadet/orchestrator'),
-    ...deletePath(targetDir, '.github/prompts'),
-    ...deletePath(targetDir, 'AGENTS.md'),
-  ],
-};
+const upgrades = {};
 
 // ── Runner ──────────────────────────────────────────────────────────────────
 

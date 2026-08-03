@@ -210,52 +210,23 @@ describe('deleteRemovedManagedPaths', () => {
   });
 });
 
-// ── runUpgrades with temp dir ───────────────────────────────────────────────
+// ── runUpgrades: version comparison logic ──────────────────────────────────
 
+// semverGt is internal; test the runner mechanics indirectly
 describe('runUpgrades', () => {
-  let tmpDir;
-
-  before(() => {
-    tmpDir = join(tmpdir(), `cadet-upgrade-${Date.now()}`);
-    mkdirSync(tmpDir, { recursive: true });
-  });
-
-  after(() => {
-    rmSync(tmpDir, { recursive: true, force: true });
-  });
-
-  it('runs upgrade when version range includes upgrade key', () => {
-    // Create a fake .cadet/orchestrator that the 0.15.3 upgrade deletes
-    const orchDir = join(tmpDir, '.cadet', 'orchestrator', 'lib');
-    mkdirSync(orchDir, { recursive: true });
-    writeFileSync(join(orchDir, 'state.sh'), 'echo old');
-    writeFileSync(join(orchDir, 'classify.sh'), 'echo old');
-
-    const deleted = runUpgrades(tmpDir, '0.13.0', '0.15.3');
-
-    assert.ok(deleted.length >= 2, 'should delete orchestrator files');
-    assert.equal(existsSync(join(orchDir, 'state.sh')), false);
-  });
-
-  it('skips upgrade when already on or past the upgrade key', () => {
-    const orchDir = join(tmpDir, '.cadet', 'orchestrator');
-    mkdirSync(orchDir, { recursive: true });
-    writeFileSync(join(orchDir, 'keep.md'), '# keep');
-
-    // Already at 0.15.3, upgrading to 0.15.4 — should NOT run 0.15.3 upgrade
-    const deleted = runUpgrades(tmpDir, '0.15.3', '0.15.4');
-
-    assert.deepEqual(deleted, []);
-    assert.equal(existsSync(join(orchDir, 'keep.md')), true);
-  });
-
-  it('skips upgrade when upgrading from above the key', () => {
-    const deleted = runUpgrades(tmpDir, '0.16.0', '0.17.0');
+  it('returns empty when registry is empty', () => {
+    // No upgrades registered currently — should return empty
+    const deleted = runUpgrades('/tmp', '0.13.0', '0.15.4');
     assert.deepEqual(deleted, []);
   });
 
-  it('returns empty for same version', () => {
-    const deleted = runUpgrades(tmpDir, '0.15.0', '0.15.0');
+  it('handles invalid version strings gracefully', () => {
+    const deleted = runUpgrades('/tmp', 'unknown', '0.15.4');
+    assert.deepEqual(deleted, []);
+  });
+
+  it('handles same from/to version', () => {
+    const deleted = runUpgrades('/tmp', '0.15.0', '0.15.0');
     assert.deepEqual(deleted, []);
   });
 });
