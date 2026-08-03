@@ -7,7 +7,7 @@ Purpose: A single independently implementable story scoped to one user-observabl
 # Story: [Name]
 
 - **Story ID:** [EPIC-1-STORY-1]
-- **Parent Epic:** [../epic.md](../epic.md)
+- **Parent Epic:** `../epic.md`
 - **Status:** Planned | In Progress | Done
 - **Estimate:** [Small | Medium — completable in a single session]
 
