@@ -57,6 +57,68 @@ Expand-Archive .\cadet-agent.zip -DestinationPath . -Force
 - For framework navigation after install, see `.cadet/agent/core/README.md`.
 - IDE setup guides and full documentation are at the [canonical repository](https://github.com/naishtech/cadet-agent) (GitHub Pages).
 
+## Workflow
+
+Cadet-Agent follows a structured SDLC with hard gates between phases. The workflow path adapts to change size: **large** changes go through the full pipeline, **small** changes skip planning artifacts, and **no_test_required** changes (docs, config) skip TDD.
+
+```mermaid
+flowchart TD
+    START(["🚀 User starts session"])
+    RESUME{"state.json<br/>exists?"}
+    INIT["Initialize state.json<br/>phase: context-resolution"]
+    REPORT["Report current phase,<br/>epics, stories & gates"]
+    CR["🔍 Context Resolution<br/>classify change size,<br/>calibrate learner,<br/>detect policy"]
+    REQ["📋 Requirements<br/>Given/When/Then criteria<br/>assumption audit"]
+    ARCH["🏗️ Architecture<br/>technical design,<br/>ADR decisions"]
+    SPIKE["🧪 Spikes<br/>resolve unverified<br/>assumptions"]
+    BREAKDOWN["📐 Story Breakdown<br/>epics → testable stories"]
+    IMPL["🔨 Implementation<br/>TDD per story,<br/>red → green → refactor"]
+    REVIEW["✅ Review<br/>hard gate: 17-step<br/>code review, security"]
+    VALIDATE["✔️ Validation<br/>acceptance criteria,<br/>design artifact sync"]
+    CLOSED(["🎉 Closed"])
+    NEXT_STORY{"More stories<br/>in epic?"}
+
+    START --> RESUME
+    RESUME -->|"no"| INIT --> CR
+    RESUME -->|"yes"| REPORT --> CR
+
+    CR -->|"large change"| REQ
+    CR -->|"small / no_test_required"| IMPL
+
+    REQ --> ARCH
+    ARCH -->|"unverified assumptions"| SPIKE
+    ARCH -->|"all assumptions resolved"| BREAKDOWN
+    SPIKE -->|"spike complete"| ARCH
+
+    BREAKDOWN --> IMPL
+
+    IMPL -->|"story complete"| REVIEW
+    REVIEW -->|"gate: codeReviewCompleted ✅<br/>gate: securityReviewPassed ✅"| VALIDATE
+    VALIDATE -->|"gate: designArtifactSyncConfirmed ✅"| NEXT_STORY
+    NEXT_STORY -->|"yes"| IMPL
+    NEXT_STORY -->|"no"| CLOSED
+
+    style START fill:#4a9,stroke:#333,color:#fff
+    style CLOSED fill:#4a9,stroke:#333,color:#fff
+    style RESUME fill:#e8a840,stroke:#333,color:#000
+    style REVIEW fill:#e87440,stroke:#333,color:#fff
+    style VALIDATE fill:#e87440,stroke:#333,color:#fff
+```
+
+### Resuming a Session
+
+Use the `/cadet-resume` slash command to pick up where you left off. It reads `.cadet/state.json` and reports the current phase, epic/story progress, and outstanding gates — then dispatches the right skill for the next step. If no state file exists, it initializes a fresh session from `context-resolution`.
+
+### Phase Gating
+
+Hard gates are enforced at every phase transition. The agent reads `.cadet/state.json → gates` before advancing and **blocks** the transition if any required gate is `false`. Gates cannot be skipped without an explicit user-directed exception recorded in `changeHistory`.
+
+| Transition | Required Gates |
+|---|---|
+| implementation → review | `testsPassed`, `compileCheckConfirmed`, `unityAnalyzerClean`, `storyTrackingUpdated` |
+| review → validation | `codeReviewCompleted`, `securityReviewPassed`, `acceptanceCriteriaValidated` |
+| validation → closed | `designArtifactSyncConfirmed` |
+
 ## Examples
 
 ### GitHub Copilot
