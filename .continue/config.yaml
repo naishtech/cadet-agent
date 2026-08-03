@@ -1,0 +1,80 @@
+# Cadet-Agent Continue Configuration
+# Custom slash commands for workflow phase dispatch.
+# Each command instructs the model to read the canonical skill file
+# from .cadet/agent/core/skills/ as the primary instruction context.
+#
+# NOTE: The key `customCommands` is used for backward compatibility with
+# older Continue versions. If commands do not appear in your Continue
+# version, try renaming `customCommands` to `slashCommands`.
+
+customCommands:
+  - name: cadet-requirements
+    description: Capture and validate Given/When/Then acceptance criteria for large changes
+    prompt: |
+      You are executing the Cadet Requirements skill.
+      Read `.cadet/agent/core/cadet-agent.md` for the global directive.
+      Read `.cadet/agent/core/skills/Requirements.md` as the primary instruction context.
+      Follow every step in that skill file. Run the Gate Check first by reading `.cadet/state.json`.
+
+  - name: cadet-architecture
+    description: Produce a technical design and ADRs from approved requirements
+    prompt: |
+      You are executing the Cadet Architecture skill.
+      Read `.cadet/agent/core/cadet-agent.md` for the global directive.
+      Read `.cadet/agent/core/skills/Architecture.md` as the primary instruction context.
+      Follow every step in that skill file. Run the Gate Check first by reading `.cadet/state.json`.
+
+  - name: cadet-spike
+    description: Answer a focused feasibility question for an unverified assumption
+    prompt: |
+      You are executing the Cadet Spike skill.
+      Read `.cadet/agent/core/cadet-agent.md` for the global directive.
+      Read `.cadet/agent/core/skills/Spike.md` as the primary instruction context.
+      Follow every step in that skill file. Run the Gate Check first by reading `.cadet/state.json`.
+
+  - name: cadet-breakdown
+    description: Decompose large work into epics and small implementable stories
+    prompt: |
+      You are executing the Cadet Story Breakdown skill.
+      Read `.cadet/agent/core/cadet-agent.md` for the global directive.
+      Read `.cadet/agent/core/skills/StoryBreakdown.md` as the primary instruction context.
+      Follow every step in that skill file. Run the Gate Check first by reading `.cadet/state.json`.
+
+  - name: cadet-tdd
+    description: Implement changes through red/green test-first cycles
+    prompt: |
+      You are executing the Cadet TDD skill.
+      Read `.cadet/agent/core/cadet-agent.md` for the global directive.
+      Read `.cadet/agent/core/skills/TDD.md` as the primary instruction context.
+      Follow every step in that skill file. Run the Gate Check first by reading `.cadet/state.json`.
+
+  - name: cadet-debug
+    description: Reproduce, isolate, and fix defects with regression protection
+    prompt: |
+      You are executing the Cadet Debugging skill.
+      Read `.cadet/agent/core/cadet-agent.md` for the global directive.
+      Read `.cadet/agent/core/skills/Debugging.md` as the primary instruction context.
+      Follow every step in that skill file. Run the Gate Check first by reading `.cadet/state.json`.
+
+  - name: cadet-review
+    description: Non-skippable review against acceptance criteria, hard gates, and framework rules
+    prompt: |
+      You are executing the Cadet Code Review skill.
+      Read `.cadet/agent/core/cadet-agent.md` for the global directive.
+      Read `.cadet/agent/core/skills/CodeReview.md` as the primary instruction context.
+      Follow every step in that skill file. Run the Gate Check first by reading `.cadet/state.json`.
+
+  - name: cadet-resume
+    description: Inspect .cadet/state.json and resume the workflow from the last recorded phase
+    prompt: |
+      You are executing the Cadet Resume skill.
+      Read `.cadet/agent/core/cadet-agent.md` for the global directive.
+      Read `.cadet/agent/core/skills/Resume.md` as the primary instruction context.
+      Follow every step in that skill file. Check whether `.cadet/state.json` exists, report the current state, and suggest the next action.
+
+  - name: cadet-agent-reviewer
+    description: Audit Cadet Agent's work against framework rules and process requirements
+    prompt: |
+      You are the Cadet Agent Reviewer. Read `.cadet/agent/core/cadet-agent.md` and `.github/agents/cadet-agent-reviewer.agent.md`.
+      Audit the current work against the framework rules. Do NOT implement, fix, or generate code — review and report only.
+      Ask the user what task, story, or PR to review, then audit state, review output, and produce a structured findings report.

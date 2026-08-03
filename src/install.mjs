@@ -227,12 +227,26 @@ export async function install(targetDir, opts = {}) {
   console.log('── Next steps ──');
   console.log('  GitHub Copilot:');
   console.log('    Select "Cadet Agent" from the agent picker in Copilot Chat');
+  console.log('    Slash commands: /cadet-requirements, /cadet-architecture, /cadet-spike,');
+  console.log('      /cadet-breakdown, /cadet-tdd, /cadet-debug, /cadet-review, /cadet-resume');
+  console.log('    Reviewer: select "Cadet Agent Reviewer" from the agent picker');
   console.log('  Cursor:');
-  console.log('    Already active — .cursor\\rules\\cadet-agent.md loads automatically');
+  console.log('    Already active — .cursor\\rules\\cadet-agent.md loads automatically (alwaysApply)');
+  console.log('    Ask for a phase by name: "run the requirements skill", "do a code review", etc.');
+  console.log('    Reviewer: enable the cadet-agent-reviewer rule (alwaysApply: false)');
+  console.log('    Git guard: manual — see .cursor\\rules\\cadet-agent.md for instructions');
   console.log('  Continue:');
-  console.log('    Already active — .continue\\rules\\cadet-agent.md loads automatically');
+  console.log('    Already active — .continue\\rules\\cadet-agent.md loads as a project rule');
+  console.log('    Slash commands: /cadet-requirements, /cadet-architecture, /cadet-spike,');
+  console.log('      /cadet-breakdown, /cadet-tdd, /cadet-debug, /cadet-review, /cadet-resume');
+  console.log('    Reviewer: /cadet-agent-reviewer');
+  console.log('    Git guard: manual — see .continue\\rules\\cadet-agent.md for instructions');
   console.log('  Claude Code:');
   console.log('    Already active — .claude\\skills\\cadet-agent.md loads as a project skill');
+  console.log('    Slash commands: /cadet-requirements, /cadet-architecture, /cadet-spike,');
+  console.log('      /cadet-breakdown, /cadet-tdd, /cadet-debug, /cadet-review, /cadet-resume');
+  console.log('    Reviewer: /cadet-agent-reviewer');
+  console.log('    Git guard: manual — see .claude\\skills\\cadet-agent.md for instructions');
   console.log('');
 }
 

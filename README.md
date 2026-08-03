@@ -19,6 +19,27 @@ Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished g
 - `package-agent.ps1` builds the distributable `cadet-agent.zip` package.
 - `publish-npm.ps1` publishes the CLI to npm using a token from `~/.npm_token`.
 
+## Cross-IDE Support
+
+Cadet-Agent provides full workflow parity across four IDEs. The same 7 skills + resume + reviewer are available in each:
+
+| Feature | GitHub Copilot | Cursor | Continue | Claude Code |
+|---|---|---|---|---|
+| Auto-load rules | Agent definition | `alwaysApply` rule | Project rule | Project skill |
+| Skill dispatch | `/cadet-<skill>` prompts | Natural language | `/cadet-<skill>` commands | `/cadet-<skill>` skills |
+| Requirements | ✅ | ✅ | ✅ | ✅ |
+| Architecture | ✅ | ✅ | ✅ | ✅ |
+| Spike | ✅ | ✅ | ✅ | ✅ |
+| Story Breakdown | ✅ | ✅ | ✅ | ✅ |
+| TDD | ✅ | ✅ | ✅ | ✅ |
+| Debugging | ✅ | ✅ | ✅ | ✅ |
+| Code Review | ✅ | ✅ | ✅ | ✅ |
+| Resume | ✅ | ✅ | ✅ | ✅ |
+| Reviewer mode | Agent picker | Rule toggle | `/cadet-agent-reviewer` | `/cadet-agent-reviewer` |
+| Git guard | PreToolUse hook | Manual | Manual | Manual |
+
+All adapters delegate to the canonical files under `.cadet/agent/core/` — no duplicated rules or skills. See `ADAPTERS.md` for the full inventory.
+
 ## Quick Install
 
 ```bash
