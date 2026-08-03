@@ -1,6 +1,6 @@
 {
   "frameworkName": "Cadet-Agent",
-  "frameworkVersion": "0.15.3",
+  "frameworkVersion": "0.15.4",
   "distributionMode": "cross-ide-universal-package",
   "canonicalRepository": "https://github.com/naishtech/cadet-agent",
   "preferredUpdateChannel": "releases",
@@ -25,9 +25,6 @@
   "preservedPaths": [
     ".cadet/agent/policies",
     ".cadet/agent/project-plans"
-  ],
-  "retiredPaths": [
-    ".cadet/orchestrator"
   ],
   "notes": [
     "Use this manifest to decide which packaged files Cadet may update during bootstrap sync.",

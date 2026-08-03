@@ -9,8 +9,11 @@ import { Buffer } from 'node:buffer';
 // ── Import actual functions from install.mjs ────────────────────────────────
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
-const { findManagedPathsInZip, deleteRemovedManagedPaths, deleteRetiredPaths } = await import(
+const { findManagedPathsInZip, deleteRemovedManagedPaths } = await import(
   `file://${join(__dirname, '..', 'src', 'install.mjs')}`
+);
+const { runUpgrades } = await import(
+  `file://${join(__dirname, '..', 'src', 'upgrades.mjs')}`
 );
 
 // ── Helper: build a minimal valid ZIP in memory ─────────────────────────────
@@ -207,13 +210,13 @@ describe('deleteRemovedManagedPaths', () => {
   });
 });
 
-// ── deleteRetiredPaths with temp dir ────────────────────────────────────────
+// ── runUpgrades with temp dir ───────────────────────────────────────────────
 
-describe('deleteRetiredPaths', () => {
+describe('runUpgrades', () => {
   let tmpDir;
 
   before(() => {
-    tmpDir = join(tmpdir(), `cadet-retired-${Date.now()}`);
+    tmpDir = join(tmpdir(), `cadet-upgrade-${Date.now()}`);
     mkdirSync(tmpDir, { recursive: true });
   });
 
@@ -221,31 +224,38 @@ describe('deleteRetiredPaths', () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('deletes retired directory with files', () => {
+  it('runs upgrade when version range includes upgrade key', () => {
+    // Create a fake .cadet/orchestrator that the 0.15.3 upgrade deletes
     const orchDir = join(tmpDir, '.cadet', 'orchestrator', 'lib');
     mkdirSync(orchDir, { recursive: true });
     writeFileSync(join(orchDir, 'state.sh'), 'echo old');
     writeFileSync(join(orchDir, 'classify.sh'), 'echo old');
 
-    const deleted = deleteRetiredPaths(tmpDir, ['.cadet/orchestrator']);
+    const deleted = runUpgrades(tmpDir, '0.13.0', '0.15.3');
 
     assert.ok(deleted.length >= 2, 'should delete orchestrator files');
     assert.equal(existsSync(join(orchDir, 'state.sh')), false);
   });
 
-  it('skips paths that do not exist', () => {
-    const deleted = deleteRetiredPaths(tmpDir, ['.cadet/nonexistent']);
+  it('skips upgrade when already on or past the upgrade key', () => {
+    const orchDir = join(tmpDir, '.cadet', 'orchestrator');
+    mkdirSync(orchDir, { recursive: true });
+    writeFileSync(join(orchDir, 'keep.md'), '# keep');
+
+    // Already at 0.15.3, upgrading to 0.15.4 — should NOT run 0.15.3 upgrade
+    const deleted = runUpgrades(tmpDir, '0.15.3', '0.15.4');
+
+    assert.deepEqual(deleted, []);
+    assert.equal(existsSync(join(orchDir, 'keep.md')), true);
+  });
+
+  it('skips upgrade when upgrading from above the key', () => {
+    const deleted = runUpgrades(tmpDir, '0.16.0', '0.17.0');
     assert.deepEqual(deleted, []);
   });
 
-  it('deletes retired single file', () => {
-    const dir = join(tmpDir, '.github', 'prompts');
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'old.prompt.md'), '# old');
-
-    const deleted = deleteRetiredPaths(tmpDir, ['.github/prompts/old.prompt.md']);
-
-    assert.equal(deleted.length, 1);
-    assert.equal(existsSync(join(dir, 'old.prompt.md')), false);
+  it('returns empty for same version', () => {
+    const deleted = runUpgrades(tmpDir, '0.15.0', '0.15.0');
+    assert.deepEqual(deleted, []);
   });
 });
