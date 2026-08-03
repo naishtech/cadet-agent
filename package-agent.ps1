@@ -3,6 +3,7 @@
 # Extract the zip at any Unity project root and files will land at:
 #   .cadet\agent\core\
 #   .github\agents\cadet.agent.md (Copilot agent mode)
+#   .github\agents\cadet-agent-reviewer.agent.md (Copilot reviewer agent)
 #   .cursor\rules\cadet-agent.md
 #   .continue\rules\cadet-agent.md
 #   .claude\skills\cadet-agent.md
@@ -169,6 +170,7 @@ Write-Host "  2. Expand-Archive .\$(Split-Path $outputZip -Leaf) -DestinationPat
 Write-Host "  Files will extract to:"
 Write-Host "    .cadet\agent\core\"
 Write-Host "    .github\agents\cadet.agent.md"
+Write-Host "    .github\agents\cadet-agent-reviewer.agent.md"
 Write-Host "    .cursor\rules\cadet-agent.md"
 Write-Host "    .continue\rules\cadet-agent.md"
 Write-Host "    .claude\skills\cadet-agent.md"
