@@ -12,8 +12,8 @@ Cadet-Agent installs these GitHub Copilot-facing files:
 - `.cadet/agent/core/` contains the shared Cadet framework instructions.
 
 ## Installation
-1. Copy `cadet-agent.zip` to the target repository root.
-2. Extract it into the repository root.
+1. From the target repository root, run `npx cadet-agent@latest init`.
+2. If you want to install into a different folder, use `npx cadet-agent@latest init --target <path>`.
 3. Confirm these paths exist: `.cadet/agent/core/` and `.github/agents/cadet.agent.md`.
 4. Open the repository in VS Code with GitHub Copilot enabled.
 5. Select the **Cadet** agent from the agent picker in Copilot Chat and describe your task.

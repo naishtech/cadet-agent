@@ -5,18 +5,16 @@ Use this guide when installing Cadet-Agent into a repository that will use Conti
 ## Installed Files
 Cadet-Agent installs these Continue-facing files:
 - `.continue/rules/cadet-agent.md`
-- `AGENTS.md`
 - `.cadet/agent/core/`
 
 ## What Each File Does
 - `.continue/rules/cadet-agent.md` is the Continue rule entrypoint for Cadet-Agent.
-- `AGENTS.md` provides a shared top-level instruction file.
 - `.cadet/agent/core/` contains the shared Cadet framework documents referenced by the rule.
 
 ## Installation
-1. Copy `cadet-agent.zip` to the target repository root.
-2. Extract it into the repository root.
-3. Confirm these paths exist: `.cadet/agent/core/`, `.continue/rules/cadet-agent.md`, and `AGENTS.md`.
+1. From the target repository root, run `npx cadet-agent@latest init`.
+2. If you want to install into a different folder, use `npx cadet-agent@latest init --target <path>`.
+3. Confirm these paths exist: `.cadet/agent/core/` and `.continue/rules/cadet-agent.md`.
 4. Open the repository in VS Code with Continue installed.
 5. Verify Continue can see the local rule under `.continue/rules`.
 
@@ -30,5 +28,5 @@ Cadet-Agent installs these Continue-facing files:
 - Keep Continue-specific instructions thin unless a behavior is genuinely unique to Continue.
 
 ## Updating
-- Replace `.continue/rules/cadet-agent.md`, `AGENTS.md`, and `.cadet/agent/core` from a new package version.
+- Replace `.continue/rules/cadet-agent.md` and `.cadet/agent/core` from a new package version.
 - Preserve `.cadet/agent/policies`, `.cadet/agent/project-plans`, and the rest of the repository.

@@ -4,7 +4,7 @@ This repository packages Cadet-Agent as a cross-IDE framework with a shared core
 
 ## Layout
 - `core/` contains the shared Cadet-Agent framework.
-- The repository root contains the authored IDE-specific files at `AGENTS.md`, `.github/`, `.cursor/`, `.continue/`, and `.claude/`.
+- The repository root contains thin IDE-specific adapter files under `.github/`, `.cursor/`, `.continue/`, and `.claude/` for native integration.
 - `docs/` contains setup guides for each supported IDE.
 
 ## Package Output

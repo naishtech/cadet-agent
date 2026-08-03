@@ -18,7 +18,8 @@
     ".cursor/rules/cadet-agent.md",
     ".continue/rules/cadet-agent.md",
     ".claude/skills/cadet-agent.md",
-    ".cadet/agent/core"
+    ".cadet/agent/core",
+    ".cadet/agent/core/templates"
   ],
   "preservedPaths": [
     ".cadet/agent/policies",

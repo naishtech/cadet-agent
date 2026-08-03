@@ -6,9 +6,10 @@
 #   .cursor\rules\cadet-agent.md
 #   .continue\rules\cadet-agent.md
 #   .claude\skills\cadet-agent.md
-# The core folder contains cadet-agent.md (condensed agent instructions) and
-# FrameworkManifest.json. Full rationale, guidance, standards, and templates
-# are in the docs/ directory (GitHub Pages).
+# The core folder contains cadet-agent.md (condensed agent instructions),
+# FrameworkManifest.json, and the runtime templates under .cadet/agent/core/templates.
+# Full rationale, guidance, standards, and templates are in the docs/ directory
+# (GitHub Pages).
 
 $ErrorActionPreference = "Stop"
 

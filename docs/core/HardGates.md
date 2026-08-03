@@ -38,6 +38,8 @@ stateDiagram-v2
 
 ## Gate Definitions by Phase
 
+The framework now expresses the checkpoints as XML structure in the core agent instructions, using `<gates>`, `<transition>`, and `<gate>` elements. The prose below preserves the same semantics for human readers.
+
 ### Implementation → Review Transition Gates
 
 Before transitioning from `implementation` to `review`, ALL of the following gates must be explicitly satisfied:
