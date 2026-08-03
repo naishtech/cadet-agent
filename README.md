@@ -1,6 +1,8 @@
 # Cadet-Agent
 
-Cadet-Agent is a cross-IDE agent framework for game-development workflows, with a shared framework core and authored root integrations for GitHub Copilot, Cursor, Continue, and Claude Code.
+Cadet-Agent is an **opinionated** cross-IDE agent framework for game-development workflows. It is built on foundational software engineering practices and real-world game-development experience, with the goal of **guiding you through the entire development process** — from requirements and technical design through TDD, implementation, and review.
+
+Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished game from a single prompt. Instead, it walks you through each phase methodically: calibrating the learner model, scoping work into epics and stories, planning architecture, writing tests first, and iterating on feedback. The shared framework core integrates with GitHub Copilot, Cursor, Continue, and Claude Code.
 
 ## Repository Layout
 - `.cadet/agent/core/` contains the shared Cadet-Agent framework documents.
