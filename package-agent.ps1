@@ -146,6 +146,7 @@ Copy-TreeIntoStaging -SourceRoot $coreSource -StagingRoot $staging -TargetRoot "
 
 # Only copy managed .github files — exclude CI workflows from the consumer package
 Copy-TreeIntoStaging -SourceRoot (Join-Path $githubSource "agents")  -StagingRoot $staging -TargetRoot ".github\agents"
+Copy-TreeIntoStaging -SourceRoot (Join-Path $githubSource "hooks")   -StagingRoot $staging -TargetRoot ".github\hooks"
 
 Copy-TreeIntoStaging -SourceRoot $cursorSource -StagingRoot $staging -TargetRoot ".cursor"
 Copy-TreeIntoStaging -SourceRoot $continueSource -StagingRoot $staging -TargetRoot ".continue"
