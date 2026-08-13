@@ -76,29 +76,38 @@ gh pr merge --squash --delete-branch
 
 **Step 5 — Create the Unity project inside this folder:**
 
-Unity Hub refuses to create a project in a non-empty directory. Because the folder already contains `.gitignore`, `README.md`, and the Cadet bootstrap files, use the Unity Editor CLI instead, which has no empty-folder restriction.
+The folder already contains `.gitignore`, `README.md`, and the Cadet bootstrap files, so it is non-empty. `unity projects new` / `unity projects create` refuse any existing folder (verified against Unity CLI v1.0.0-beta.4), so project creation stays on the Unity Editor CLI (`-batchmode -createProject`), which has no empty-folder restriction. The Unity CLI handles the editor-management and registration steps around it.
 
-**5a — Confirm Unity is installed:**
-- Unity must already be installed via Unity Hub before this step can run.
-- If the user has not installed Unity yet, direct them to open Unity Hub, go to **Installs**, and add their target Unity version. Return to this step once installation is complete.
-
-**5b — Discover the installed Unity version:**
+**5a — Install the Editor (if needed):**
 ```powershell
-Get-ChildItem "C:\Program Files\Unity\Hub\Editor" | Select-Object Name
+unity install <version-or-alias> -m <modules>
+# examples:
+unity install lts
+unity install 6000.0.47f1 -m android ios webgl
 ```
-- This lists all installed editor versions (e.g. `6000.0.47f1`).
-- If the path returns nothing, the Hub editors root may be in a custom location — ask the user where they installed Unity Hub and adjust the path accordingly.
+- `<version-or-alias>` may be `lts`, `latest`, or a specific version string (e.g. `6000.0.47f1`).
+- If the Unity CLI itself is not installed: Windows `$env:UNITY_CLI_CHANNEL='beta'; irm https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.ps1 | iex`; macOS/Linux `brew install --cask unity-cli` or the install script.
+- This replaces the old "open Unity Hub → Installs → add version" step.
+
+**5b — Discover the installed Editor:**
+```powershell
+unity editors -i --format json
+```
+- Lists installed editors as structured JSON (including their install paths) — no hardcoded `C:\Program Files\Unity\Hub\Editor` assumption.
+- If empty, the editor is not installed (or was installed outside the CLI's registry) — run `unity install <version>` first, or register an existing install with `unity editors add <path>`.
 - If more than one version is listed, ask the user to confirm which version to use.
 
 **5c — Create the project via the Unity Editor CLI:**
 ```powershell
 $unityVersion = "<version-confirmed-in-5b>"
-$unityExe = "C:\Program Files\Unity\Hub\Editor\$unityVersion\Editor\Unity.exe"
+$unityExe = "<editor-executable-from-5b-json>"  # e.g. C:\Program Files\Unity\Hub\Editor\<version>\Editor\Unity.exe
 & $unityExe -batchmode -createProject "$PWD" -quit
 ```
 - `-batchmode -quit` creates the Unity project files (`Assets/`, `Packages/`, `ProjectSettings/`) and exits without opening the editor UI.
 - This takes 20–60 seconds. Wait for the process to exit before continuing.
-- Once complete, open Unity Hub → **Open > Add project from disk** → select this folder to register and open the project normally.
+- Once complete, register the project with the Hub and open it:
+  - `unity projects add "$PWD"` — register the existing folder in the Hub registry.
+  - `unity open "$PWD"` — open it with the resolved editor.
 
 - After the bootstrap state is established on `main` and Unity finishes generating files, create a new branch, commit the scaffold, and merge it through a pull request:
 ```powershell
