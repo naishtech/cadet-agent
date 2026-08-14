@@ -26,6 +26,7 @@ This document tracks every IDE adapter file, its purpose, and its canonical depe
 | GitHub Copilot | `.github/prompts/cadet-debug.prompt.md` | Slash-command prompt | `.cadet/agent/core/skills/Debugging.md` |
 | GitHub Copilot | `.github/prompts/cadet-review.prompt.md` | Slash-command prompt | `.cadet/agent/core/skills/CodeReview.md` |
 | GitHub Copilot | `.github/prompts/cadet-resume.prompt.md` | Slash-command prompt | `.cadet/agent/core/cadet-agent.md` (resume logic) |
+| GitHub Copilot | `.github/prompts/cadet-mcp-setup.prompt.md` | Slash-command prompt | `.cadet/agent/core/skills/MCPSetup.md` |
 | GitHub Copilot | `.github/hooks/git-guard.json` | PreToolUse hook config | n/a (infrastructure) |
 | Cursor | `.cursor/rules/cadet-agent.md` | Always-apply rule | `.cadet/agent/core/cadet-agent.md` |
 | Cursor | `.cursor/rules/cadet-agent-reviewer.md` | Reviewer rule | `.cadet/agent/core/cadet-agent.md` |
@@ -42,6 +43,7 @@ This document tracks every IDE adapter file, its purpose, and its canonical depe
 | Claude Code | `.claude/skills/cadet-debug/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Debugging.md` |
 | Claude Code | `.claude/skills/cadet-review/SKILL.md` | Phase skill | `.cadet/agent/core/skills/CodeReview.md` |
 | Claude Code | `.claude/skills/cadet-resume/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Resume.md` |
+| Claude Code | `.claude/skills/cadet-mcp-setup/SKILL.md` | Phase skill | `.cadet/agent/core/skills/MCPSetup.md` |
 
 ## Verification
 

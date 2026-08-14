@@ -29,6 +29,7 @@ Available skills:
 | `/cadet-debug` | `.cadet/agent/core/skills/Debugging.md` | Defect reports or unexpected behavior |
 | `/cadet-review` | `.cadet/agent/core/skills/CodeReview.md` | After each story — **non-skippable** |
 | `/cadet-resume` | `.cadet/agent/core/skills/Resume.md` | Inspect state.json and resume workflow |
+| `/cadet-mcp-setup` | `.cadet/agent/core/skills/MCPSetup.md` | Install Pipeline + register Unity's MCP server to connect Cadet to the Editor |
 
 ## Reviewer Mode
 

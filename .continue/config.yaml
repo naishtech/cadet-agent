@@ -72,6 +72,14 @@ customCommands:
       Read `.cadet/agent/core/skills/Resume.md` as the primary instruction context.
       Follow every step in that skill file. Check whether `.cadet/state.json` exists, report the current state, and suggest the next action.
 
+  - name: cadet-mcp-setup
+    description: Install the Pipeline package and register Unity's built-in MCP server to connect Cadet to the Editor
+    prompt: |
+      You are executing the Cadet MCP Setup skill.
+      Read `.cadet/agent/core/cadet-agent.md` for the global directive.
+      Read `.cadet/agent/core/skills/MCPSetup.md` as the primary instruction context.
+      Follow every step in that skill file. Read `.cadet/agent/core/UnityCli.md` for the gate → command → state contract.
+
   - name: cadet-agent-reviewer
     description: Audit Cadet Agent's work against framework rules and process requirements
     prompt: |

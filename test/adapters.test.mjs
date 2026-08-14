@@ -23,6 +23,7 @@ const expectedSkills = [
   'Debugging.md',
   'CodeReview.md',
   'Resume.md',
+  'MCPSetup.md',
 ];
 
 // ── Per-IDE expected adapter files ──────────────────────────────────────────
@@ -43,6 +44,7 @@ const ideAdapters = {
       'TDD.md': 'cadet-tdd.prompt.md',
       'Debugging.md': 'cadet-debug.prompt.md',
       'CodeReview.md': 'cadet-review.prompt.md',
+      'MCPSetup.md': 'cadet-mcp-setup.prompt.md',
     },
     extraPrompts: ['cadet-resume.prompt.md'],
   },
@@ -72,6 +74,7 @@ const ideAdapters = {
       'TDD.md': 'cadet-tdd/SKILL.md',
       'Debugging.md': 'cadet-debug/SKILL.md',
       'CodeReview.md': 'cadet-review/SKILL.md',
+      'MCPSetup.md': 'cadet-mcp-setup/SKILL.md',
     },
     extraSkills: ['cadet-resume/SKILL.md'],
   },
@@ -300,7 +303,7 @@ describe('Adapter inventory', () => {
       const skillNames = [
         'cadet-requirements', 'cadet-architecture', 'cadet-spike',
         'cadet-breakdown', 'cadet-tdd', 'cadet-debug', 'cadet-review',
-        'cadet-resume', 'cadet-agent-reviewer',
+        'cadet-resume', 'cadet-mcp-setup', 'cadet-agent-reviewer',
       ];
       for (const name of skillNames) {
         assert.ok(
@@ -420,6 +423,7 @@ describe('Adapter inventory', () => {
       '.github/prompts/cadet-debug.prompt.md',
       '.github/prompts/cadet-review.prompt.md',
       '.github/prompts/cadet-resume.prompt.md',
+      '.github/prompts/cadet-mcp-setup.prompt.md',
       // Cursor
       '.cursor/rules/cadet-agent.md',
       '.cursor/rules/cadet-agent-reviewer.md',
@@ -438,6 +442,7 @@ describe('Adapter inventory', () => {
       '.claude/skills/cadet-debug',
       '.claude/skills/cadet-review',
       '.claude/skills/cadet-resume',
+      '.claude/skills/cadet-mcp-setup',
       // Core
       '.cadet/agent/core',
       '.cadet/agent/core/templates',

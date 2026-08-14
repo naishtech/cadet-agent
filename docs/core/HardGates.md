@@ -46,8 +46,10 @@ Before transitioning from `implementation` to `review`, ALL of the following gat
 
 | Gate | Requirement | How to Satisfy |
 |------|-------------|----------------|
-| `testsPassed` | All tests for the current story pass | Run tests, confirm green. Report results to user. |
-| `compileCheckConfirmed` | Unity project compiles without errors | Ask user to focus Unity window, confirm 0 errors. |
+| `testsPassed` | All tests for the current story pass | Run `unity test <project>` (CLI; exit `6` = fail) or confirm user-run tests — see `core/UnityCli.md`. |
+| `compileCheckConfirmed` | Unity project compiles without errors | Run `unity build`/`run`/`command eval` (CLI), or ask user to focus Unity and confirm 0 errors — see `core/UnityCli.md`. |
+
+> `testsPassed` and `compileCheckConfirmed` are **agent-executable** via the Unity CLI. Use CLI commands for these deterministic checks (exit codes), and MCP mode for inspection/reasoning — see `core/UnityCli.md`.
 | `storyTrackingUpdated` | Story markdown marked complete, epic progress updated | Update story file to `[x] done`, update epic tracker. |
 
 **Transition rule:** If ANY of these three gates is `false`, do NOT advance to `review`. Fix the failing gate first.

@@ -127,17 +127,17 @@ Implement in small, reviewable increments.
 - Maintain a full change history across requirements, technical design, project plan, and epics, including descopes and mid-implementation direction changes.
 - After each epic is completed, ask the user to check AI token count.
 - If context exceeds 100k tokens, recommend starting a new chat before continuing.
-- If Unity test validation is needed, tell the user exactly which tests to run and why.
-- Do not run Unity tests directly unless the user explicitly asks for it.
-- Use user-reported test outcomes to drive the next implementation or fix step.
+- If Unity test validation is needed, run `unity test <project>` for a deterministic pass/fail, or tell the user which tests to run — see `core/UnityCli.md` for the CLI-vs-MCP distinction and the gate→command contract.
+- Use CLI commands for deterministic verification (exit codes), MCP mode for inspection/reasoning. Confirm with the user before driving a live Editor.
+- Use reported test outcomes to drive the next implementation or fix step.
 - Treat spikes as reference-only once their question is answered and keep production code paths separate. See [SpikePatterns](../guidance/SpikePatterns.md).
 - Keep game-specific logic in domain folders and shared logic in the repository's designated shared-code location when one exists.
 - Keep work on the active feature branch, rebase as needed to stay current, and use force-push with lease only when rewriting branch history intentionally.
 - Prepare changes for PR-based integration and prefer squash merge unless the user specifies a different merge policy.
 - Route user-facing strings through the project localization helper/pipeline and preserve fallback behavior.
 - For non-Latin locale updates, verify glyph coverage in font maps and ask the user to regenerate TMP font assets when glyph sets change.
-- After relevant code changes, prompt the user to recompile in Unity when needed.
-- Unity-specific rule: ask the user to focus the Unity window so compilation can run.
+- After relevant code changes, prompt the user to recompile in Unity when needed — or recompile/verify via `unity test` / `unity command eval` (see `core/UnityCli.md`).
+- Unity-specific rule: ask the user to focus the Unity window so compilation can run when no Unity CLI or live Editor connection is available.
 
 **Hard Gates (Step 3):** Before transitioning from `implementation` to `review`, the following gates in `.cadet/state.json` must ALL be `true`. See [HardGates](HardGates.md) for the full gate protocol.
 

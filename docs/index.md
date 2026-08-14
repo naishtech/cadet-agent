@@ -30,6 +30,8 @@ Cadet skills are phase-scoped instruction files. When invoked (via `/cadet-<skil
 
 ## Detailed process reference
 
+- [Unity CLI](core/UnityCli.md) — CLI commands vs MCP mode, and the gate→command contract
+
 ## Guidance
 
 - [Architecture Patterns](guidance/ArchitecturePatterns.md)
