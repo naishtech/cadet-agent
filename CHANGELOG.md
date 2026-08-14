@@ -11,6 +11,26 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ---
 
+## [0.20.0] — 2026-08-14
+
+### Added
+- Canonical `AgentReviewer.md` skill; reviewer adapters across all IDEs now point at it.
+- `<role>` persona blocks and structural XML tags (`<instructions>`, `<context>`, `<input>`, `<process>`, `<output>`, `<completion>`, `<documents>`) in all core skills.
+- ETC (Easy To Change) primary principle in the Architecture skill.
+- Business-risk evaluation (brand risk, time to market, regulatory/compliance, opportunity cost, strategic alignment) and ask-don't-assume behavior in the Requirements skill.
+- Global "never assume" rule in `cadet-agent.md`.
+
+### Changed
+- All IDE adapters (Claude Code, GitHub Copilot, Continue, Cursor) reduced to thin pointer wrappers referencing core skills.
+- `<output ref="…"/>` retired in favor of `<document index="n" ref="…" purpose="fill-and-strip"/>`.
+- Wrapper-only completion details folded into core skills.
+- `cadet-agent.md` skill dispatch table completed to 10 skills; XML tag convention updated.
+- `package-agent.ps1` hardened to stage `.claude` from `FrameworkManifest.json` managed paths.
+- Tests flipped from enforcing adapter duplication to forbidding it.
+
+### Removed
+- Orphaned flat `.claude/skills/cadet-agent.md` (superseded by `.claude/skills/cadet-agent/SKILL.md`).
+
 ## [0.18.0] — 2026-08-03
 
 ### Added
