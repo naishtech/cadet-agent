@@ -1,6 +1,6 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync, rmSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
@@ -9,7 +9,7 @@ import { Buffer } from 'node:buffer';
 // ── Import actual functions from install.mjs ────────────────────────────────
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
-const { findManagedPathsInZip, deleteRemovedManagedPaths } = await import(
+const { findManagedPathsInZip, deleteRemovedManagedPaths, extractZip } = await import(
   `file://${join(__dirname, '..', 'src', 'install.mjs')}`
 );
 const { runUpgrades } = await import(
@@ -137,6 +137,46 @@ describe('findManagedPathsInZip', () => {
       assert.ok(normalized.some(p => p === '.cadet/agent/core' || p.startsWith('.cadet/agent/core/')));
     });
   }
+});
+
+// ── Windows-style zip extraction (backslash separators) ────────────────────
+
+describe('extractZip handles Windows-style paths', () => {
+  let tmpDir;
+
+  before(() => {
+    tmpDir = join(tmpdir(), `cadet-extract-${Date.now()}`);
+    mkdirSync(tmpDir, { recursive: true });
+  });
+
+  after(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('skips backslash directory entries and extracts nested files', async () => {
+    const zip = buildMinimalZip([
+      { name: '.cadet\\agent\\', content: Buffer.alloc(0) },
+      { name: '.claude\\skills\\', content: Buffer.alloc(0) },
+      { name: '.cadet\\agent\\core\\skills\\Requirements.md', content: '# req' },
+      { name: '.cadet\\agent\\core\\templates\\StoryTemplate.md', content: '# story' },
+      { name: '.github\\prompts\\cadet-requirements.prompt.md', content: '---' },
+    ]);
+
+    const extracted = await extractZip(zip, tmpDir);
+
+    assert.equal(extracted.length, 3, 'directory entries must be skipped');
+
+    const skills = join(tmpDir, '.cadet', 'agent', 'core', 'skills', 'Requirements.md');
+    const templates = join(tmpDir, '.cadet', 'agent', 'core', 'templates', 'StoryTemplate.md');
+    const prompt = join(tmpDir, '.github', 'prompts', 'cadet-requirements.prompt.md');
+
+    assert.equal(readFileSync(skills, 'utf-8'), '# req');
+    assert.equal(readFileSync(templates, 'utf-8'), '# story');
+    assert.equal(readFileSync(prompt, 'utf-8'), '---');
+
+    // .cadet/agent must be a directory, not a file
+    assert.equal(statSync(join(tmpDir, '.cadet', 'agent')).isDirectory(), true);
+  });
 });
 
 // ── deleteRemovedManagedPaths with temp dir ─────────────────────────────────

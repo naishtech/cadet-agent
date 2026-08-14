@@ -59,7 +59,7 @@ function* centralDirectoryEntries(buf, cdOffset, cdSize) {
     const extraLen         = read16(buf, off + 30);
     const commentLen       = read16(buf, off + 32);
     const localHeaderOff   = read32(buf, off + 42);
-    const filename         = buf.toString('utf-8', off + 46, off + 46 + filenameLen);
+    const filename         = buf.toString('utf-8', off + 46, off + 46 + filenameLen).replace(/\\/g, '/');
 
     // Skip directory entries (trailing / in filename, or uncompressedSize == 0 with no method)
     if (!filename.endsWith('/')) {
@@ -109,7 +109,7 @@ function extractFile(buf, entry, targetDir) {
   });
 }
 
-async function extractZip(buf, targetDir) {
+export async function extractZip(buf, targetDir) {
   const eocdOff = findEocd(buf);
   const cdSize  = read32(buf, eocdOff + 12);
   const cdOff   = read32(buf, eocdOff + 16);
