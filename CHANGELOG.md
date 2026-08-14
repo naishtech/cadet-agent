@@ -11,6 +11,11 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ---
 
+## [0.20.2] — 2026-08-14
+
+### Fixed
+- `src/install.mjs`: fix obsolete-file cleanup during sync so nested files under managed directories (e.g. `.cadet/agent/core/skills/`) are not deleted. `walkDir` computed relative paths from the current subdirectory instead of the walked root, so nested skills and templates were removed after extraction, leaving empty directories.
+
 ## [0.20.1] — 2026-08-14
 
 ### Fixed
