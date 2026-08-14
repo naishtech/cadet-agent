@@ -11,6 +11,11 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ---
 
+## [0.20.1] — 2026-08-14
+
+### Fixed
+- `src/install.mjs`: normalize backslash separators when reading zip entries so Windows-built packages extract correctly. Directory entries ending in `\` (e.g. `.cadet\agent\core\skills\`) were previously written as files, causing nested skills and templates to fail with `ENOTDIR` and be silently dropped.
+
 ## [0.20.0] — 2026-08-14
 
 ### Added
