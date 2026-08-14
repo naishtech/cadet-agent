@@ -23,12 +23,14 @@ When the user names a workflow phase (requirements, architecture, spike, breakdo
    - `Debugging` → `.cadet/agent/core/skills/Debugging.md`
    - `Code Review` → `.cadet/agent/core/skills/CodeReview.md`
    - `Resume` → `.cadet/agent/core/skills/Resume.md`
+   - `MCP Setup` → `.cadet/agent/core/skills/MCPSetup.md`
 3. **Follow the skill process** exactly — do not skip steps or mix with unrelated tasks.
 4. **Update state** after the skill completes.
 
 **Prefer using Continue custom commands** for phase dispatch:
 - `/cadet-requirements` through `/cadet-review` (see `.continue/config.yaml`)
 - `/cadet-resume` to inspect state and resume workflow
+- `/cadet-mcp-setup` to install the Pipeline package and register Unity's MCP server
 - `/cadet-agent-reviewer` for auditing without writing code
 
 ## Reviewer Mode

@@ -23,6 +23,7 @@ When the user names a workflow phase (requirements, architecture, spike, breakdo
    - `Debugging` → `.cadet/agent/core/skills/Debugging.md`
    - `Code Review` → `.cadet/agent/core/skills/CodeReview.md`
    - `Resume` → `.cadet/agent/core/skills/Resume.md`
+   - `MCP Setup` → `.cadet/agent/core/skills/MCPSetup.md`
 3. **Follow the skill process** exactly — do not skip steps, do not mix with unrelated tasks.
 4. **Update state** after the skill completes before dispatching the next skill.
 

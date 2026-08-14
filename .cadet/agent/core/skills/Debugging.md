@@ -34,7 +34,7 @@ Diagnose and resolve defects through reproducible evidence, minimal-risk fixes, 
 6. Ensure failures surface concrete diagnostic reasons, not generic messages.
 7. Re-run validation to confirm resolution and guard against regression.
 8. Update technical design, plan, and epic status if the fix affects scope or sequencing.
-9. If Unity code changed, ask the user to focus Unity and trigger recompilation.
+9. If Unity code changed, ask the user to focus Unity and trigger recompilation. (When the user wants agent-driven verification, use the Unity CLI / MCP per `.cadet/agent/core/UnityCli.md` — CLI commands for deterministic reproduction, MCP mode for live context.)
 10. If the defect is not resolved after three genuine fix attempts, invoke the **Persistent-Failure Protocol** below.
 
 ## Persistent-Failure Protocol

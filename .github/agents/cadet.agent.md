@@ -25,7 +25,7 @@ Read `.cadet/agent/core/cadet-agent.md` as the single condensed instruction file
 
 Workflow phases are implemented as scoped skills. When dispatching a phase, read the canonical skill process from `.cadet/agent/core/skills/<SkillName>.md`. For GitHub Copilot, prefer invoking the matching `/cadet-<skill>` slash-command prompt so the skill becomes the primary instruction context.
 
-Available skills: Requirements, Architecture, Spike, StoryBreakdown, TDD, Debugging, CodeReview.
+Available skills: Requirements, Architecture, Spike, StoryBreakdown, TDD, Debugging, CodeReview, MCPSetup.
 
 ## Kickoff Flow (first interaction in a session)
 
