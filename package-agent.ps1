@@ -145,7 +145,25 @@ Copy-TreeIntoStaging -SourceRoot $promptsSource                        -StagingR
 
 Copy-TreeIntoStaging -SourceRoot $cursorSource -StagingRoot $staging -TargetRoot ".cursor"
 Copy-TreeIntoStaging -SourceRoot $continueSource -StagingRoot $staging -TargetRoot ".continue"
-Copy-TreeIntoStaging -SourceRoot $claudeSource -StagingRoot $staging -TargetRoot ".claude"
+
+# Stage only the managed .claude paths (from FrameworkManifest.json) so
+# orphaned files cannot leak into the package.
+foreach ($managedPath in $manifest.managedPaths) {
+    if ($managedPath -notlike '.claude/*') { continue }
+    $src = Join-Path $scriptDir ($managedPath -replace '/', '\')
+    $rel = $managedPath.Substring('.claude/'.Length) -replace '/', '\'
+    $dest = Join-Path $staging (Join-Path '.claude' $rel)
+    $destParent = Split-Path $dest -Parent
+    if (-not (Test-Path $destParent)) {
+        New-Item -ItemType Directory -Path $destParent -Force | Out-Null
+    }
+    if ((Get-Item $src).PSIsContainer) {
+        Copy-Item -Path $src -Destination $destParent -Recurse -Force
+    }
+    else {
+        Copy-Item -Path $src -Destination $dest -Force
+    }
+}
 
 $fileCount = (Get-ChildItem -Path $staging -Recurse -File).Count
 

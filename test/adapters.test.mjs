@@ -154,11 +154,6 @@ describe('Adapter inventory', () => {
         const content = readFile(join(copilot.promptsDir, promptFile));
         assert.ok(content.startsWith('---'), `${promptFile} must start with YAML frontmatter`);
       });
-
-      it(`prompt ${promptFile} has Gate Check`, () => {
-        const content = readFile(join(copilot.promptsDir, promptFile));
-        assert.ok(content.includes('Gate Check'), `${promptFile} must include a gate check`);
-      });
     }
 
     for (const extra of copilot.extraPrompts) {
@@ -374,11 +369,6 @@ describe('Adapter inventory', () => {
         assert.ok(content.includes('name:'), `${skillFile} frontmatter must include name`);
         assert.ok(content.includes('description:'), `${skillFile} frontmatter must include description`);
       });
-
-      it(`skill ${skillFile} has Gate Check`, () => {
-        const content = readFile(fullPath);
-        assert.ok(content.includes('Gate Check'), `${skillFile} must include a gate check`);
-      });
     }
 
     for (const extra of claude.extraSkills) {
@@ -398,6 +388,71 @@ describe('Adapter inventory', () => {
         content.includes('.cadet/agent/core/cadet-agent.md'),
         'Claude reviewer must reference cadet-agent.md'
       );
+    });
+  });
+
+  // ── DRY guard: adapters must not duplicate canonical content ───────────
+
+  describe('Adapters do not duplicate canonical content', () => {
+    const adapterFiles = [
+      '.github/agents/cadet.agent.md',
+      '.github/agents/cadet-agent-reviewer.agent.md',
+      ...Object.values(ideAdapters['github-copilot'].skillToPrompt).map((p) => `.github/prompts/${p}`),
+      ...ideAdapters['github-copilot'].extraPrompts.map((p) => `.github/prompts/${p}`),
+      '.claude/skills/cadet-agent/SKILL.md',
+      '.claude/skills/cadet-agent-reviewer/SKILL.md',
+      ...Object.values(ideAdapters['claude-code'].skillToFile).map((f) => `.claude/skills/${f}`),
+      ...ideAdapters['claude-code'].extraSkills.map((f) => `.claude/skills/${f}`),
+      '.continue/rules/cadet-agent.md',
+      '.continue/rules/cadet-agent-reviewer.md',
+      '.continue/config.yaml',
+      '.cursor/rules/cadet-agent.md',
+      '.cursor/rules/cadet-agent-reviewer.md',
+    ];
+
+    const forbiddenStrings = [
+      'Given/When/Then acceptance criteria',
+      'red/green test-first',
+      'ADRDecisionTemplate',
+      'Persistent-Failure Protocol',
+      'Assumption audit',
+      '## Process',
+    ];
+
+    // Match a structural XML element copied into an adapter (at line start),
+    // while allowing prose that merely mentions the tag name inline.
+    const structuralTag = /^\s*<\/?(?:role|instructions|context|input|process|output|completion|documents|document)\b/;
+
+    function bodyOf(file, content) {
+      let body = content;
+      if (file.endsWith('.md') && body.startsWith('---')) {
+        const end = body.indexOf('\n---', 3);
+        if (end !== -1) body = body.slice(end + 4);
+      }
+      if (file.endsWith('config.yaml')) {
+        body = body
+          .split('\n')
+          .filter((line) => !/^\s+description:/.test(line))
+          .join('\n');
+      }
+      return body;
+    }
+
+    for (const rel of adapterFiles) {
+      it(`${rel} does not duplicate canonical content`, () => {
+        const content = readFile(rel);
+        const body = bodyOf(rel, content);
+        for (const phrase of forbiddenStrings) {
+          assert.ok(!body.includes(phrase), `${rel} must not contain "${phrase}"`);
+        }
+        for (const line of body.split('\n')) {
+          assert.ok(!structuralTag.test(line), `${rel} must not contain structural tag element: ${line.trim()}`);
+        }
+      });
+    }
+
+    it('flat .claude/skills/cadet-agent.md does not exist', () => {
+      assert.ok(!fileExists('.claude/skills/cadet-agent.md'), 'orphan flat skill must be removed');
     });
   });
 

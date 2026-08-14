@@ -21,6 +21,7 @@ These rules apply to all work, regardless of learner tier, operating mode, or wo
 - Do not skip required large-change artifacts (requirements, technical design, project plan, epics) unless the user explicitly directs that exception. If they do, state the skipped artifact and the reason before continuing.
 - During planning (requirements and architecture), explicitly list every assumption being made about technology capabilities, integration behavior, performance characteristics, or platform constraints. For each assumption, classify it as **verified** (documented/known), **reasonable** (standard practice, low risk), or **unverified** (unknown, high risk). For unverified assumptions, recommend a spike to answer the open question before the assumption becomes a design dependency.
 - When uncertain, ask. If both sides are uncertain, get permission before searching online.
+- **Never assume you or the user already knows the answer.** If any fact, constraint, or requirement is unclear or ambiguous, ask — do not fill gaps with assumptions. If the user does not know, direct them to the appropriate subject matter expert rather than guessing.
 - For new tech: check familiarity, explain if unfamiliar, confirm consent before adoption.
 - When an active repository policy defines technology defaults, state the policy default before recommending alternatives. Do not silently substitute a different technology.
 - For Unity projects, use Unity Test Framework (UTF) for unit tests. Do not recommend external test frameworks like NUnit or xUnit for Unity code.
@@ -29,13 +30,25 @@ These rules apply to all work, regardless of learner tier, operating mode, or wo
 
 ### XML Tag Convention
 
-Three XML tag families are used throughout this framework. All tags are authoring-time only — strip them from final output.
+Two XML tag families are used throughout this framework.
+
+**Structural tags** — delimit sections inside `.cadet/agent/core/skills/*.md`. They stay in the skill file and are never emitted as output:
+
+- `<role>` — the persona the model adopts for this skill.
+- `<instructions>` — the primary directive, including `## Gate Check`.
+- `<context>` — Purpose and When to Invoke.
+- `<input>` — Required Inputs.
+- `<process>` — the numbered process steps.
+- `<output>` — Expected Outputs.
+- `<completion>` — state-update steps.
+- `<documents>` → `<document index="n" ref="..." purpose="..."/>` — canonical template references. `ref` must target `.cadet/agent/core/templates/...` only; `purpose` is `fill-and-strip` (produce an artifact) or `reference` (read-only context). Process steps reference documents by index and never repeat a template path inline.
+
+**Authoring tags** — resolved or stripped when producing artifacts (never emitted in final output):
 
 - `<slot/>` — fill-in zone. Replace with the requested value. Self-closing or wrapping. Attributes: `id`, `opt`, `fmt`, `note`, `repeat`, `header`.
 - `<gate/>` — structurally enforced checkpoint. Appears inside `<gates>` / `<transition>` wrappers. Read-only — never emit in output. Describes a condition that must be `true` before phase advancement.
-- `<output ref="path"/>` — read the referenced template file, fill every `<slot/>`, strip all XML wrappers, and produce pure Markdown output.
 
-Template path policy: `ref` paths must target `.cadet/agent/core/templates/...` only.
+`<output ref="path"/>` is retired — its role is replaced by `<document index="n" ref="..." purpose="fill-and-strip"/>` inside a `<documents>` block.
 
 After filling, the final artifact contains zero XML tags.
 
@@ -96,6 +109,9 @@ Cadet workflows are implemented as scoped skills. The global directive decides *
 | **TDD** | `/cadet-tdd` | Per story for large changes; per change for small changes. |
 | **Debugging** | `/cadet-debug` | On defect reports or unexpected behavior. |
 | **Code Review** | `/cadet-review` | After each completed story or change — **non-skippable**. |
+| **Resume** | `/cadet-resume` | On session start, after a break, or when state is unclear. |
+| **MCP Setup** | `/cadet-mcp-setup` | When the agent needs Unity Editor connectivity via Unity CLI/MCP. |
+| **Agent Reviewer** | `/cadet-agent-reviewer` | Audit-only mode — never writes code; after a story or on demand. |
 
 ### Dispatch Rules
 
@@ -106,6 +122,7 @@ Cadet workflows are implemented as scoped skills. The global directive decides *
    - For GitHub Copilot, use the `/cadet-<skill>` slash-command prompt when available.
 4. Do not mix skill instructions with unrelated tasks in the same turn.
 5. After the skill completes, update `.cadet/state.json` before dispatching the next skill or ending the session.
+6. IDE adapter files (`.github/prompts/`, `.claude/skills/`, `.continue/config.yaml`, `.cursor/rules/`) must reference canonical skill files and must not re-state gate checks, process steps, or completion steps.
 
 ### Skill Gate Checks
 
