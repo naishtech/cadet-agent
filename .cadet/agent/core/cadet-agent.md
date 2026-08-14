@@ -192,6 +192,7 @@ If a gate cannot be satisfied: STOP immediately. Report which gate failed and wh
 - Bootstrap: create remote repo → `git init` in existing folder → add `.gitignore` (Unity template) + `README.md` → push initial commit.
 - All subsequent work on feature branches. Integration to `main` via pull requests only.
 - Prefer squash merge. Rebase to stay current; force-push with `--force-with-lease` only when intentionally rewriting branch history.
+- Before starting a new task, check the current branch and working tree (`git branch --show-current`, `git status --short`). If leftover changes from a previous task exist, ask the user whether to commit, stash, push, or move to a new branch — before making further changes. Start new tasks on a branch off `main`.
 
 ## Framework Sync
 

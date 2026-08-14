@@ -138,6 +138,15 @@ After reporting all discrepancies:
   - If the user chooses automatic reconciliation: update `state.json` to match on-disk reality (git history takes precedence for phase determination; markdown files take precedence for story status in markdown mode).
   - If the user chooses manual resolution: stop and wait for instructions.
 
+### 2d — Branch and Working-Tree Status
+
+1. Run `git branch --show-current` and `git status --short`.
+2. Determine whether the current work is a continuation or a new task:
+   - If uncommitted changes match the active story/phase in `state.json`, this is a continuation — continue on the current branch.
+   - If the changes look like leftover work from a previous task and the user wants to start something new, ask how to proceed before making further changes: commit, stash, push, or move the work to a new branch.
+   - If the tree is clean but the current branch has unpushed commits, report them and ask whether to push before starting anything new.
+3. If this is a brand-new task (no active story in `state.json`, or the user explicitly starts new work), recommend creating a new branch from `main` before making changes.
+
 ## Phase 3 — Determine Next Action
 
 Based on `currentPhase` (after any reconciliation from Phase 2), determine the next action:

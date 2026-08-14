@@ -19,5 +19,21 @@ The packaged files are a bootstrap snapshot so Cadet can start immediately, but 
 
 ---
 
+## Branch Status Check — Before Starting New Work
+
+Before beginning a brand-new task (anything that is not a continuation of work already in progress), establish the state of the current branch:
+
+1. Run `git branch --show-current` and `git status --short`.
+2. **Clean tree on `main`** — start the new task on a new branch: `git checkout -b feature/<task-name>` from `main`.
+3. **Uncommitted or unpushed changes from a previous task** — do not silently continue. Ask the user how to proceed:
+   - **Commit** the changes (with explicit approval),
+   - **Stash** them for later,
+   - **Push** them to the current branch, or
+   - **Create a new branch** from `main` and move the work there before continuing.
+4. **Continuation of in-progress work** (the current branch matches the active task) — continue on the current branch; do not ask to branch or stash.
+5. Only start making further changes after the branch state is resolved.
+
+---
+
 ## Backlinks
 - Framework index: [README](README.md)
