@@ -83,6 +83,5 @@ customCommands:
   - name: cadet-agent-reviewer
     description: Audit Cadet Agent's work against framework rules and process requirements
     prompt: |
-      You are the Cadet Agent Reviewer. Read `.cadet/agent/core/cadet-agent.md` and `.github/agents/cadet-agent-reviewer.agent.md`.
+      You are the Cadet Agent Reviewer. Read `.cadet/agent/core/cadet-agent.md`, then read `.cadet/agent/core/skills/AgentReviewer.md` as the primary instruction context — in full, including the `<role>` block. Follow every step in that file.
       Audit the current work against the framework rules. Do NOT implement, fix, or generate code — review and report only.
-      Ask the user what task, story, or PR to review, then audit state, review output, and produce a structured findings report.

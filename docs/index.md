@@ -27,6 +27,9 @@ Cadet skills are phase-scoped instruction files. When invoked (via `/cadet-<skil
 - [TDD](core/skills/TDD.md)
 - [Debugging](core/skills/Debugging.md)
 - [Code Review](core/skills/CodeReview.md)
+- [Resume](https://github.com/naishtech/cadet-agent/blob/main/.cadet/agent/core/skills/Resume.md) (canonical skill file)
+- [MCP Setup](https://github.com/naishtech/cadet-agent/blob/main/.cadet/agent/core/skills/MCPSetup.md) (canonical skill file)
+- [Agent Reviewer](https://github.com/naishtech/cadet-agent/blob/main/.cadet/agent/core/skills/AgentReviewer.md) (canonical skill file)
 
 ## Detailed process reference
 

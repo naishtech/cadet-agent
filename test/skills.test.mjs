@@ -22,6 +22,7 @@ const expectedSkills = [
   'Debugging.md',
   'CodeReview.md',
   'Resume.md',
+  'MCPSetup.md',
 ];
 
 const expectedPrompts = [
@@ -32,11 +33,21 @@ const expectedPrompts = [
   'cadet-tdd.prompt.md',
   'cadet-debug.prompt.md',
   'cadet-review.prompt.md',
+  'cadet-resume.prompt.md',
+  'cadet-mcp-setup.prompt.md',
 ];
 
 describe('Skill files', () => {
   it('has a skills directory under .cadet/agent/core', () => {
     assert.equal(existsSync(skillsDir), true);
+  });
+
+  it('includes the canonical reviewer skill', () => {
+    const path = join(skillsDir, 'AgentReviewer.md');
+    assert.equal(existsSync(path), true, 'missing AgentReviewer.md');
+    const content = readFileSync(path, 'utf-8');
+    assert.ok(content.includes('<role>'), 'AgentReviewer.md must include a role block');
+    assert.ok(content.includes('.cadet/agent/core/cadet-agent.md'), 'AgentReviewer.md must reference cadet-agent.md');
   });
 
   for (const skill of expectedSkills) {
@@ -62,8 +73,7 @@ describe('Copilot prompt adapters', () => {
       const content = readFileSync(path, 'utf-8');
       assert.ok(content.startsWith('---'), `${prompt} must start with YAML frontmatter`);
       assert.ok(content.includes('description:'), `${prompt} frontmatter must include a description`);
-      assert.ok(content.includes('Gate Check'), `${prompt} must include a gate check`);
-      assert.ok(content.includes('## Process'), `${prompt} must include a process section`);
+      assert.ok(content.includes('.cadet/agent/core/skills/'), `${prompt} must reference its canonical skill`);
     });
   }
 });
