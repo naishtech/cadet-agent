@@ -11,6 +11,11 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ---
 
+## [0.21.0] — 2026-08-14
+
+### Added
+- Branch status check before starting new work: `GitFirstRule.md` now requires checking the current branch and working tree (`git branch --show-current`, `git status --short`) before a new task, with options to commit, stash, push, or move leftover changes to a new branch. The same check was added to the Resume skill (step 2d) and the condensed Git Workflow rules in `cadet-agent.md`.
+
 ## [0.20.2] — 2026-08-14
 
 ### Fixed
