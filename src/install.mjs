@@ -276,15 +276,19 @@ function matchesManagedPath(filename, managedPaths) {
 }
 
 function walkDir(dir, fn) {
-  const entries = readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const fullPath = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      walkDir(fullPath, fn);
-    } else {
-      fn(fullPath, relative(dir, fullPath));
+  const root = dir;
+  const walk = (current) => {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const fullPath = join(current, entry.name);
+      if (entry.isDirectory()) {
+        walk(fullPath);
+      } else {
+        // rel must be relative to the walked root, not the current subdirectory
+        fn(fullPath, relative(root, fullPath));
+      }
     }
-  }
+  };
+  walk(root);
 }
 
 function deleteObsoleteManagedFiles(targetDir, managedPaths, zipFilenames) {
@@ -320,7 +324,7 @@ function deleteObsoleteManagedFiles(targetDir, managedPaths, zipFilenames) {
   return deleted;
 }
 
-async function extractZipWithManifest(buf, targetDir, { preserved, managed }) {
+export async function extractZipWithManifest(buf, targetDir, { preserved, managed }) {
   const eocdOff = findEocd(buf);
   const cdSize  = read32(buf, eocdOff + 12);
   const cdOff   = read32(buf, eocdOff + 16);

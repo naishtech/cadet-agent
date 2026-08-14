@@ -9,7 +9,7 @@ import { Buffer } from 'node:buffer';
 // ── Import actual functions from install.mjs ────────────────────────────────
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
-const { findManagedPathsInZip, deleteRemovedManagedPaths, extractZip } = await import(
+const { findManagedPathsInZip, deleteRemovedManagedPaths, extractZip, extractZipWithManifest } = await import(
   `file://${join(__dirname, '..', 'src', 'install.mjs')}`
 );
 const { runUpgrades } = await import(
@@ -176,6 +176,47 @@ describe('extractZip handles Windows-style paths', () => {
 
     // .cadet/agent must be a directory, not a file
     assert.equal(statSync(join(tmpDir, '.cadet', 'agent')).isDirectory(), true);
+  });
+});
+
+// ── Sync extraction preserves nested managed files ──────────────────────────
+
+describe('extractZipWithManifest preserves nested managed files', () => {
+  let tmpDir;
+
+  before(() => {
+    tmpDir = join(tmpdir(), `cadet-sync-${Date.now()}`);
+    mkdirSync(tmpDir, { recursive: true });
+  });
+
+  after(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('keeps nested files under a managed directory and removes stale files', async () => {
+    const manifest = JSON.stringify({
+      frameworkVersion: '0.20.0',
+      managedPaths: ['.cadet/agent/core'],
+      preservedPaths: [],
+    });
+    const zip = buildMinimalZip([
+      { name: '.cadet/agent/core/FrameworkManifest.json', content: manifest },
+      { name: '.cadet/agent/core/skills/Architecture.md', content: '# arch' },
+      { name: '.cadet/agent/core/templates/StoryTemplate.md', content: '# story' },
+    ]);
+
+    // Pre-existing install with a stale file that should be removed
+    mkdirSync(join(tmpDir, '.cadet', 'agent', 'core'), { recursive: true });
+    writeFileSync(join(tmpDir, '.cadet', 'agent', 'core', 'stale.md'), 'stale');
+
+    await extractZipWithManifest(zip, tmpDir, {
+      preserved: [],
+      managed: ['.cadet/agent/core'],
+    });
+
+    assert.equal(existsSync(join(tmpDir, '.cadet', 'agent', 'core', 'skills', 'Architecture.md')), true);
+    assert.equal(existsSync(join(tmpDir, '.cadet', 'agent', 'core', 'templates', 'StoryTemplate.md')), true);
+    assert.equal(existsSync(join(tmpDir, '.cadet', 'agent', 'core', 'stale.md')), false, 'stale file must be removed');
   });
 });
 
