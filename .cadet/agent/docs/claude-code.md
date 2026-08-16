@@ -4,28 +4,29 @@ Use this guide when installing Cadet-Agent into a repository that will use Claud
 
 ## Installed Files
 Cadet-Agent installs these Claude Code-facing files:
-- `.claude/skills/cadet-agent.md` — Base/global skill (always active)
-- `.claude/skills/cadet-agent-reviewer.md` — Reviewer skill
-- `.claude/skills/cadet-requirements.md` — Requirements phase skill
-- `.claude/skills/cadet-architecture.md` — Architecture phase skill
-- `.claude/skills/cadet-spike.md` — Spike phase skill
-- `.claude/skills/cadet-breakdown.md` — Story Breakdown phase skill
-- `.claude/skills/cadet-tdd.md` — TDD phase skill
-- `.claude/skills/cadet-debug.md` — Debugging phase skill
-- `.claude/skills/cadet-review.md` — Code Review phase skill
-- `.claude/skills/cadet-resume.md` — Resume workflow skill
+- `.claude/skills/cadet-agent/SKILL.md` — Base/global skill (always active)
+- `.claude/skills/cadet-agent-reviewer/SKILL.md` — Reviewer skill
+- `.claude/skills/cadet-requirements/SKILL.md` — Requirements phase skill
+- `.claude/skills/cadet-architecture/SKILL.md` — Architecture phase skill
+- `.claude/skills/cadet-spike/SKILL.md` — Spike phase skill
+- `.claude/skills/cadet-breakdown/SKILL.md` — Story Breakdown phase skill
+- `.claude/skills/cadet-tdd/SKILL.md` — TDD phase skill
+- `.claude/skills/cadet-debug/SKILL.md` — Debugging phase skill
+- `.claude/skills/cadet-review/SKILL.md` — Code Review phase skill
+- `.claude/skills/cadet-resume/SKILL.md` — Resume workflow skill
+- `.claude/skills/cadet-mcp-setup/SKILL.md` — MCP Setup skill
 - `.cadet/agent/core/` — Shared framework documents
 
 ## What Each File Does
-- `.claude/skills/cadet-agent.md` is the base skill that loads automatically. It defines the global directive, skill dispatch table, reviewer mode, operational files, and git guard instructions.
-- Each per-phase skill (`cadet-requirements.md` through `cadet-resume.md`) is a thin loader with YAML frontmatter. When invoked via `/cadet-<skill>`, it instructs Claude to read `cadet-agent.md` and then the canonical skill from `.cadet/agent/core/skills/` as primary context.
-- `.claude/skills/cadet-agent-reviewer.md` is the reviewer skill for auditing without writing code.
+- `.claude/skills/cadet-agent/SKILL.md` is the base skill that loads automatically. It defines the global directive, skill dispatch table, reviewer mode, operational files, and git guard instructions.
+- Each per-phase skill (`cadet-requirements/SKILL.md` through `cadet-mcp-setup/SKILL.md`) is a thin loader with YAML frontmatter. When invoked via `/cadet-<skill>`, it instructs Claude to read `.cadet/agent/core/cadet-agent.md` and then the canonical skill from `.cadet/agent/core/skills/` as primary context.
+- `.claude/skills/cadet-agent-reviewer/SKILL.md` is the reviewer skill for auditing without writing code.
 - `.cadet/agent/core/` contains the shared Cadet framework documents.
 
 ## Installation
 1. From the target repository root, run `npx cadet-agent@latest init`.
 2. If you want to install into a different folder, use `npx cadet-agent@latest init --target <path>`.
-3. Confirm these paths exist: `.cadet/agent/core/` and `.claude/skills/` (with 10 `.md` files).
+3. Confirm these paths exist: `.cadet/agent/core/` and `.claude/skills/` (with 11 skill folders, each containing a `SKILL.md`).
 4. Open the repository in Claude Code.
 5. Verify the skills appear under Claude Code project skills.
 
@@ -46,7 +47,7 @@ Each Claude Code skill becomes a discoverable slash command:
 | `/cadet-agent-reviewer` | Audit work against framework rules |
 
 ## Expected Behavior
-- Claude Code should load `.claude/skills/cadet-agent.md` as a project skill (available globally).
+- Claude Code should load `.claude/skills/cadet-agent/SKILL.md` as a project skill (available globally).
 - Use `/cadet-<skill>` commands for phase dispatch.
 - Each skill command reads the canonical skill from `.cadet/agent/core/skills/` as primary context.
 - The base skill enforces gate checks and the full Cadet workflow.

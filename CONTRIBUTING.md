@@ -35,7 +35,9 @@ All changes must happen on a feature branch. Direct commits to `main` are not pe
 - `.github/prompts/cadet-review.prompt.md`
 - `.cursor/rules/cadet-agent.md`
 - `.continue/rules/cadet-agent.md`
-- `.claude/skills/cadet-agent.md`
+- `.claude/skills/cadet-agent/SKILL.md`
+- `.claude/skills/cadet-agent-reviewer/SKILL.md`
+- `.claude/skills/cadet-*/SKILL.md`
 
 **Preserved paths** (owned by the consumer, never overwritten by a Cadet update):
 - `.cadet/agent/policies/`

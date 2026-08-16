@@ -17,6 +17,9 @@ Workflow phases are implemented as scoped skills under **[skills/](skills/)**. W
 - [TDD](skills/TDD.md)
 - [Debugging](skills/Debugging.md)
 - [CodeReview](skills/CodeReview.md)
+- [Resume](skills/Resume.md)
+- [MCPSetup](skills/MCPSetup.md)
+- [AgentReviewer](skills/AgentReviewer.md)
 
 For GitHub Copilot, these skills are also exposed as slash-command prompts under `.github/prompts/`.
 
@@ -29,7 +32,7 @@ For GitHub Copilot, these skills are also exposed as slash-command prompts under
 
 These files define specific operational workflows. Their rules are also condensed into `cadet-agent.md`.
 
-- [GitFirstRule](GitFirstRule.md) — Git must be initialized before any Unity project or code.
+- [GitFirstRule](GitFirstRule.md) — Git must be initialized before any Unity project or code, and branch status must be checked before starting new work.
 - [FrameworkSyncGate](FrameworkSyncGate.md) — Check for framework updates before substantive work.
 - [KickoffFlow](KickoffFlow.md) — Step-by-step kickoff sequence.
 - [FirstResponseFormat](FirstResponseFormat.md) — Required format for first response.

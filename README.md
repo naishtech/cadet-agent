@@ -7,7 +7,7 @@ Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished g
 ## Repository Layout
 - `.cadet/agent/core/` contains the shared Cadet-Agent framework documents.
   - `cadet-agent.md` is the thin global directive: identity, non-negotiable rules, workflow routing, hard-gate protocol, and skill dispatch.
-  - `skills/` contains scoped workflow-phase skills (Requirements, Architecture, Spike, StoryBreakdown, TDD, Debugging, CodeReview).
+  - `skills/` contains scoped workflow-phase skills (Requirements, Architecture, Spike, StoryBreakdown, TDD, Debugging, CodeReview, Resume, MCPSetup, AgentReviewer).
   - `templates/` contains runtime templates for planning artifacts.
 - `.cadet/agent/docs/` contains setup guides for each supported IDE.
 - `.github/agents/` contains the Copilot custom agent definitions (Cadet Agent + Cadet Agent Reviewer).
@@ -21,7 +21,7 @@ Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished g
 
 ## Cross-IDE Support
 
-Cadet-Agent provides full workflow parity across four IDEs. The same 7 skills + resume + reviewer are available in each:
+Cadet-Agent provides full workflow parity across four IDEs. The same 9 skills + reviewer are available in each:
 
 | Feature | GitHub Copilot | Cursor | Continue | Claude Code |
 |---|---|---|---|---|
@@ -35,6 +35,7 @@ Cadet-Agent provides full workflow parity across four IDEs. The same 7 skills + 
 | Debugging | ✅ | ✅ | ✅ | ✅ |
 | Code Review | ✅ | ✅ | ✅ | ✅ |
 | Resume | ✅ | ✅ | ✅ | ✅ |
+| MCP Setup | ✅ | ✅ | ✅ | ✅ |
 | Reviewer mode | Agent picker | Rule toggle | `/cadet-agent-reviewer` | `/cadet-agent-reviewer` |
 | Git guard | PreToolUse hook | Manual | Manual | Manual |
 
@@ -128,7 +129,7 @@ flowchart TD
 
 ### Resuming a Session
 
-Use the `/cadet-resume` slash command to pick up where you left off. It reads `.cadet/state.json` and reports the current phase, epic/story progress, and outstanding gates — then dispatches the right skill for the next step. If no state file exists, it initializes a fresh session from `context-resolution`.
+Use the `/cadet-resume` slash command to pick up where you left off. It reads `.cadet/state.json` and reports the current phase, epic/story progress, and outstanding gates — then dispatches the right skill for the next step. It also checks the current branch and working tree, so leftover changes from a previous task are resolved (commit, stash, push, or move to a new branch) before a new task begins. If no state file exists, it initializes a fresh session from `context-resolution`.
 
 ### Phase Gating
 
@@ -207,8 +208,12 @@ Running `./package-agent.ps1` produces `cadet-agent.zip` with this layout:
 - `.github/prompts/cadet-*.prompt.md`
 - `.github/hooks/`
 - `.cursor/rules/cadet-agent.md`
+- `.cursor/rules/cadet-agent-reviewer.md`
 - `.continue/rules/cadet-agent.md`
-- `.claude/skills/cadet-agent.md`
+- `.continue/rules/cadet-agent-reviewer.md`
+- `.continue/config.yaml`
+- `.claude/skills/cadet-agent/SKILL.md`
+- `.claude/skills/cadet-*/SKILL.md`
 
 ## Notes
 - `.cadet/agent/core/FrameworkManifest.json` defines the managed and preserved paths for packaged installs.
