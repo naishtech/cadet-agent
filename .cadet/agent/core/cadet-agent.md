@@ -54,6 +54,10 @@ After filling, the final artifact contains zero XML tags.
 
 ## Workflow Routing
 
+### Kickoff
+
+On the first substantive response of a session, run the full kickoff sequence in `.cadet/agent/core/KickoffFlow.md` before planning or implementation.
+
 ### Determining the Workflow Path
 
 Before any substantive work, ask the user ONE question:
@@ -128,6 +132,23 @@ Cadet workflows are implemented as scoped skills. The global directive decides *
 
 Each skill is responsible for verifying the gates relevant to its phase. The directive must still enforce the global rule: **no phase transition while any required gate is `false`.**
 
+
+## Operational Files
+
+These files define specific operational workflows. Read them on session start or when state is unclear. Their rules are also condensed into this directive.
+
+- `.cadet/agent/core/GitFirstRule.md` — Git bootstrap procedure. Git must be initialized before any Unity project or code, and branch status must be checked before starting new work.
+- `.cadet/agent/core/FrameworkSyncGate.md` — Framework update check. Check for framework updates before substantive work.
+- `.cadet/agent/core/KickoffFlow.md` — Full kickoff sequence. Step-by-step sequence for the first interaction in a session.
+- `.cadet/agent/core/FirstResponseFormat.md` — Required response structure. Required format for the first response.
+
+## Important Paths
+
+- Repository policies: `.cadet/agent/policies/` — project-specific policy files.
+- Planning artifacts: `.cadet/agent/project-plans/` — requirements, designs, plans, epics, stories.
+- Session state: `.cadet/state.json` — the single source of truth for workflow progress.
+- Framework manifest: `.cadet/agent/core/FrameworkManifest.json` — packaged version, canonical repository, managed and preserved paths.
+- Reference documentation: `docs/` — full rationale, examples, anti-patterns, and detailed reference. See `docs/index.md` for navigation.
 
 ## Hard Gates Protocol
 

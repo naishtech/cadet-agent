@@ -242,11 +242,11 @@ export async function install(targetDir, opts = {}) {
   console.log('    Reviewer: /cadet-agent-reviewer');
   console.log('    Git guard: manual — see .continue\\rules\\cadet-agent.md for instructions');
   console.log('  Claude Code:');
-  console.log('    Already active — .claude\\skills\\cadet-agent.md loads as a project skill');
+  console.log('    Already active — .claude\\skills\\cadet-agent\\SKILL.md loads as a project skill');
   console.log('    Slash commands: /cadet-requirements, /cadet-architecture, /cadet-spike,');
   console.log('      /cadet-breakdown, /cadet-tdd, /cadet-debug, /cadet-review, /cadet-resume');
   console.log('    Reviewer: /cadet-agent-reviewer');
-  console.log('    Git guard: manual — see .claude\\skills\\cadet-agent.md for instructions');
+  console.log('    Git guard: manual — see .claude\\skills\\cadet-agent\\SKILL.md for instructions');
   console.log('');
 }
 

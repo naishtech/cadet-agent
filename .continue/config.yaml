@@ -11,7 +11,6 @@ customCommands:
   - name: cadet-requirements
     description: Capture and validate Given/When/Then acceptance criteria for large changes
     prompt: |
-      You are executing the Cadet Requirements skill.
       Read `.cadet/agent/core/cadet-agent.md` for the global directive.
       Read `.cadet/agent/core/skills/Requirements.md` as the primary instruction context.
       Follow every step in that skill file. Run the Gate Check first by reading `.cadet/state.json`.
@@ -19,7 +18,6 @@ customCommands:
   - name: cadet-architecture
     description: Produce a technical design and ADRs from approved requirements
     prompt: |
-      You are executing the Cadet Architecture skill.
       Read `.cadet/agent/core/cadet-agent.md` for the global directive.
       Read `.cadet/agent/core/skills/Architecture.md` as the primary instruction context.
       Follow every step in that skill file. Run the Gate Check first by reading `.cadet/state.json`.
@@ -27,7 +25,6 @@ customCommands:
   - name: cadet-spike
     description: Answer a focused feasibility question for an unverified assumption
     prompt: |
-      You are executing the Cadet Spike skill.
       Read `.cadet/agent/core/cadet-agent.md` for the global directive.
       Read `.cadet/agent/core/skills/Spike.md` as the primary instruction context.
       Follow every step in that skill file. Run the Gate Check first by reading `.cadet/state.json`.
@@ -35,7 +32,6 @@ customCommands:
   - name: cadet-breakdown
     description: Decompose large work into epics and small implementable stories
     prompt: |
-      You are executing the Cadet Story Breakdown skill.
       Read `.cadet/agent/core/cadet-agent.md` for the global directive.
       Read `.cadet/agent/core/skills/StoryBreakdown.md` as the primary instruction context.
       Follow every step in that skill file. Run the Gate Check first by reading `.cadet/state.json`.
@@ -43,7 +39,6 @@ customCommands:
   - name: cadet-tdd
     description: Implement changes through red/green test-first cycles
     prompt: |
-      You are executing the Cadet TDD skill.
       Read `.cadet/agent/core/cadet-agent.md` for the global directive.
       Read `.cadet/agent/core/skills/TDD.md` as the primary instruction context.
       Follow every step in that skill file. Run the Gate Check first by reading `.cadet/state.json`.
@@ -51,7 +46,6 @@ customCommands:
   - name: cadet-debug
     description: Reproduce, isolate, and fix defects with regression protection
     prompt: |
-      You are executing the Cadet Debugging skill.
       Read `.cadet/agent/core/cadet-agent.md` for the global directive.
       Read `.cadet/agent/core/skills/Debugging.md` as the primary instruction context.
       Follow every step in that skill file. Run the Gate Check first by reading `.cadet/state.json`.
@@ -59,7 +53,6 @@ customCommands:
   - name: cadet-review
     description: Non-skippable review against acceptance criteria, hard gates, and framework rules
     prompt: |
-      You are executing the Cadet Code Review skill.
       Read `.cadet/agent/core/cadet-agent.md` for the global directive.
       Read `.cadet/agent/core/skills/CodeReview.md` as the primary instruction context.
       Follow every step in that skill file. Run the Gate Check first by reading `.cadet/state.json`.
@@ -67,7 +60,6 @@ customCommands:
   - name: cadet-resume
     description: Inspect .cadet/state.json and resume the workflow from the last recorded phase
     prompt: |
-      You are executing the Cadet Resume skill.
       Read `.cadet/agent/core/cadet-agent.md` for the global directive.
       Read `.cadet/agent/core/skills/Resume.md` as the primary instruction context.
       Follow every step in that skill file. Check whether `.cadet/state.json` exists, report the current state, and suggest the next action.
@@ -75,7 +67,6 @@ customCommands:
   - name: cadet-mcp-setup
     description: Install the Pipeline package and register Unity's built-in MCP server to connect Cadet to the Editor
     prompt: |
-      You are executing the Cadet MCP Setup skill.
       Read `.cadet/agent/core/cadet-agent.md` for the global directive.
       Read `.cadet/agent/core/skills/MCPSetup.md` as the primary instruction context.
       Follow every step in that skill file. Read `.cadet/agent/core/UnityCli.md` for the gate → command → state contract.
@@ -83,5 +74,4 @@ customCommands:
   - name: cadet-agent-reviewer
     description: Audit Cadet Agent's work against framework rules and process requirements
     prompt: |
-      You are the Cadet Agent Reviewer. Read `.cadet/agent/core/cadet-agent.md`, then read `.cadet/agent/core/skills/AgentReviewer.md` as the primary instruction context — in full, including the `<role>` block. Follow every step in that file.
-      Audit the current work against the framework rules. Do NOT implement, fix, or generate code — review and report only.
+      Read `.cadet/agent/core/cadet-agent.md`, then read `.cadet/agent/core/skills/AgentReviewer.md` as the primary instruction context — in full, including the `<role>` block. Follow every step in that file.

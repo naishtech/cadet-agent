@@ -1,16 +1,29 @@
 # Cadet-Agent Adapter Inventory
 
-> Generated: 2026-08-14 | Framework version: 0.21.0
+> Generated: 2026-08-14 | Updated: 2026-09-11 | Framework version: 0.22.0
 
-This document tracks every IDE adapter file, its purpose, and its canonical dependency. The adapter contract is: **no IDE-specific file may duplicate canonical content from `.cadet/agent/core/`.** Each adapter must only contain frontmatter, identity, file-reference instructions, and IDE-specific invocation patterns.
+This document tracks every IDE adapter file, its purpose, and its canonical dependency. The adapter contract is: **no IDE-specific file may duplicate canonical content from `.cadet/agent/core/`.** Each adapter must only contain frontmatter, file-reference instructions, and IDE-specific mechanics.
 
 ## Adapter Contract
 
+An adapter file is a **pointer and a registration**. It names the core file and defers to it.
+
 1. **Frontmatter** required by the target IDE.
-2. **Short identity/description** of Cadet-Agent.
-3. **Instructions to read** canonical files under `.cadet/agent/core/`.
-4. **IDE-specific invocation patterns** (slash commands, rule globs, skill names).
-5. **References to preserved user paths** (`.cadet/agent/policies/`, `.cadet/agent/project-plans/`, `.cadet/state.json`).
+2. **A pointer** to specific `.cadet/agent/core/` files, treated as authoritative.
+3. **IDE-specific mechanics** that cannot live in core: literal slash-command names for this IDE, git-guard hook wiring, and IDE-specific tool notes (e.g. Copilot's `read_file` `startLine`/`endLine` requirement).
+4. **References to preserved user paths** (`.cadet/agent/policies/`, `.cadet/agent/project-plans/`, `.cadet/state.json`).
+
+### What counts as canonical content (must NOT appear in an adapter)
+
+- **Inventories** — skill/command lists, dispatch tables, "available skills" enumerations.
+- **File and path lists** — operational-file lists, important-path lists, "read these too" blocks.
+- **Identity, persona, and role statements** — `You are …`, `You are executing the Cadet **X** skill.`, or any paraphrase of a core `<role>` block or `<instructions>` opening sentence.
+- **Guardrails and constraints** — restatements of rules that live in core (e.g. TDD, commit approval).
+- **Any sentence that also appears in a `.cadet/agent/core/` file.**
+
+The permitted prose in an adapter is *connective pointer text* ("Read X, then follow every step in it"). Explanatory prose that conveys a fact belongs in core.
+
+> **Enforcement:** `test/adapters.test.mjs` contains Shape A, Shape B, size-budget, and discovery guards. If a change makes them fail, the change is wrong, not the test. The discovery guard mechanically compares adapter sentences against core sentences; its known limit is that it catches verbatim duplication, not paraphrase — a human re-read is still required.
 
 ## Inventory
 
