@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.27.0] — 2026-09-11
+
 ### Added
 
 - **Lint command and pre-release lint gate.** `npm run lint` runs the same offline markdown-link check as CI (`lychee --offline --include-fragments`), and `npm run verify` chains `test` + `lint`. `bump-version.ps1` now runs lint before touching any file and aborts if it fails, so a broken link can never be committed or tagged; pass `-SkipLint` to override.
