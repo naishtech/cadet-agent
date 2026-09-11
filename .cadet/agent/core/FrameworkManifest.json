@@ -44,17 +44,22 @@
     ".cadet/agent/core",
     ".cadet/agent/core/templates",
     ".cadet/agent/core/skills",
-    ".cadet/agent/core/state.schema.json"
+    ".cadet/agent/core/state.schema.json",
+    ".cadet/agent/core/Harness.md",
+    ".cadet/agent/core/harness.schema.json"
   ],
   "preservedPaths": [
     ".cadet/agent/policies",
     ".cadet/agent/project-plans",
-    ".cadet/state.json"
+    ".cadet/state.json",
+    ".cadet/harness.json",
+    ".cadet/runs"
   ],
   "notes": [
     "Use this manifest to decide which packaged files Cadet may update during bootstrap sync.",
     "If managed framework files are updated, require a fresh chat before continuing.",
     "Treat the packaged zip as a universal bootstrap package rather than the long-term source of truth.",
-    "As of v0.5.0, the agent instruction set is condensed into cadet-agent.md. Full rationale, guidance, standards, and templates are in the docs/ directory (GitHub Pages)."
+    "As of v0.5.0, the agent instruction set is condensed into cadet-agent.md. Full rationale, guidance, standards, and templates are in the docs/ directory (GitHub Pages).",
+    "As of the harness modernization, .cadet/harness.json (policy overrides) and .cadet/runs/ (sanitized run ledgers) are preserved by sync and never deleted."
   ]
 }

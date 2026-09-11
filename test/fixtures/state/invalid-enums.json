@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "session": {
+    "workflowPath": "huge",
+    "currentPhase": "not-a-phase",
+    "trackingMode": "telepathy"
+  },
+  "epics": "not-an-object"
+}

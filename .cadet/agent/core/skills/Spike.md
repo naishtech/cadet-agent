@@ -10,6 +10,8 @@ You are executing the Cadet **Spike** skill. This skill is the primary instructi
 ## Gate Check
 
 Before proceeding, read `.cadet/state.json`. A spike is triggered by an unverified assumption in requirements or architecture. Identify the source assumption and the exact question to answer.
+
+Read `.cadet/agent/core/Harness.md`. A spike runs under a bounded budget with an explicit stop condition and produces an evidence artifact.
 </instructions>
 
 <context>
@@ -30,18 +32,21 @@ Answer a focused feasibility or integration question so an unverified assumption
 - The source requirement or design assumption.
 - Time box.
 - Available sources (docs, APIs, community knowledge).
+- The spike budget: tool-call and wall-clock limits from `.cadet/harness.json` (or a recorded, user-approved override).
 </input>
 
 <process>
 1. State the exact question the spike must answer.
-2. Research using available sources. Ask permission before searching online.
-3. Report findings:
+2. **Declare the stop condition and budget.** A spike stops when the question is answered, the time box elapses, or the tool-call/wall-clock budget is exhausted — whichever comes first. Record the stop condition before starting.
+3. Research using available sources. Ask permission before searching online.
+4. Report findings:
    - **Capabilities** — what the option can do.
    - **Limitations** — what it cannot do, constraints, edge cases.
    - **Recommendation** — use, avoid, or more research needed.
-4. Produce a spike file under `.cadet/agent/project-plans/spikes/` from `<document index="1"/>` — fill every `<slot/>`, strip all XML wrappers, write pure Markdown.
-5. Update the source requirements/design assumption from **unverified** to **verified** with the spike results.
-6. Keep any spike code isolated and reference-only. Do not wire spike code into production paths.
+5. Produce a spike file under `.cadet/agent/project-plans/spikes/` from `<document index="1"/>` — fill every `<slot/>`, strip all XML wrappers, write pure Markdown. Record the evidence artifact (command, output, or reference) that backs each finding.
+6. Update the source requirements/design assumption from **unverified** to **verified** with the spike results; promote verified assumptions into the design.
+7. Keep any spike code isolated and reference-only. Do not wire spike code into production paths.
+8. If the spike ends without answering the question, say so explicitly and escalate — do not present partial research as a verified assumption.
 </process>
 
 <output>

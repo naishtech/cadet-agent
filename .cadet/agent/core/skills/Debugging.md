@@ -10,6 +10,8 @@ You are executing the Cadet **Debugging** skill. This skill is the primary instr
 ## Gate Check
 
 Before proceeding, read `.cadet/state.json`. If a story is active, record that debugging is in progress. If this is an ad-hoc defect report, initialize state if needed.
+
+Read `.cadet/agent/core/Harness.md`. Debugging follows the harness loop contract: reproduce → classify → bounded retry/repair → regression verification, with every attempt recorded.
 </instructions>
 
 <context>
@@ -35,16 +37,16 @@ Diagnose and resolve defects through reproducible evidence, minimal-risk fixes, 
 </input>
 
 <process>
-1. Reproduce the issue using either a failing test or explicit user instructions.
+1. Reproduce the issue using either a failing test or explicit user instructions. Record the reproduction as a **failed** evidence record (command, exit code, artifact).
 2. Define the failure boundary and isolate the likely root cause.
-3. Confirm root cause with targeted checks.
+3. **Classify the failure** per `Harness.md`: `deterministic` (assertion/compile/analyzer/invalid input/timeout) → no automatic retry; `transient` → retry within `maxRetriesPerStep`/`maxTotalRetries` with 250 ms → 1 s → 4 s backoff; `repair` → one retry per repair action. Record every attempt as its own span and evidence record; a retry never overwrites a failed attempt.
 4. Create or update a failing test when valid.
-5. Implement the smallest safe fix.
+5. Implement the smallest safe fix. A repair retry must reference the failed evidence ID and the changed files.
 6. Ensure failures surface concrete diagnostic reasons, not generic messages.
-7. Re-run validation to confirm resolution and guard against regression.
+7. Re-run validation to confirm resolution and guard against regression — ideally via `cadet-agent harness verify --gate testsPassed`.
 8. Update technical design, plan, and epic status if the fix affects scope or sequencing.
 9. If Unity code changed, ask the user to focus Unity and trigger recompilation. (When the user wants agent-driven verification, use the Unity CLI / MCP per `.cadet/agent/core/UnityCli.md` — CLI commands for deterministic reproduction, MCP mode for live context.)
-10. If the defect is not resolved after three genuine fix attempts, invoke the **Persistent-Failure Protocol** below.
+10. If the defect is not resolved after three genuine fix attempts, invoke the **Persistent-Failure Protocol** below. This is distinct from automatic retries: three failed repairs escalate to the user, they do not keep looping.
 
 ## Persistent-Failure Protocol
 

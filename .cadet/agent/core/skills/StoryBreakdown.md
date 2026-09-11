@@ -10,6 +10,8 @@ You are executing the Cadet **Story Breakdown** skill. This skill is the primary
 ## Gate Check
 
 Before proceeding, read `.cadet/state.json`. Requirements and architecture must be complete (`currentPhase` is `architectureComplete` or later). Any spikes triggered by unverified assumptions must be complete.
+
+Read `.cadet/agent/core/Harness.md`. Every story must declare its verification commands, evidence outputs, retry policy, and expected context/tool scope.
 </instructions>
 
 <context>
@@ -37,8 +39,14 @@ Decompose large work into small, independently implementable stories grouped und
 4. Each story must be completable in a single session and produce a working, testable increment.
 5. A story should address exactly one user-observable behavior or integration point.
 6. If a story still feels large, split it further until each story is small enough for a focused code review.
-7. Create each story as `story-N-name.md` from `<document index="2"/>` — fill every `<slot/>`, strip all XML wrappers, write pure Markdown.
-8. After producing all epic and story files, ask the user if they want to commit them before beginning implementation.
+7. **Harness contract per story:** each story must declare —
+   - the acceptance-criterion ID(s) it satisfies;
+   - the verification command(s) and expected evidence output (report path/hash) for `testsPassed` and any Unity gates;
+   - the retry policy (per-step and total) and what counts as a deterministic failure;
+   - the expected context tier and tool scope (files, tests, and whether live Unity/MCP is needed).
+   A story that cannot name its verification command is not ready to implement.
+8. Create each story as `story-N-name.md` from `<document index="2"/>` — fill every `<slot/>`, strip all XML wrappers, write pure Markdown.
+9. After producing all epic and story files, ask the user if they want to commit them before beginning implementation.
 </process>
 
 <output>

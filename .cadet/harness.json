@@ -1,0 +1,46 @@
+{
+  "$schema": "../agent/core/harness.schema.json#/$defs/policy",
+  "budgets": {
+    "maxContextTokens": { "hard": 64000, "warn": 0.8 },
+    "maxOutputTokens": { "hard": 8000, "warn": 0.8 },
+    "maxToolCalls": { "hard": 80, "warn": 0.75 },
+    "maxRetriesPerStep": { "hard": 2, "warn": null },
+    "maxTotalRetries": { "hard": 8, "warn": 0.75 },
+    "maxWallClockMs": { "hard": 1800000, "warn": 0.8 },
+    "maxEstimatedCostUsd": { "hard": 2.0, "warn": 0.8 },
+    "maxDownloadedBytes": { "hard": 26214400, "warn": 0.8 },
+    "maxDecompressedBytes": { "hard": 104857600, "warn": 0.8 },
+    "maxArchiveFiles": { "hard": 2000, "warn": 0.8 }
+  },
+  "archive": {
+    "maxCompressedBytes": 26214400,
+    "maxDecompressedBytes": 104857600,
+    "maxFiles": 2000,
+    "maxFilenameBytes": 240,
+    "maxCompressionRatio": 100
+  },
+  "output": {
+    "maxInlineBytes": 65536,
+    "previewBytes": 4096
+  },
+  "retention": {
+    "keepOnFailure": true,
+    "retainRunRecords": false,
+    "retainRawPrompt": false
+  },
+  "estimation": {
+    "bytesPerToken": 3,
+    "rateCards": {}
+  },
+  "hook": {
+    "mode": "ask-on-recognized-write"
+  },
+  "allowEmptyFreshness": false,
+  "scopes": {
+    "perRun": {},
+    "perStory": {}
+  },
+  "analyzerCommand": null,
+  "compileCommand": null,
+  "testCommand": null
+}

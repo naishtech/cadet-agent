@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "session": {
+    "workflowPath": "large",
+    "currentPhase": "review",
+    "trackingMode": "markdown"
+  },
+  "epics": {
+    "epic-1": { "status": "in-progress", "stories": { "story-1.md": "done" } }
+  },
+  "gates": {
+    "testsPassed": true,
+    "compileCheckConfirmed": true,
+    "unityAnalyzerClean": true,
+    "storyTrackingUpdated": true
+  },
+  "spikes": { "spike-1": "complete" },
+  "changeHistory": [
+    { "date": "2026-09-02T09:00:00.000Z", "change": "story complete", "phase": "implementation" }
+  ],
+  "unexpectedLegacyField": { "keep": "me" }
+}

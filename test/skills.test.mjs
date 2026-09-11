@@ -133,4 +133,122 @@ describe('state.schema.json', () => {
       assert.ok(gateNames.includes(gate), `schema must define gate ${gate}`);
     }
   });
+
+  it('accepts both v1 and v2 state documents', () => {
+    const schema = JSON.parse(readFileSync(join(coreDir, 'state.schema.json'), 'utf-8'));
+    assert.deepEqual(schema.properties.version.enum, [1, 2]);
+    for (const field of ['stateVersion', 'gateEvidence', 'activeRunId', 'activeWorkItem', 'lastTransition']) {
+      assert.ok(schema.properties[field], `v2 schema must define ${field}`);
+    }
+  });
+});
+
+describe('harness artifacts', () => {
+  it('ships Harness.md, harness.schema.json, and harness.json', () => {
+    assert.equal(existsSync(join(coreDir, 'Harness.md')), true, 'missing Harness.md');
+    assert.equal(existsSync(join(coreDir, 'harness.schema.json')), true, 'missing harness.schema.json');
+    assert.equal(existsSync(join(repoRoot, '.cadet', 'harness.json')), true, 'missing .cadet/harness.json');
+  });
+
+  it('lists Harness.md and harness.schema.json as managed paths', () => {
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+    const normalized = manifest.managedPaths.map(p => p.replace(/\\/g, '/'));
+    assert.ok(normalized.includes('.cadet/agent/core/Harness.md'), 'Harness.md must be managed');
+    assert.ok(normalized.includes('.cadet/agent/core/harness.schema.json'), 'harness.schema.json must be managed');
+  });
+
+  it('lists .cadet/harness.json and .cadet/runs as preserved paths', () => {
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+    const normalized = manifest.preservedPaths.map(p => p.replace(/\\/g, '/'));
+    assert.ok(normalized.includes('.cadet/harness.json'), 'harness.json must be preserved');
+    assert.ok(normalized.includes('.cadet/runs'), 'runs must be preserved');
+  });
+
+  it('has a valid harness schema with the required definitions', () => {
+    const schema = JSON.parse(readFileSync(join(coreDir, 'harness.schema.json'), 'utf-8'));
+    for (const def of ['policy', 'evidence', 'span', 'decision', 'run', 'stateV2']) {
+      assert.ok(schema.$defs[def], `harness schema must define $defs.${def}`);
+    }
+  });
+});
+
+// ── Harness contract per skill (Phase 7 exit criterion) ─────────────────────
+//
+// Every canonical skill must either consume or emit harness records, and must
+// reference Harness.md. This fails if a skill omits its required harness contract.
+
+describe('Skill harness contract', () => {
+  const harnessSkills = [
+    'Requirements.md',
+    'Architecture.md',
+    'Spike.md',
+    'StoryBreakdown.md',
+    'TDD.md',
+    'Debugging.md',
+    'CodeReview.md',
+    'Resume.md',
+    'MCPSetup.md',
+    'AgentReviewer.md',
+  ];
+
+  for (const skill of harnessSkills) {
+    it(`${skill} references the harness contract`, () => {
+      const content = readFileSync(join(skillsDir, skill), 'utf-8');
+      assert.ok(
+        content.includes('.cadet/agent/core/Harness.md'),
+        `${skill} must reference .cadet/agent/core/Harness.md`
+      );
+    });
+  }
+
+  it('TDD requires red/green evidence for testsPassed', () => {
+    const content = readFileSync(join(skillsDir, 'TDD.md'), 'utf-8');
+    assert.ok(/red/i.test(content), 'TDD must mention the red record');
+    assert.ok(content.includes('testsPassed'), 'TDD must reference the testsPassed gate');
+    assert.ok(/evidence/i.test(content), 'TDD must require evidence');
+  });
+
+  it('CodeReview audits the ledger, evidence freshness, and budget status', () => {
+    const content = readFileSync(join(skillsDir, 'CodeReview.md'), 'utf-8');
+    assert.ok(/ledger/i.test(content), 'CodeReview must audit the run ledger');
+    assert.ok(/fresh/i.test(content), 'CodeReview must check evidence freshness');
+    assert.ok(/budget/i.test(content), 'CodeReview must audit budget status');
+  });
+
+  it('Debugging requires classification and bounded retries', () => {
+    const content = readFileSync(join(skillsDir, 'Debugging.md'), 'utf-8');
+    assert.ok(/deterministic/i.test(content), 'Debugging must classify deterministic failures');
+    assert.ok(/transient/i.test(content), 'Debugging must classify transient failures');
+  });
+
+  it('Resume validates the active run, stale evidence, and legal transition', () => {
+    const content = readFileSync(join(skillsDir, 'Resume.md'), 'utf-8');
+    assert.ok(/harness report/i.test(content), 'Resume must load the run report');
+    assert.ok(/evidence/i.test(content), 'Resume must check evidence freshness');
+    assert.ok(/transition/i.test(content), 'Resume must check the next legal transition');
+  });
+
+  it('StoryBreakdown requires per-story verification commands', () => {
+    const content = readFileSync(join(skillsDir, 'StoryBreakdown.md'), 'utf-8');
+    assert.ok(/verification command/i.test(content), 'StoryBreakdown must require verification commands');
+    assert.ok(/retry policy/i.test(content), 'StoryBreakdown must require a retry policy');
+  });
+
+  it('Spike requires a bounded budget and stop condition', () => {
+    const content = readFileSync(join(skillsDir, 'Spike.md'), 'utf-8');
+    assert.ok(/stop condition/i.test(content), 'Spike must declare a stop condition');
+    assert.ok(/budget/i.test(content), 'Spike must be bounded by budget');
+  });
+
+  it('MCPSetup requires round-trip evidence and mutation approval', () => {
+    const content = readFileSync(join(skillsDir, 'MCPSetup.md'), 'utf-8');
+    assert.ok(/round-trip/i.test(content), 'MCPSetup must require round-trip evidence');
+    assert.ok(/confirmation|approval/i.test(content), 'MCPSetup must require mutation approval');
+  });
+
+  it('AgentReviewer audits evidence-backed gates and ledger completeness', () => {
+    const content = readFileSync(join(skillsDir, 'AgentReviewer.md'), 'utf-8');
+    assert.ok(/Harness Audit/i.test(content), 'AgentReviewer must have a harness audit');
+    assert.ok(/ledger/i.test(content), 'AgentReviewer must audit the ledger');
+  });
 });

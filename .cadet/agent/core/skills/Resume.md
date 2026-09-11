@@ -10,6 +10,8 @@ You are executing the Cadet **Resume** skill. Your sole purpose is to inspect th
 ## Gate Check
 
 Before proceeding, read `.cadet/state.json`. No specific phase gate — this skill can be invoked at any time to inspect and resume the current workflow.
+
+Read `.cadet/agent/core/Harness.md`. Resume must load and validate the active run, stale evidence, remaining budgets, pending escalations, and the next legal transition before recommending an action.
 </instructions>
 
 <context>
@@ -146,6 +148,22 @@ After reporting all discrepancies:
    - If the changes look like leftover work from a previous task and the user wants to start something new, ask how to proceed before making further changes: commit, stash, push, or move the work to a new branch.
    - If the tree is clean but the current branch has unpushed commits, report them and ask whether to push before starting anything new.
 3. If this is a brand-new task (no active story in `state.json`, or the user explicitly starts new work), recommend creating a new branch from `main` before making changes.
+
+### 2e — Harness Validation
+
+Before recommending the next action, validate the harness state:
+
+1. Run `cadet-agent state migrate` (idempotent) so a v1 state is upgraded to v2 before inspection.
+2. Run `cadet-agent state validate --format json`. Report any schema errors or warnings.
+3. Load the active run: `cadet-agent harness report --format json`. Report:
+   - consumed vs. remaining context, token, tool, retry, time, and cost budgets;
+   - the run status (ok / warning / failed / exhausted / blocked);
+   - any unresolved escalation (budget exhaustion, deterministic failure, stale evidence).
+4. Check gate evidence freshness for the current work item:
+   - For each claimed `true` gate, confirm a matching, non-expired, non-superseded evidence record.
+   - Flag any gate whose evidence has a stale input tree hash, a different work item, or changed acceptance criteria.
+5. Determine the **next legal transition** and whether its required gates are evidence-backed. Use `cadet-agent state transition --to <phase>` as a dry check; a rejection lists the exact missing or stale gates.
+6. Report harness findings as warnings — do not silently reconcile.
 
 ## Phase 3 — Determine Next Action
 

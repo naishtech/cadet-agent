@@ -1,0 +1,334 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cadet-agent.dev/harness-v2.json",
+  "title": "Cadet-Agent Harness Records",
+  "description": "Schemas for harness policy, run ledgers, spans, evidence, decisions, and state v2. Contract: docs/core/HarnessContract.md.",
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "context-resolution",
+        "requirements",
+        "requirementsComplete",
+        "architecture",
+        "architectureComplete",
+        "spikes",
+        "story-breakdown",
+        "implementation",
+        "review",
+        "validation",
+        "closed"
+      ]
+    },
+    "gate": {
+      "type": "string",
+      "enum": [
+        "codeReviewCompleted",
+        "testsPassed",
+        "storyTrackingUpdated",
+        "compileCheckConfirmed",
+        "unityAnalyzerClean",
+        "acceptanceCriteriaValidated",
+        "securityReviewPassed",
+        "designArtifactSyncConfirmed"
+      ]
+    },
+    "evidenceStatus": {
+      "type": "string",
+      "enum": ["passed", "failed", "blocked", "manual-confirmation", "superseded"]
+    },
+    "retryClass": {
+      "type": "string",
+      "enum": ["deterministic", "transient", "repair", "unknown"]
+    },
+    "contextTier": {
+      "type": "string",
+      "enum": ["tier0", "tier1", "tier2", "tier3"]
+    },
+    "budget": {
+      "type": "object",
+      "required": ["hard"],
+      "properties": {
+        "hard": { "type": "number", "minimum": 0 },
+        "warn": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "unit": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "policy": {
+      "type": "object",
+      "properties": {
+        "$schema": { "type": "string" },
+        "budgets": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/budget" }
+        },
+        "archive": {
+          "type": "object",
+          "properties": {
+            "maxCompressedBytes": { "type": "integer", "minimum": 0 },
+            "maxDecompressedBytes": { "type": "integer", "minimum": 0 },
+            "maxFiles": { "type": "integer", "minimum": 0 },
+            "maxFilenameBytes": { "type": "integer", "minimum": 0 },
+            "maxCompressionRatio": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "output": {
+          "type": "object",
+          "properties": {
+            "maxInlineBytes": { "type": "integer", "minimum": 0 },
+            "previewBytes": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "retention": {
+          "type": "object",
+          "properties": {
+            "keepOnFailure": { "type": "boolean" },
+            "retainRunRecords": { "type": "boolean" },
+            "retainRawPrompt": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "estimation": {
+          "type": "object",
+          "properties": {
+            "bytesPerToken": { "type": "integer", "minimum": 1 },
+            "rateCards": { "type": "object" }
+          },
+          "additionalProperties": false
+        },
+        "hook": {
+          "type": "object",
+          "properties": {
+            "mode": { "type": "string", "enum": ["ask-on-recognized-write", "fail-open"] }
+          },
+          "additionalProperties": false
+        },
+        "allowBudgetCeilingOverride": { "type": "boolean" },
+        "allowEmptyFreshness": { "type": "boolean" },
+        "scopes": {
+          "type": "object",
+          "properties": {
+            "perRun": { "type": "object" },
+            "perStory": { "type": "object" }
+          },
+          "additionalProperties": false
+        },
+        "model": { "type": ["string", "null"] },
+        "analyzerCommand": { "type": ["string", "null"] },
+        "compileCommand": { "type": ["string", "null"] },
+        "testCommand": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "freshnessPolicy": {
+      "type": "object",
+      "properties": {
+        "scope": { "type": "string", "enum": ["story", "phase", "run", "manual"] },
+        "allowPhases": { "type": "array", "items": { "$ref": "#/$defs/phase" } },
+        "expiresAt": { "type": ["string", "null"], "format": "date-time" }
+      },
+      "required": ["scope"],
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "required": [
+        "evidenceId", "workItemId", "phase", "gate", "status",
+        "command", "result", "inputTreeHash", "criteriaHash", "relevantFiles", "createdAt"
+      ],
+      "anyOf": [
+        { "required": ["expiresAt"] },
+        { "required": ["freshnessPolicy"] }
+      ],
+      "properties": {
+        "evidenceId": { "$ref": "#/$defs/uuid" },
+        "workItemId": { "type": "string" },
+        "acceptanceCriterionId": { "type": ["string", "null"] },
+        "phase": { "$ref": "#/$defs/phase" },
+        "gate": { "$ref": "#/$defs/gate" },
+        "status": { "$ref": "#/$defs/evidenceStatus" },
+        "command": { "type": ["string", "null"] },
+        "result": { "type": ["string", "null"] },
+        "exitCode": { "type": ["integer", "null"] },
+        "artifactPath": { "type": ["string", "null"] },
+        "artifactHash": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "inputTreeHash": { "$ref": "#/$defs/sha256" },
+        "criteriaHash": { "$ref": "#/$defs/sha256" },
+        "relevantFiles": { "type": "array", "items": { "type": "string" } },
+        "toolVersion": { "type": ["string", "null"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": ["string", "null"], "format": "date-time" },
+        "freshnessPolicy": { "oneOf": [{ "$ref": "#/$defs/freshnessPolicy" }, { "type": "null" }] },
+        "supersededBy": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
+        "source": { "type": "string", "enum": ["automated", "manual-confirmation", "provider"] }
+      },
+      "additionalProperties": false
+    },
+    "span": {
+      "type": "object",
+      "required": ["spanId", "runId", "kind", "startedAt", "status"],
+      "properties": {
+        "spanId": { "$ref": "#/$defs/uuid" },
+        "runId": { "$ref": "#/$defs/uuid" },
+        "parentSpanId": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
+        "kind": {
+          "type": "string",
+          "enum": ["context-load", "tool-call", "tool-output", "verification", "retry", "phase-transition", "budget-warning", "decision", "error"]
+        },
+        "name": { "type": "string" },
+        "tier": { "oneOf": [{ "$ref": "#/$defs/contextTier" }, { "type": "null" }] },
+        "reason": { "type": ["string", "null"] },
+        "tool": { "type": ["string", "null"] },
+        "args": { "type": ["object", "null"] },
+        "result": { "type": ["string", "null"] },
+        "exitCode": { "type": ["integer", "null"] },
+        "retryClass": { "oneOf": [{ "$ref": "#/$defs/retryClass" }, { "type": "null" }] },
+        "retryNumber": { "type": ["integer", "null"], "minimum": 0 },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "finishedAt": { "type": ["string", "null"], "format": "date-time" },
+        "durationMs": { "type": ["number", "null"], "minimum": 0 },
+        "outputBytes": { "type": ["integer", "null"], "minimum": 0 },
+        "artifactPath": { "type": ["string", "null"] },
+        "artifactHash": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "status": { "type": "string", "enum": ["ok", "warning", "failed", "blocked", "exhausted", "timed-out"] },
+        "error": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "decision": {
+      "type": "object",
+      "required": ["decisionId", "runId", "kind", "reason", "createdAt"],
+      "properties": {
+        "decisionId": { "$ref": "#/$defs/uuid" },
+        "runId": { "$ref": "#/$defs/uuid" },
+        "kind": { "type": "string", "enum": ["transition", "escalation", "budget-override", "gate-exception", "stop"] },
+        "from": { "type": ["string", "null"] },
+        "to": { "type": ["string", "null"] },
+        "reason": { "type": "string" },
+        "evidenceIds": { "type": "array", "items": { "$ref": "#/$defs/uuid" } },
+        "approvedBy": { "type": ["string", "null"] },
+        "expiresAt": { "type": ["string", "null"], "format": "date-time" },
+        "scope": { "type": ["string", "null"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "usage": {
+      "type": "object",
+      "required": ["source"],
+      "properties": {
+        "source": { "type": "string", "enum": ["provider", "estimate", "unknown"] },
+        "inputTokens": { "type": ["integer", "null"] },
+        "outputTokens": { "type": ["integer", "null"] },
+        "cachedTokens": { "type": ["integer", "null"] },
+        "confidence": { "type": ["string", "null"] },
+        "usd": { "type": ["number", "null"] },
+        "model": { "type": ["string", "null"] },
+        "rateCardId": { "type": ["string", "null"] },
+        "effectiveDate": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "run": {
+      "type": "object",
+      "required": ["runId", "startedAt", "status", "spans", "budget"],
+      "properties": {
+        "runId": { "$ref": "#/$defs/uuid" },
+        "schemaVersion": { "type": "integer", "const": 2 },
+        "workItemId": { "type": ["string", "null"] },
+        "phase": { "oneOf": [{ "$ref": "#/$defs/phase" }, { "type": "null" }] },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "finishedAt": { "type": ["string", "null"], "format": "date-time" },
+        "status": { "type": "string", "enum": ["running", "ok", "warning", "failed", "blocked", "exhausted"] },
+        "spans": { "type": "array", "items": { "$ref": "#/$defs/span" } },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } },
+        "decisions": { "type": "array", "items": { "$ref": "#/$defs/decision" } },
+        "budget": {
+          "type": "object",
+          "required": ["status", "ok", "checks"],
+          "properties": {
+            "status": { "type": "string", "enum": ["ok", "warning", "exhausted"] },
+            "ok": { "type": "boolean" },
+            "exhausted": { "type": "boolean" },
+            "checks": { "type": "array" },
+            "counters": { "type": "object" }
+          }
+        },
+        "usage": { "oneOf": [{ "$ref": "#/$defs/usage" }, { "type": "null" }] },
+        "capabilities": { "type": "object" },
+        "retention": {
+          "type": "object",
+          "properties": {
+            "rawPromptRetained": { "type": "boolean" },
+            "keepOnFailure": { "type": "boolean" }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "stateV2": {
+      "type": "object",
+      "required": ["version", "session", "epics"],
+      "properties": {
+        "version": { "type": "integer", "const": 2 },
+        "stateVersion": { "type": "integer", "const": 2 },
+        "session": {
+          "type": "object",
+          "required": ["workflowPath", "currentPhase", "trackingMode"],
+          "properties": {
+            "trackingMode": { "type": "string", "enum": ["markdown", "github"] },
+            "learnerTier": { "type": "string", "enum": ["beginner", "intermediate", "advanced", "guided"] },
+            "operatingMode": { "type": "string", "enum": ["instruction-first", "implementation-first", "hybrid"] },
+            "workflowPath": { "type": "string", "enum": ["large", "small", "no_test_required"] },
+            "currentPhase": { "$ref": "#/$defs/phase" }
+          }
+        },
+        "activeRunId": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
+        "activeWorkItem": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "epicId": { "type": ["string", "null"] },
+                "storyId": { "type": ["string", "null"] }
+              },
+              "additionalProperties": false
+            },
+            { "type": "null" }
+          ]
+        },
+        "epics": { "type": "object" },
+        "gates": { "type": "object" },
+        "gateEvidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } },
+        "lastTransition": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "from": { "$ref": "#/$defs/phase" },
+                "to": { "$ref": "#/$defs/phase" },
+                "at": { "type": "string", "format": "date-time" },
+                "evidenceIds": { "type": "array", "items": { "$ref": "#/$defs/uuid" } }
+              },
+              "required": ["from", "to", "at"]
+            },
+            { "type": "null" }
+          ]
+        },
+        "spikes": { "type": "object" },
+        "changeHistory": { "type": "array" }
+      }
+    }
+  }
+}

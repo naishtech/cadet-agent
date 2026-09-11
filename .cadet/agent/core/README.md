@@ -26,7 +26,31 @@ For GitHub Copilot, these skills are also exposed as slash-command prompts under
 ## Framework Artifacts
 
 - **[FrameworkManifest.json](FrameworkManifest.json)** — Distribution contract: managed paths, preserved paths, canonical repository, supported IDEs.
+- **[Harness.md](Harness.md)** — Harness rules: budgets, evidence-backed gates, retries, context tiers, tool routing, privacy, and escalation.
+- **[harness.schema.json](harness.schema.json)** — JSON Schema for harness policy, run ledgers, spans, evidence, decisions, and state v2.
+- **[state.schema.json](state.schema.json)** — Session state schema (v1 and v2). See `docs/core/HarnessContract.md` for the frozen contract.
 - **[LICENSE.md](LICENSE.md)** — CC BY 4.0 License.
+
+## Harness
+
+Cadet runs under an observable, bounded harness. In short:
+
+- A gate is `true` only when backed by fresh, structured evidence in `.cadet/state.json → gateEvidence`.
+- Every run records a sanitized ledger under `.cadet/runs/<runId>.json` (no secrets, no raw prompts by default).
+- Budgets and limits live in `.cadet/harness.json` (repository overrides) with conservative defaults defined in `src/harness/policy.mjs`.
+- The CLI enforces the rules:
+
+```bash
+cadet-agent state validate          # validate state against the schema
+cadet-agent state migrate           # atomically upgrade v1 → v2
+cadet-agent state transition --to <phase>
+cadet-agent harness verify --gate <gate>
+cadet-agent harness report
+cadet-agent harness cleanup
+cadet-agent harness capabilities
+```
+
+Read `Harness.md` for the full contract. See `docs/core/HarnessContract.md` for the frozen data contract and compatibility invariants.
 
 ## Operational Files
 
