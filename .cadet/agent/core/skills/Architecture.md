@@ -10,6 +10,8 @@ You are executing the Cadet **Architecture** skill. This skill is the primary in
 ## Gate Check
 
 Before proceeding, read `.cadet/state.json`. Requirements must be finalized (`currentPhase` is `requirementsComplete` or later). If requirements are not approved, stop and invoke the Requirements skill first.
+
+Read `.cadet/agent/core/Harness.md`. Record the context assumptions, expected verification methods, tool selection, and relevant budget constraints the design implies.
 </instructions>
 
 <context>
@@ -42,10 +44,11 @@ Produce a technical design that translates approved requirements into implementa
 4. Evaluate technology options using the TechnologyDecisionFramework. Record each significant decision as an ADR under `.cadet/agent/project-plans/adr/`.
 5. Include an explicit TDD red/green test strategy tied to acceptance criteria.
 6. Identify architectural seams and test boundaries.
-7. **Assumption audit:** List every design assumption. Classify each as **verified**, **reasonable**, or **unverified**. For unverified assumptions, recommend a spike.
-8. Produce `technical-design.md` from `<document index="1"/>` — fill every `<slot/>`, strip all XML wrappers, write pure Markdown.
-9. Ask the user whether to commit the technical design to a new branch and create a PR.
-10. If design changes later, propagate updates to the project plan and epics before continuing.
+7. **Verification and tool plan:** for each acceptance criterion, state the verification method and command, the tool selection (deterministic CLI for verification, repository read/search for static context, MCP only for live Unity inspection/mutation), and any budget implication (e.g. context tier, wall-clock for a Unity build). Declare any project-specific analyzer/compile/test command that must be added to `.cadet/harness.json`.
+8. **Assumption audit:** List every design assumption. Classify each as **verified**, **reasonable**, or **unverified**. For unverified assumptions, recommend a spike.
+9. Produce `technical-design.md` from `<document index="1"/>` — fill every `<slot/>`, strip all XML wrappers, write pure Markdown.
+10. Ask the user whether to commit the technical design to a new branch and create a PR.
+11. If design changes later, propagate updates to the project plan and epics before continuing.
 </process>
 
 <output>

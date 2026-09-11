@@ -33,6 +33,7 @@ Cadet skills are phase-scoped instruction files. When invoked (via `/cadet-<skil
 
 ## Detailed process reference
 
+- [Harness Contract](core/HarnessContract.md) — frozen data contract, compatibility invariants, and the contract test matrix
 - [Unity CLI](core/UnityCli.md) — CLI commands vs MCP mode, and the gate→command contract
 
 ## Guidance
@@ -44,6 +45,7 @@ Cadet skills are phase-scoped instruction files. When invoked (via `/cadet-<skil
 - [Localization Patterns](guidance/LocalizationPatterns.md)
 - [Spike Patterns](guidance/SpikePatterns.md)
 - [Technology Decision Framework](guidance/TechnologyDecisionFramework.md)
+- [Harness Troubleshooting](guidance/HarnessTroubleshooting.md)
 
 ## Standards
 

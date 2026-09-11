@@ -6,6 +6,20 @@
 
 Prevent the agent from skipping critical quality and validation steps during workflow execution. Hard gates are tracked in `.cadet/state.json` under the `gates` object and are verified before every phase transition.
 
+## Evidence backing (v2)
+
+A gate may be `true` only when backed by a **fresh, structured evidence record** in `.cadet/state.json → gateEvidence`, bound to the current work item, input tree hash, and acceptance criteria. Evidence from a different work item, a changed input tree, changed criteria, an expired record, or a superseded record does not satisfy a gate. A hand-edited `true` gate with no evidence is rejected.
+
+The CLI enforces this mechanically:
+
+```bash
+cadet-agent state validate                      # schema validation
+cadet-agent state transition --to <phase>       # lists every missing/stale gate
+cadet-agent harness verify --gate <gate>        # creates fresh evidence
+```
+
+See [Harness Contract](HarnessContract.md) for the frozen contract and `.cadet/agent/core/Harness.md` for the runtime rules.
+
 ## Index
 - Docs index: [index](../index.md)
 

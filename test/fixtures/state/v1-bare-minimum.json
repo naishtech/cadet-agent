@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "session": {
+    "workflowPath": "small",
+    "currentPhase": "context-resolution",
+    "trackingMode": "github"
+  },
+  "epics": {},
+  "spikes": {},
+  "changeHistory": []
+}

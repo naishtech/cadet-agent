@@ -10,6 +10,8 @@ You are executing the Cadet **Requirements** skill. This skill is the primary in
 ## Gate Check
 
 Before proceeding, read `.cadet/state.json`. If the current phase is not `contextResolution` or `requirements`, report the phase and ask the user whether to reset state before continuing.
+
+Read `.cadet/agent/core/Harness.md`. Record the context assumptions, expected verification method, tool selection, and relevant budget constraints for the work.
 </instructions>
 
 <context>
@@ -40,12 +42,13 @@ Capture requirements with clear, testable Given/When/Then acceptance criteria th
 3. Capture requirements in Markdown with Given/When/Then acceptance criteria.
 4. Walk the user through each criterion at a depth matching the learner tier, unless they request end-only review.
 5. Validate each criterion is testable and maps to an expected outcome.
-6. Run an ambiguity scan after initial drafting.
-7. Ask permission before running one-by-one clarification questions.
-8. **Assumption audit:** List every assumption. Classify each as **verified**, **reasonable**, or **unverified**. For unverified assumptions, recommend a spike.
-9. Produce `requirements.md` from `<document index="1"/>` — fill every `<slot/>`, strip all XML wrappers, write pure Markdown.
-10. Ask the user whether to commit the requirements to a new branch and create a PR.
-11. If criteria change later, propagate updates to technical design, project plan, and epics before continuing implementation.
+6. **Harness planning:** for each criterion, record the expected verification method (automated command vs. manual confirmation), the tool selection (deterministic CLI / repository read / MCP), and any budget constraint the work implies (e.g. long Unity builds, large context). Note anything that will need a `.cadet/harness.json` override.
+7. Run an ambiguity scan after initial drafting.
+8. Ask permission before running one-by-one clarification questions.
+9. **Assumption audit:** List every assumption. Classify each as **verified**, **reasonable**, or **unverified**. For unverified assumptions, recommend a spike.
+10. Produce `requirements.md` from `<document index="1"/>` — fill every `<slot/>`, strip all XML wrappers, write pure Markdown.
+11. Ask the user whether to commit the requirements to a new branch and create a PR.
+12. If criteria change later, propagate updates to technical design, project plan, and epics before continuing implementation — and note that the criteria hash changes, invalidating any evidence tied to the old criteria.
 </process>
 
 <output>

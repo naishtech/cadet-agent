@@ -7,8 +7,13 @@ Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished g
 ## Repository Layout
 - `.cadet/agent/core/` contains the shared Cadet-Agent framework documents.
   - `cadet-agent.md` is the thin global directive: identity, non-negotiable rules, workflow routing, hard-gate protocol, and skill dispatch.
+  - `Harness.md` is the canonical harness contract: budgets, evidence-backed gates, retries, context tiers, tool routing, privacy, and escalation.
+  - `harness.schema.json` and `state.schema.json` are the machine-readable schemas for harness records and session state.
   - `skills/` contains scoped workflow-phase skills (Requirements, Architecture, Spike, StoryBreakdown, TDD, Debugging, CodeReview, Resume, MCPSetup, AgentReviewer).
   - `templates/` contains runtime templates for planning artifacts.
+- `.cadet/harness.json` holds repository-local budget/policy overrides (preserved by sync).
+- `.cadet/runs/` holds sanitized run ledgers (preserved by sync; no secrets or raw prompts by default).
+- `src/harness/` contains the dependency-free harness implementation (policy, budget, state, verification, context, routing, redaction, ledger, archive, hook).
 - `.cadet/agent/docs/` contains setup guides for each supported IDE.
 - `.github/agents/` contains the Copilot custom agent definitions (Cadet Agent + Cadet Agent Reviewer).
 - `.github/prompts/` contains Copilot slash-command skill prompts (`/cadet-review`, `/cadet-tdd`, etc.).
@@ -59,7 +64,7 @@ npx cadet-agent@latest init --target ./my-unity-project
 npx cadet-agent@latest sync
 ```
 
-When a new release is available, `sync` downloads the updated framework and replaces managed files (`.cadet/agent/core/`, IDE integration shims, agent definitions). Your local policies (`.cadet/agent/policies/`) and project plans (`.cadet/agent/project-plans/`) are automatically preserved. After syncing, start a fresh chat for the changes to take effect.
+When a new release is available, `sync` downloads the updated framework and replaces managed files (`.cadet/agent/core/`, IDE integration shims, agent definitions). Your local policies (`.cadet/agent/policies/`), project plans (`.cadet/agent/project-plans/`), harness overrides (`.cadet/harness.json`), and run ledgers (`.cadet/runs/`) are automatically preserved. After syncing, start a fresh chat for the changes to take effect.
 
 To sync a specific directory:
 
@@ -141,6 +146,34 @@ Hard gates are enforced at every phase transition. The agent reads `.cadet/state
 | review → validation | `codeReviewCompleted`, `securityReviewPassed`, `acceptanceCriteriaValidated` |
 | validation → closed | `designArtifactSyncConfirmed` |
 
+### Harness
+
+Gates are backed by **evidence**, not assertion. Each claimed gate must have a fresh, non-superseded evidence record bound to the current work item, input tree hash, and acceptance criteria. The harness also bounds context, tokens, tool calls, retries, wall-clock time, cost, and archive sizes — and those bounds are enforced, not advisory.
+
+- Rules: `.cadet/agent/core/Harness.md`. Data contract: `docs/core/HarnessContract.md`.
+- Overrides: `.cadet/harness.json` (preserved by sync; conservative defaults in `src/harness/policy.mjs`).
+- Ledgers: `.cadet/runs/<runId>.json` (sanitized; artifacts are redacted before they are written; no secrets or raw prompts by default).
+- Transitions recompute the input tree hash from the evidence's relevant files, so editing a relevant file invalidates the evidence.
+- `harness verify` binds evidence to `--files` (or the working tree's changed files), and a `testsPassed` green result requires a prior red record.
+- When Git is unavailable and no `--files` are given, verification blocks (`freshness-unavailable`) rather than recording unscoped evidence.
+- `state validate` rejects a `true` gate whose evidence is missing, stale, expired, or bound to another work item; evidence records are schema-validated in full (`command`, `result`, `criteriaHash`, and a freshness bound).
+- Command output counts against the output budget; a configured cost budget cannot be satisfied by unmeasurable cost (the run is blocked, `budget-blocked`).
+- State and run ledgers are written atomically, so an interrupted write cannot truncate a record.
+
+```bash
+cadet-agent state validate                       # validate state against the schema
+cadet-agent state migrate                        # atomically upgrade v1 → v2
+cadet-agent state transition --to review         # enforce the matrix + evidence
+cadet-agent harness verify --gate testsPassed --files src/a.cs   # bounded, classified loop
+cadet-agent harness report                       # budget consumption and failures (no secrets)
+cadet-agent harness cleanup                      # apply the retention policy
+cadet-agent harness capabilities                 # available CLI/Unity/MCP/hook/token/cost telemetry
+```
+
+Every command supports `--format human|json` and exits nonzero for invalid state, failed verification, budget exhaustion, stale evidence, or safety rejection.
+
+See `docs/guidance/HarnessTroubleshooting.md` for stale evidence, budget exhaustion, unavailable Unity CLI, and live MCP connection failures.
+
 ## Examples
 
 ### GitHub Copilot
@@ -200,7 +233,7 @@ If a specific game repository needs local conventions, add a policy file under `
 
 ## Package Output
 Running `./package-agent.ps1` produces `cadet-agent.zip` with this layout:
-- `.cadet/agent/core/`
+- `.cadet/agent/core/` (including `Harness.md`, `harness.schema.json`, and `state.schema.json`)
 - `.cadet/agent/core/skills/`
 - `.cadet/agent/core/templates/`
 - `.github/agents/cadet.agent.md`

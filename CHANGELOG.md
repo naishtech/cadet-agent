@@ -11,6 +11,54 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Harness modernization.** Cadet-Agent now runs under an observable, bounded, evidence-backed harness while preserving every existing phase, gate, dispatch order, and approval rule.
+  - `docs/core/HarnessContract.md` freezes the v2 data contract, compatibility invariants, default budgets, evidence freshness rules, the retry decision tree, context tiers, redaction categories, archive/hook safety limits, and the contract test matrix.
+  - `.cadet/agent/core/Harness.md` — canonical harness rules (budgets, evidence, retries, context tiers, privacy, escalation, skill contract, CLI surface).
+  - `.cadet/agent/core/harness.schema.json` — JSON Schema for policy, run ledgers, spans, evidence, decisions, and state v2.
+  - `.cadet/harness.json` — repository-local budget/policy overrides (preserved by sync; conservative code defaults in `src/harness/policy.mjs`).
+  - `src/harness/` — dependency-free implementation: `policy`, `budget`, `state`, `verification`, `context`, `routing`, `redaction`, `ledger`, `archive`, `hook`, `util`, and stable `index.mjs`.
+  - CLI: `cadet-agent state validate|migrate|transition` and `cadet-agent harness record|verify|report|cleanup|capabilities`, each with `--format human|json` and nonzero exits for invalid state, failed verification, budget exhaustion, stale evidence, and safety rejection.
+  - `.cadet/runs/<runId>.json` — sanitized run ledgers (no secrets or raw prompts by default; gitignored).
+  - `docs/guidance/HarnessTroubleshooting.md` — recovery steps for stale evidence, budget exhaustion, unavailable Unity CLI, and live MCP failures.
+  - `test/harness-*.test.mjs` — policy/budget, state, verification, context/routing, redaction, ledger, archive, hook, and CLI contract tests.
+
+### Changed
+
+- **State schema v2.** `state.schema.json` adds `stateVersion`, `activeRunId`, `activeWorkItem`, `gateEvidence`, and `lastTransition`. v1 documents remain valid input and are migrated atomically by `cadet-agent state migrate` (`.v1.bak` backup; original untouched on failure).
+- **Gates are evidence-backed.** A gate may be `true` only with a fresh, non-superseded evidence record bound to the work item, input tree hash, and acceptance criteria. `cadet-agent state transition` rejects unsupported claims and lists missing/stale gates.
+- **Canonical skills consume the harness.** TDD, CodeReview, Debugging, Resume, Requirements, Architecture, StoryBreakdown, Spike, MCPSetup, and AgentReviewer now require or emit harness records and block on missing evidence/budget state.
+- **Installer hardening.** `src/install.mjs` delegates ZIP handling to `src/harness/archive.mjs`: containment (no absolute paths/traversal), filename/size/file-count/compression-ratio limits, header bounds validation, and CRC verification. Downloads are size- and timeout-bounded.
+- **Hook fail-closed by default.** The Copilot git guard now returns a structured `hook-error` (deny) on malformed or unrecognized input instead of silently passing; `fail-open` is opt-in via `.cadet/harness.json` or `CADET_GIT_GUARD_MODE` and logs every time it allows a call.
+- `FrameworkManifest.json` lists `Harness.md`/`harness.schema.json` as managed and `.cadet/harness.json`/`.cadet/runs` as preserved.
+- `cadet-agent.md`: added a Harness pointer, harness paths, evidence-backed gate protocol, and harness-based context management (replacing the manual 100k-token reminder).
+- `test/fixtures/state/` — valid, bare-minimum, gates-true-without-evidence, malformed, invalid-enum, and v2-minimal state fixtures.
+
+### Fixed
+
+- **Transitions now enforce file freshness.** `state transition` recomputes each gate's `inputTreeHash` from the evidence's `relevantFiles`, so an edit to a relevant file rejects the transition instead of passing on work-item/status checks alone.
+- **Verification binds to relevant files.** `harness verify` hashes `--files` (or the working tree's changed files) into the evidence, so changes to source files invalidate the evidence. Previously it hashed the empty set.
+- **Artifacts are redacted before they are written.** Oversized ledger and verification-command artifacts are redacted, then written; the artifact hash covers the persisted redacted bytes and the inline preview is redacted too.
+- **Hard budgets block execution.** The context loader refuses an item that would exceed the context-token budget, and the verification loop refuses a passing gate once any hard limit (tool calls, output tokens, wall-clock, cost) is reached.
+- **Red-before-green is enforced.** A `testsPassed` green result is rejected (`red-required`) unless a prior failed record exists for the same work item and gate; a `no_test_required` work item is exempt.
+- **Unmeasurable cost cannot satisfy the cost envelope.** When a cost budget is configured but no rate card resolves the cost, the counter is marked unmeasurable and the run is blocked (`budget-blocked`) rather than reported as within budget.
+- **State writes are atomic.** CLI transitions and verification updates write to a temp file and rename into place, so an interruption cannot truncate `state.json`.
+- **Verification output counts against the output budget.** `runVerificationLoop` now adds the command's output bytes (estimated as tokens) to the `outputTokens` counter, so the output budget is enforced like the others instead of being advisory.
+- **Non-Git verification fails safe.** When Git cannot be queried and no `--files` are given, `harness verify` blocks with `freshness-unavailable` instead of recording evidence against an empty input tree. `allowEmptyFreshness: true` is the explicit opt-out.
+- **`state validate` rejects unbacked true gates.** A v2 document with `gates.<name>: true` and no supporting `passed`/`manual-confirmation` evidence now fails validation, not just transition.
+- **Ledger finalization cannot launder a bad budget.** `RunLedger.finalize` forces exhausted and unmeasurable-cost runs to `exhausted`/`blocked`; a caller-supplied `status: 'ok'` cannot override them.
+- **Artifact redaction has no bypass.** The `redactOutput` option was removed; `recordOutput` always redacts before persisting.
+- **Ledger persistence is atomic.** `RunLedger.persist()` writes to a temp file and renames into place, matching the atomic state writes; an interruption cannot truncate a run record.
+- **Evidence validation is complete.** `validateState` now requires and type-checks `command`, `result`, `criteriaHash`, and a freshness bound (`expiresAt` or `freshnessPolicy`), so a forged record with only identifier fields no longer passes structural validation.
+- **`state validate` checks evidence binding and freshness.** A claimed-true gate is rejected when its evidence belongs to a different work item, has a stale `inputTreeHash`, or has expired — not only at transition time. The CLI passes `rootDir` so the tree comparison runs; a caller that validates without a root gets an explicit `freshness was not verified` warning instead of a silent pass, and the migration path opts out via `structuralOnly`.
+
+### Compatibility
+
+- No phase name, gate name, skill dispatch order, or user-approval rule changes. Existing v1 `state.json` files are migrated to v2 atomically with the original preserved on failure. Hard enforcement can be relaxed only through an explicit, documented compatibility mode (budget ceiling override; `fail-open` hook mode).
+
 ## [0.22.0] — 2026-09-11
 
 ### Changed

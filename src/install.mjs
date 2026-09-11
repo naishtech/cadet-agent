@@ -1,13 +1,20 @@
-import { createWriteStream, mkdirSync, readFileSync, unlinkSync, existsSync, readdirSync, statSync } from 'node:fs';
-import { join, dirname, relative } from 'node:path';
-import { inflateRawSync } from 'node:zlib';
-import { Readable } from 'node:stream';
+import { readFileSync, unlinkSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { runUpgrades } from './upgrades.mjs';
+import {
+  extractArchive, readArchiveEntry, findEocd,
+  DEFAULT_ARCHIVE_LIMITS, ArchiveError,
+} from './harness/archive.mjs';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const DEFAULT_API = 'https://api.github.com/repos/naishtech/cadet-agent/releases/latest';
 const USER_AGENT = 'cadet-agent-cli';
+
+/** Network timeouts and bounded download limits. */
+const FETCH_TIMEOUT_MS = 60_000;
+const READ_TIMEOUT_MS = 120_000;
+const MAX_DOWNLOAD_BYTES = 25 * 1024 * 1024;
 
 function resolveApiUrl(override) {
   return override || process.env.CADET_AGENT_RELEASE_URL || DEFAULT_API;
@@ -29,106 +36,35 @@ function buildHeaders(extra = {}) {
   return headers;
 }
 
-// ── ZIP parser (zero-dependency, handles store + deflate) ───────────────────
-
-const SIG_EOCD  = 0x06054b50;
-const SIG_CD    = 0x02014b50;
-const SIG_LFH   = 0x04034b50;
-
-function read32(buf, off) { return buf.readUInt32LE(off); }
-function read16(buf, off) { return buf.readUInt16LE(off); }
-
-function findEocd(buf) {
-  // Search backwards from end for EOCD signature (comment is max 65535 bytes)
-  const maxStart = Math.max(0, buf.length - 65535 - 22);
-  for (let i = buf.length - 22; i >= maxStart; i--) {
-    if (read32(buf, i) === SIG_EOCD) return i;
-  }
-  throw new Error('Not a valid ZIP file: EOCD signature not found');
-}
-
-function* centralDirectoryEntries(buf, cdOffset, cdSize) {
-  let off = cdOffset;
-  const end = cdOffset + cdSize;
-  while (off < end) {
-    if (read32(buf, off) !== SIG_CD) break;
-    const method           = read16(buf, off + 10);
-    const compressedSize   = read32(buf, off + 20);
-    const uncompressedSize = read32(buf, off + 24);
-    const filenameLen      = read16(buf, off + 28);
-    const extraLen         = read16(buf, off + 30);
-    const commentLen       = read16(buf, off + 32);
-    const localHeaderOff   = read32(buf, off + 42);
-    const filename         = buf.toString('utf-8', off + 46, off + 46 + filenameLen).replace(/\\/g, '/');
-
-    // Skip directory entries (trailing / in filename, or uncompressedSize == 0 with no method)
-    if (!filename.endsWith('/')) {
-      yield { filename, method, compressedSize, uncompressedSize, localHeaderOff };
+/** fetch with an AbortController timeout; never leaves a request hanging. */
+async function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error(`Request timed out after ${timeoutMs}ms: ${url}`);
     }
-
-    off += 46 + filenameLen + extraLen + commentLen;
+    throw err;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
-function extractFile(buf, entry, targetDir) {
-  const { filename, method, compressedSize, localHeaderOff } = entry;
+// ── ZIP extraction (hardened via src/harness/archive.mjs) ────────────────────
+//
+// Containment and resource limits live in the archive module; these wrappers
+// preserve the historical return shapes while refusing anything unsafe.
 
-  // Read local file header to get filename + extra lengths (they may differ from CD)
-  const lfhFilenameLen = read16(buf, localHeaderOff + 26);
-  const lfhExtraLen    = read16(buf, localHeaderOff + 28);
+const ARCHIVE_LIMITS = DEFAULT_ARCHIVE_LIMITS;
 
-  const dataStart = localHeaderOff + 30 + lfhFilenameLen + lfhExtraLen;
-  const compressed = buf.subarray(dataStart, dataStart + compressedSize);
+export { ArchiveError, findEocd };
 
-  let data;
-  if (method === 0) {
-    // Stored — no compression
-    data = compressed;
-  } else if (method === 8) {
-    // Deflate
-    data = inflateRawSync(compressed);
-  } else {
-    throw new Error(
-      `Unsupported compression method ${method} for ${filename}.\n` +
-      `This zip uses a compression format this CLI doesn't support.\n` +
-      `Try downloading cadet-agent.zip manually from:\n` +
-      `  https://github.com/naishtech/cadet-agent/releases/latest`
-    );
-  }
-
-  const outPath = join(targetDir, filename);
-  mkdirSync(dirname(outPath), { recursive: true });
-
-  return new Promise((resolve, reject) => {
-    const rs = Readable.from(data);
-    const ws = createWriteStream(outPath);
-    rs.pipe(ws);
-    ws.on('finish', () => resolve(outPath));
-    ws.on('error', (err) => reject(new Error(`Write failed for ${filename}: ${err.message}`)));
-    rs.on('error', (err) => reject(new Error(`Read failed for ${filename}: ${err.message}`)));
-  });
-}
-
+/** Extract every file entry into targetDir, returning the written paths. */
 export async function extractZip(buf, targetDir) {
-  const eocdOff = findEocd(buf);
-  const cdSize  = read32(buf, eocdOff + 12);
-  const cdOff   = read32(buf, eocdOff + 16);
-
-  // ZIP64 detection — 0xFFFFFFFF in 32-bit fields means real values are in ZIP64 extra records
-  if (cdOff === 0xFFFFFFFF || cdSize === 0xFFFFFFFF) {
-    throw new Error(
-      'This zip uses ZIP64 format, which is not supported.\n' +
-      'Try downloading cadet-agent.zip manually from:\n' +
-      '  https://github.com/naishtech/cadet-agent/releases/latest'
-    );
-  }
-
-  const paths = [];
-  for (const entry of centralDirectoryEntries(buf, cdOff, cdSize)) {
-    const outPath = await extractFile(buf, entry, targetDir);
-    paths.push(outPath);
-  }
-  return paths;
+  const { extracted } = extractArchive(buf, targetDir, { limits: ARCHIVE_LIMITS });
+  return extracted;
 }
 
 // ── GitHub release download ─────────────────────────────────────────────────
@@ -137,9 +73,9 @@ async function fetchLatestRelease(apiUrl) {
   const url = resolveApiUrl(apiUrl);
   console.log('🔍 Fetching latest Cadet-Agent release...');
 
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     headers: buildHeaders({ 'Accept': 'application/vnd.github+json' }),
-  });
+  }, FETCH_TIMEOUT_MS);
 
   if (!res.ok) {
     if (res.status === 403 || res.status === 429) {
@@ -168,33 +104,55 @@ function findZipAsset(release) {
 async function downloadZip(url) {
   console.log('⬇️  Downloading cadet-agent.zip...');
 
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     headers: buildHeaders({ 'Accept': 'application/octet-stream' }),
-  });
+  }, FETCH_TIMEOUT_MS);
 
   if (!res.ok) {
     throw new Error(`Download failed: ${res.status} ${res.statusText}`);
   }
 
   const contentLength = res.headers.get('content-length');
-  const total = contentLength ? parseInt(contentLength, 10) : 0;
+  const declared = contentLength ? parseInt(contentLength, 10) : 0;
+  if (declared > MAX_DOWNLOAD_BYTES) {
+    throw new ArchiveError(
+      `Refusing download: declared size ${declared} bytes exceeds the ${MAX_DOWNLOAD_BYTES}-byte limit`,
+      'download-too-large'
+    );
+  }
 
-  // Stream to buffer with progress
+  // Stream to buffer with progress, enforcing a hard size cap and read timeout.
   const chunks = [];
   let downloaded = 0;
   const reader = res.body.getReader();
+  const readTimer = setTimeout(() => { try { reader.cancel('read timeout'); } catch { /* ignore */ } }, READ_TIMEOUT_MS);
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    downloaded += value.length;
-    if (total > 0) {
-      const pct = Math.round((downloaded / total) * 100);
-      process.stdout.write(`\r   ${pct}% (${(downloaded / 1024).toFixed(0)} KB / ${(total / 1024).toFixed(0)} KB)`);
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      downloaded += value.length;
+      if (downloaded > MAX_DOWNLOAD_BYTES) {
+        try { await reader.cancel('size limit'); } catch { /* ignore */ }
+        throw new ArchiveError(
+          `Refusing download: body exceeded the ${MAX_DOWNLOAD_BYTES}-byte limit`,
+          'download-too-large'
+        );
+      }
+      chunks.push(value);
+      if (declared > 0) {
+        const pct = Math.round((downloaded / declared) * 100);
+        process.stdout.write(`\r   ${pct}% (${(downloaded / 1024).toFixed(0)} KB / ${(declared / 1024).toFixed(0)} KB)`);
+      }
     }
+  } catch (err) {
+    if (err instanceof ArchiveError) throw err;
+    if (err.name === 'AbortError') throw new Error(`Download timed out after ${READ_TIMEOUT_MS}ms`);
+    throw err;
+  } finally {
+    clearTimeout(readTimer);
   }
-  if (total > 0) process.stdout.write('\n');
+  if (declared > 0) process.stdout.write('\n');
 
   return Buffer.concat(chunks);
 }
@@ -324,32 +282,28 @@ function deleteObsoleteManagedFiles(targetDir, managedPaths, zipFilenames) {
   return deleted;
 }
 
-export async function extractZipWithManifest(buf, targetDir, { preserved, managed }) {
-  const eocdOff = findEocd(buf);
-  const cdSize  = read32(buf, eocdOff + 12);
-  const cdOff   = read32(buf, eocdOff + 16);
-
-  if (cdOff === 0xFFFFFFFF || cdSize === 0xFFFFFFFF) {
-    throw new Error(
-      'This zip uses ZIP64 format, which is not supported.\n' +
-      'Try downloading cadet-agent.zip manually from:\n' +
-      '  https://github.com/naishtech/cadet-agent/releases/latest'
-    );
-  }
-
+export async function extractZipWithManifest(buf, targetDir, { preserved, managed, limits = ARCHIVE_LIMITS }) {
   const updated = [];
   const preserved_list = [];
   const added = [];
   const zipFilenames = [];
 
-  for (const entry of centralDirectoryEntries(buf, cdOff, cdSize)) {
-    zipFilenames.push(entry.filename);
-    if (matchesPreservedPath(entry.filename, preserved)) {
-      preserved_list.push(entry.filename);
-      continue;
-    }
-    const outPath = await extractFile(buf, entry, targetDir);
-    if (matchesManagedPath(entry.filename, managed)) {
+  const { extracted } = extractArchive(buf, targetDir, {
+    limits,
+    filter: (entry) => {
+      zipFilenames.push(entry.filename);
+      if (matchesPreservedPath(entry.filename, preserved)) {
+        preserved_list.push(entry.filename);
+        return { skip: true };
+      }
+      return true;
+    },
+  });
+
+  // `extractArchive` skips directory entries; classify the extracted files.
+  for (const outPath of extracted) {
+    const rel = outPath.replace(/\\/g, '/');
+    if (matchesManagedPath(rel, managed)) {
       updated.push(outPath);
     } else {
       added.push(outPath);
@@ -366,26 +320,10 @@ export async function extractZipWithManifest(buf, targetDir, { preserved, manage
 
 export function findManagedPathsInZip(buf) {
   try {
-    const eocdOff = findEocd(buf);
-    const cdSize  = read32(buf, eocdOff + 12);
-    const cdOff   = read32(buf, eocdOff + 16);
-
-    for (const entry of centralDirectoryEntries(buf, cdOff, cdSize)) {
-      const fn = entry.filename.replace(/^\.\//, '').replace(/\\/g, '/');
-      if (fn === '.cadet/agent/core/FrameworkManifest.json') {
-        // Extract just this one entry to read managedPaths
-        const lfhFilenameLen = read16(buf, entry.localHeaderOff + 26);
-        const lfhExtraLen    = read16(buf, entry.localHeaderOff + 28);
-        const dataStart = entry.localHeaderOff + 30 + lfhFilenameLen + lfhExtraLen;
-        const compressed = buf.subarray(dataStart, dataStart + entry.compressedSize);
-        let data;
-        if (entry.method === 0) data = compressed;
-        else if (entry.method === 8) data = inflateRawSync(compressed);
-        else break;
-        const manifest = JSON.parse(data.toString('utf-8'));
-        return manifest.managedPaths || [];
-      }
-    }
+    const data = readArchiveEntry(buf, '.cadet/agent/core/FrameworkManifest.json', ARCHIVE_LIMITS);
+    if (!data) return [];
+    const manifest = JSON.parse(data.toString('utf-8'));
+    return manifest.managedPaths || [];
   } catch {
     // Not a valid zip or manifest not found
   }

@@ -9,7 +9,7 @@ You are the **Cadet Agent Reviewer**. This skill is the primary instruction cont
 
 ## Gate Check
 
-No phase gate applies — the reviewer audits work without advancing state. Read `.cadet/agent/core/cadet-agent.md` in full before auditing; it is the single source of truth for framework compliance.
+No phase gate applies — the reviewer audits work without advancing state. Read `.cadet/agent/core/cadet-agent.md` in full before auditing; it is the single source of truth for framework compliance. Also read `.cadet/agent/core/Harness.md` — the reviewer audits evidence-backed gates, budget enforcement, and ledger completeness.
 </instructions>
 
 <context>
@@ -37,15 +37,21 @@ Audit completed work (a story, change, or PR) against the framework's non-negoti
 2. **Load the Rules** — Read `.cadet/agent/core/cadet-agent.md` in full. Note non-negotiable rules, hard gates, workflow routing, skill dispatch, Unity-specific rules, document rules, and Git workflow.
 3. **Audit State** — Read `.cadet/state.json` if it exists. Check that gates match the claimed phase, hard-gate values match observable evidence, and `currentPhase` is consistent with the work.
 4. **Audit the Output** — Review changed files against: TDD, hard gates, Unity rules, scope (stories not epics), assumptions, artifacts, and Git workflow.
-5. **Report Findings** — Produce a structured report: Summary, Gate Audit, Process Deviations (with rule quotes), Code Quality Notes, Recommendations.
+5. **Audit the Harness** —
+   - For every claimed gate, confirm a fresh, non-superseded evidence record for the current work item (matching input tree hash, criteria hash, no expiry).
+   - Confirm the run ledger (`.cadet/runs/`) records tool calls, retries, and results without secrets or raw prompts.
+   - Confirm no hard budget was silently exceeded; confirm any override is a recorded, user-approved decision.
+   - Confirm each skill actually followed its harness contract (Phase 7 skill contract table in `Harness.md`), not just the older prose.
+6. **Report Findings** — Produce a structured report: Summary, Gate Audit, Harness Audit, Process Deviations (with rule quotes), Code Quality Notes, Recommendations.
 </process>
 
 <output>
 ## Expected Outputs
 
-- Structured findings report: Summary, Gate Audit, Process Deviations, Code Quality Notes, Recommendations.
-- Specific rule quotes for every deviation from `cadet-agent.md`.
+- Structured findings report: Summary, Gate Audit, Harness Audit, Process Deviations, Code Quality Notes, Recommendations.
+- Specific rule quotes for every deviation from `cadet-agent.md` or `Harness.md`.
 - A clear compliance verdict and remediation guidance.
+- Explicit statement of any unresolved high-severity finding.
 </output>
 
 <completion>

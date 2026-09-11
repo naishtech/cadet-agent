@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "session": {
+    "workflowPath": "large",
+    "currentPhase": "implementation",
+    "trackingMode": "markdown",
+    "learnerTier": "intermediate",
+    "operatingMode": "hybrid"
+  },
+  "epics": {
+    "epic-1-player-movement": {
+      "status": "in-progress",
+      "stories": {
+        "story-1-walk.md": "in-progress",
+        "story-2-jump.md": "planned"
+      }
+    }
+  },
+  "gates": {
+    "codeReviewCompleted": false,
+    "testsPassed": false,
+    "storyTrackingUpdated": false,
+    "compileCheckConfirmed": false,
+    "unityAnalyzerClean": false,
+    "acceptanceCriteriaValidated": false,
+    "securityReviewPassed": false,
+    "designArtifactSyncConfirmed": false
+  },
+  "spikes": {},
+  "changeHistory": [
+    {
+      "date": "2026-09-01T10:00:00.000Z",
+      "change": "Initialized session state",
+      "phase": "context-resolution"
+    }
+  ]
+}

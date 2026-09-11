@@ -1,0 +1,646 @@
+/**
+ * Cadet-Agent state validation, legal transitions, and evidence-backed gates.
+ *
+ * Phase names, gate names, and the transition table are frozen compatibility
+ * invariants (docs/core/HarnessContract.md §1). This module validates state v2,
+ * migrates v1 → v2 atomically, rejects unsupported gate claims, and enforces
+ * evidence freshness before any phase transition.
+ */
+
+import { readFileSync, writeFileSync, renameSync, copyFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { tmpdir } from 'node:os';
+import {
+  PHASES, GATES, TRANSITIONS, EVIDENCE_STATUSES,
+} from './policy.mjs';
+import { hashTree, hashFile, hashCriteria, timestamp, isUuid } from './util.mjs';
+
+export { PHASES, GATES, TRANSITIONS, EVIDENCE_STATUSES };
+
+export const STATE_VERSION = 2;
+
+class StateError extends Error {
+  constructor(message, detail = {}) {
+    super(message);
+    this.name = 'StateError';
+    Object.assign(this, detail);
+  }
+}
+
+function isPlainObject(v) {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+// ── Validation ──────────────────────────────────────────────────────────────
+
+/**
+ * Validate a state document. Returns `{ valid, errors, warnings }` — never throws
+ * for user input so the CLI can report every problem at once.
+ *
+ * When `context.rootDir` is supplied, a claimed-true gate's supporting evidence is
+ * also checked for work-item binding and input-tree freshness, so a stale or
+ * foreign evidence record cannot make `state validate` report a false valid.
+ *
+ * Without `rootDir`, freshness cannot be checked; a warning is emitted so a
+ * structural-only validation is never mistaken for a full gate-safety check.
+ * Callers that validate state on disk should pass `rootDir`.
+ */
+export function validateState(state, context = {}) {
+  const errors = [];
+  const warnings = [];
+  const rootDir = context.rootDir || null;
+  const hasTrueGate = isPlainObject(state) && isPlainObject(state.gates)
+    && Object.values(state.gates).some((v) => v === true);
+  if (!rootDir && hasTrueGate && context.structuralOnly !== true) {
+    warnings.push({
+      path: 'gateEvidence',
+      message: 'gate freshness was not verified: no rootDir was supplied, so stale or foreign '
+        + 'evidence cannot be detected. Pass { rootDir } to run the full check.',
+    });
+  }
+
+  if (!isPlainObject(state)) {
+    return { valid: false, errors: [{ path: '$', message: 'state must be a JSON object' }], warnings };
+  }
+
+  const version = state.version ?? state.stateVersion;
+  if (version !== 1 && version !== 2) {
+    errors.push({ path: 'version', message: `unsupported state version ${JSON.stringify(version)} (expected 1 or 2)` });
+  }
+
+  if (!isPlainObject(state.session)) {
+    errors.push({ path: 'session', message: 'session must be an object' });
+  } else {
+    const s = state.session;
+    for (const required of ['workflowPath', 'currentPhase', 'trackingMode']) {
+      if (s[required] === undefined || s[required] === null) {
+        errors.push({ path: `session.${required}`, message: `${required} is required` });
+      }
+    }
+    if (s.currentPhase !== undefined && !PHASES.includes(s.currentPhase)) {
+      errors.push({ path: 'session.currentPhase', message: `unknown phase "${s.currentPhase}"` });
+    }
+    if (s.workflowPath !== undefined && !['large', 'small', 'no_test_required'].includes(s.workflowPath)) {
+      errors.push({ path: 'session.workflowPath', message: `unknown workflowPath "${s.workflowPath}"` });
+    }
+    if (s.trackingMode !== undefined && !['markdown', 'github'].includes(s.trackingMode)) {
+      errors.push({ path: 'session.trackingMode', message: `unknown trackingMode "${s.trackingMode}"` });
+    }
+    if (s.learnerTier !== undefined && !['beginner', 'intermediate', 'advanced', 'guided'].includes(s.learnerTier)) {
+      errors.push({ path: 'session.learnerTier', message: `unknown learnerTier "${s.learnerTier}"` });
+    }
+    if (s.operatingMode !== undefined && !['instruction-first', 'implementation-first', 'hybrid'].includes(s.operatingMode)) {
+      errors.push({ path: 'session.operatingMode', message: `unknown operatingMode "${s.operatingMode}"` });
+    }
+  }
+
+  if (state.epics !== undefined && !isPlainObject(state.epics)) {
+    errors.push({ path: 'epics', message: 'epics must be an object' });
+  }
+  if (state.gates !== undefined && !isPlainObject(state.gates)) {
+    errors.push({ path: 'gates', message: 'gates must be an object' });
+  }
+  if (state.gates && isPlainObject(state.gates)) {
+    for (const key of Object.keys(state.gates)) {
+      if (!GATES.includes(key)) {
+        warnings.push({ path: `gates.${key}`, message: `unknown gate "${key}"` });
+      } else if (typeof state.gates[key] !== 'boolean') {
+        errors.push({ path: `gates.${key}`, message: `gate "${key}" must be a boolean` });
+      }
+    }
+  }
+
+  if (version === 2) {
+    if (state.gateEvidence !== undefined && !Array.isArray(state.gateEvidence)) {
+      errors.push({ path: 'gateEvidence', message: 'gateEvidence must be an array' });
+    }
+    if (Array.isArray(state.gateEvidence)) {
+      state.gateEvidence.forEach((ev, i) => {
+        for (const e of validateEvidenceShape(ev)) errors.push({ path: `gateEvidence[${i}].${e.path}`, message: e.message });
+      });
+    }
+    // A claimed-true gate must be backed by evidence. This is rejected at
+    // validation time (not only at transition time) so `state validate` cannot
+    // report an unsupported gate as valid. When a rootDir is available, the
+    // supporting record must also belong to the active work item and have a
+    // fresh input tree hash.
+    if (isPlainObject(state.gates)) {
+      const activeWorkItem = isPlainObject(state.activeWorkItem) ? state.activeWorkItem : null;
+      const workItemId = activeWorkItem
+        ? `${activeWorkItem.epicId || 'none'}::${activeWorkItem.storyId || 'none'}`
+        : null;
+      for (const gate of GATES) {
+        if (state.gates[gate] !== true) continue;
+        const evidence = latestEvidenceForGate(state, gate);
+        if (!evidence || (evidence.status !== 'passed' && evidence.status !== 'manual-confirmation')) {
+          errors.push({
+            path: `gates.${gate}`,
+            message: `gate "${gate}" is true but has no supporting evidence record (status "passed" or "manual-confirmation")`,
+          });
+          continue;
+        }
+        if (workItemId && evidence.workItemId && evidence.workItemId !== workItemId) {
+          errors.push({
+            path: `gates.${gate}`,
+            message: `gate "${gate}" is backed by evidence for work item "${evidence.workItemId}", not the active work item "${workItemId}"`,
+          });
+          continue;
+        }
+        if (rootDir) {
+          const relevant = Array.isArray(evidence.relevantFiles) ? evidence.relevantFiles : [];
+          const currentHash = computeInputTreeHash(rootDir, relevant);
+          if (evidence.inputTreeHash && evidence.inputTreeHash !== currentHash) {
+            errors.push({
+              path: `gates.${gate}`,
+              message: `gate "${gate}" is backed by stale evidence: the input tree hash no longer matches the current files`,
+            });
+            continue;
+          }
+        }
+        if (evidence.expiresAt && Date.parse(evidence.expiresAt) <= Date.now()) {
+          errors.push({
+            path: `gates.${gate}`,
+            message: `gate "${gate}" is backed by expired evidence (expired ${evidence.expiresAt})`,
+          });
+        }
+      }
+    }
+    if (state.activeRunId !== undefined && state.activeRunId !== null && !isUuid(state.activeRunId)) {
+      errors.push({ path: 'activeRunId', message: 'activeRunId must be a UUIDv4 or null' });
+    }
+    if (state.activeWorkItem !== undefined && state.activeWorkItem !== null) {
+      if (!isPlainObject(state.activeWorkItem)) {
+        errors.push({ path: 'activeWorkItem', message: 'activeWorkItem must be an object or null' });
+      }
+    }
+    if (state.lastTransition !== undefined && state.lastTransition !== null) {
+      const lt = state.lastTransition;
+      if (!isPlainObject(lt)) {
+        errors.push({ path: 'lastTransition', message: 'lastTransition must be an object or null' });
+      } else {
+        if (lt.from !== undefined && !PHASES.includes(lt.from)) errors.push({ path: 'lastTransition.from', message: `unknown phase "${lt.from}"` });
+        if (lt.to !== undefined && !PHASES.includes(lt.to)) errors.push({ path: 'lastTransition.to', message: `unknown phase "${lt.to}"` });
+      }
+    }
+  } else if (state.gateEvidence !== undefined) {
+    warnings.push({ path: 'gateEvidence', message: 'gateEvidence on a v1 state is ignored until migration' });
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
+}
+
+function validateEvidenceShape(ev) {
+  const errors = [];
+  if (!isPlainObject(ev)) return [{ path: '', message: 'evidence must be an object' }];
+  // Required, non-null fields (contract §2).
+  const required = ['evidenceId', 'workItemId', 'phase', 'gate', 'status', 'inputTreeHash', 'criteriaHash', 'relevantFiles', 'createdAt'];
+  for (const field of required) {
+    if (ev[field] === undefined || ev[field] === null) {
+      errors.push({ path: field, message: `${field} is required` });
+    }
+  }
+  // Required keys that may be explicitly null (e.g. manual-confirmation has no command).
+  for (const field of ['command', 'result']) {
+    if (!(field in ev)) errors.push({ path: field, message: `${field} is required (may be null)` });
+  }
+  // A freshness bound is mandatory: either an expiry or an explicit policy.
+  if (ev.expiresAt === undefined && ev.freshnessPolicy === undefined) {
+    errors.push({ path: 'expiresAt', message: 'evidence must declare expiresAt or freshnessPolicy' });
+  }
+  if (ev.evidenceId !== undefined && !isUuid(ev.evidenceId)) errors.push({ path: 'evidenceId', message: 'evidenceId must be a UUIDv4' });
+  if (ev.phase !== undefined && !PHASES.includes(ev.phase)) errors.push({ path: 'phase', message: `unknown phase "${ev.phase}"` });
+  if (ev.gate !== undefined && !GATES.includes(ev.gate)) errors.push({ path: 'gate', message: `unknown gate "${ev.gate}"` });
+  if (ev.status !== undefined && !EVIDENCE_STATUSES.includes(ev.status)) errors.push({ path: 'status', message: `unknown evidence status "${ev.status}"` });
+  if (ev.relevantFiles !== undefined && !Array.isArray(ev.relevantFiles)) errors.push({ path: 'relevantFiles', message: 'relevantFiles must be an array' });
+  if (ev.inputTreeHash !== undefined && !/^[0-9a-f]{64}$/.test(String(ev.inputTreeHash))) {
+    errors.push({ path: 'inputTreeHash', message: 'inputTreeHash must be a SHA-256 hex digest' });
+  }
+  if (ev.criteriaHash !== undefined && ev.criteriaHash !== null && !/^[0-9a-f]{64}$/.test(String(ev.criteriaHash))) {
+    errors.push({ path: 'criteriaHash', message: 'criteriaHash must be a SHA-256 hex digest' });
+  }
+  if (ev.command !== undefined && ev.command !== null && typeof ev.command !== 'string') {
+    errors.push({ path: 'command', message: 'command must be a string or null' });
+  }
+  if (ev.result !== undefined && ev.result !== null && typeof ev.result !== 'string') {
+    errors.push({ path: 'result', message: 'result must be a string or null' });
+  }
+  if (ev.createdAt !== undefined && ev.createdAt !== null && Number.isNaN(Date.parse(ev.createdAt))) {
+    errors.push({ path: 'createdAt', message: 'createdAt must be an ISO-8601 date-time' });
+  }
+  if (ev.expiresAt !== undefined && ev.expiresAt !== null && Number.isNaN(Date.parse(ev.expiresAt))) {
+    errors.push({ path: 'expiresAt', message: 'expiresAt must be an ISO-8601 date-time or null' });
+  }
+  if (ev.freshnessPolicy !== undefined && ev.freshnessPolicy !== null) {
+    if (!isPlainObject(ev.freshnessPolicy)) {
+      errors.push({ path: 'freshnessPolicy', message: 'freshnessPolicy must be an object or null' });
+    } else if (!['story', 'phase', 'run', 'manual'].includes(ev.freshnessPolicy.scope)) {
+      errors.push({ path: 'freshnessPolicy.scope', message: 'freshnessPolicy.scope must be story|phase|run|manual' });
+    }
+  }
+  return errors;
+}
+
+// ── Migration ───────────────────────────────────────────────────────────────
+
+/**
+ * Migrate a v1 state document to v2 in memory. Unknown top-level fields are
+ * preserved. Does not touch the filesystem.
+ */
+export function migrateStateV1toV2(v1) {
+  if (!isPlainObject(v1)) throw new StateError('cannot migrate a non-object state');
+  if (v1.version === 2 || v1.stateVersion === 2) {
+    return { state: { ...v1, version: 2, stateVersion: 2, gateEvidence: v1.gateEvidence || [] }, changed: false };
+  }
+  const gates = isPlainObject(v1.gates) ? { ...v1.gates } : {};
+  for (const gate of GATES) {
+    if (typeof gates[gate] !== 'boolean') gates[gate] = false;
+  }
+  // Preserve any unknown top-level fields that are safe to keep.
+  const preserved = {};
+  for (const [key, value] of Object.entries(v1)) {
+    if (!['version', 'session', 'epics', 'gates', 'spikes', 'changeHistory'].includes(key)) {
+      preserved[key] = value;
+    }
+  }
+  const v2 = {
+    ...preserved,
+    version: 2,
+    stateVersion: 2,
+    session: { ...v1.session },
+    epics: v1.epics || {},
+    gates,
+    gateEvidence: [],
+    activeRunId: null,
+    activeWorkItem: activeWorkItemFromState(v1),
+    lastTransition: null,
+    spikes: v1.spikes || {},
+    changeHistory: Array.isArray(v1.changeHistory) ? [...v1.changeHistory] : [],
+  };
+  return { state: v2, changed: true };
+}
+
+function activeWorkItemFromState(state) {
+  const epics = state.epics;
+  if (!isPlainObject(epics)) return null;
+  for (const [epicId, epic] of Object.entries(epics)) {
+    if (!isPlainObject(epic) || !isPlainObject(epic.stories)) continue;
+    for (const [storyId, status] of Object.entries(epic.stories)) {
+      if (status === 'in-progress') return { epicId, storyId };
+    }
+  }
+  return null;
+}
+
+/**
+ * Migrate a state file on disk atomically: write a temporary file, optionally
+ * back up the original, then rename into place. A failed migration leaves the
+ * original untouched.
+ */
+export function migrateStateFile(statePath, { backup = true } = {}) {
+  if (!existsSync(statePath)) {
+    throw new StateError(`state file not found: ${statePath}`);
+  }
+  let raw;
+  try {
+    raw = JSON.parse(readFileSync(statePath, 'utf-8'));
+  } catch (err) {
+    throw new StateError(`cannot migrate malformed state: ${err.message}`);
+  }
+  const { state, changed } = migrateStateV1toV2(raw);
+  if (!changed) return { migrated: false, statePath, state };
+
+  const dir = dirname(statePath);
+  const tmpDir = mkdtempSync(join(tmpdir(), 'cadet-state-'));
+  const tmpPath = join(tmpDir, 'state.json');
+  try {
+    writeFileSync(tmpPath, JSON.stringify(state, null, 2) + '\n', 'utf-8');
+    if (backup) {
+      copyFileSync(statePath, `${statePath}.v1.bak`);
+    }
+    // A failed rename leaves the original in place; validate before committing.
+    // This is a structural-only check: a freshly migrated state has no on-disk
+    // evidence to bind, so freshness is intentionally not evaluated here.
+    const check = validateState(state, { structuralOnly: true });
+    if (!check.valid) {
+      throw new StateError(`migrated state failed validation: ${check.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
+    }
+    renameSync(tmpPath, statePath);
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+  return { migrated: true, statePath, state };
+}
+
+// ── Evidence ────────────────────────────────────────────────────────────────
+
+/** Build an evidence record. `id` defaults to a fresh UUIDv4. */
+export function createEvidence({
+  evidenceId,
+  workItemId,
+  acceptanceCriterionId = null,
+  phase,
+  gate,
+  status,
+  command = null,
+  result = null,
+  exitCode = null,
+  artifactPath = null,
+  artifactHash = null,
+  inputTreeHash,
+  criteriaHash = null,
+  relevantFiles = [],
+  toolVersion = null,
+  createdAt = new Date(),
+  expiresAt = null,
+  freshnessPolicy = null,
+  source = 'automated',
+  id,
+}) {
+  return {
+    evidenceId: evidenceId || id || undefined,
+    workItemId,
+    acceptanceCriterionId,
+    phase,
+    gate,
+    status,
+    command,
+    result,
+    exitCode,
+    artifactPath,
+    artifactHash,
+    inputTreeHash,
+    criteriaHash: criteriaHash || hashCriteria([]),
+    relevantFiles,
+    toolVersion,
+    createdAt: timestamp(createdAt),
+    expiresAt: expiresAt ? timestamp(expiresAt) : null,
+    freshnessPolicy,
+    supersededBy: null,
+    source,
+  };
+}
+
+/**
+ * Build the input tree hash for a set of relevant files resolved against a root.
+ * Missing files are recorded as `missing` so their absence is detectable.
+ */
+export function computeInputTreeHash(rootDir, relativePaths) {
+  const pairs = relativePaths.map((p) => ({ path: p, hash: hashFile(join(rootDir, p)) }));
+  return hashTree(pairs);
+}
+
+/** A work item identifier string used to bind evidence to the active story. */
+export function workItemIdOf(state) {
+  const item = state?.activeWorkItem;
+  if (!item) return 'unscoped';
+  return `${item.epicId || 'none'}::${item.storyId || 'none'}`;
+}
+
+/**
+ * Is an evidence record usable for a gate at this point in time?
+ * Returns `{ fresh, reasons }`.
+ */
+export function evidenceFreshness(evidence, context) {
+  const reasons = [];
+  const {
+    now = new Date(),
+    workItemId = null,
+    phase = null,
+    inputTreeHash = null,
+    criteriaHash = null,
+  } = context || {};
+
+  if (evidence.status === 'superseded') reasons.push('evidence was superseded');
+  if (evidence.status !== 'passed' && evidence.status !== 'manual-confirmation') {
+    if (evidence.status !== 'superseded') reasons.push(`evidence status is "${evidence.status}", not passing`);
+  }
+  if (workItemId && evidence.workItemId !== workItemId) {
+    reasons.push(`evidence belongs to work item "${evidence.workItemId}", not "${workItemId}"`);
+  }
+  if (inputTreeHash && evidence.inputTreeHash !== inputTreeHash) {
+    reasons.push('input tree hash changed since the evidence was recorded');
+  }
+  if (criteriaHash && evidence.criteriaHash && evidence.criteriaHash !== criteriaHash) {
+    reasons.push('acceptance criteria changed since the evidence was recorded');
+  }
+  if (evidence.expiresAt && new Date(evidence.expiresAt).getTime() <= now.getTime()) {
+    reasons.push('evidence expired');
+  }
+  if (phase && evidence.phase !== phase) {
+    const allowed = evidence.freshnessPolicy?.allowPhases || [];
+    if (!allowed.includes(phase)) {
+      reasons.push(`evidence was recorded for phase "${evidence.phase}", not "${phase}"`);
+    }
+  }
+  return { fresh: reasons.length === 0, reasons };
+}
+
+/** The most recent evidence for a gate, or null. */
+export function latestEvidenceForGate(state, gate) {
+  const list = Array.isArray(state?.gateEvidence) ? state.gateEvidence : [];
+  const matching = list.filter((e) => e.gate === gate);
+  if (matching.length === 0) return null;
+  return matching.reduce((a, b) => (new Date(a.createdAt) >= new Date(b.createdAt) ? a : b));
+}
+
+/** Active gate exceptions keyed by gate, honoring scope and expiry. */
+export function activeExceptions(state, { workItemId, now = new Date() } = {}) {
+  const history = Array.isArray(state?.changeHistory) ? state.changeHistory : [];
+  const active = {};
+  for (const entry of history) {
+    if (entry?.type !== 'gate-exception') continue;
+    if (workItemId && entry.scope && !String(entry.scope).includes(workItemId)) continue;
+    if (entry.expiresAt && new Date(entry.expiresAt).getTime() <= now.getTime()) continue;
+    if (entry.gate) active[entry.gate] = entry;
+  }
+  return active;
+}
+
+// ── Transitions ─────────────────────────────────────────────────────────────
+
+/** Required gates for a transition target, or null when the target is not gated. */
+export function requiredGates(toPhase) {
+  for (const [from, spec] of Object.entries(TRANSITIONS)) {
+    if (spec.to === toPhase) return { from, gates: spec.gates };
+  }
+  return null;
+}
+
+/**
+ * Evaluate whether a transition is legal and evidence-backed.
+ * Returns a machine-readable result: `{ allowed, toPhase, missingGates, staleEvidence, errors }`.
+ */
+export function evaluateTransition(state, toPhase, context = {}) {
+  const errors = [];
+  const missingGates = [];
+  const staleEvidence = [];
+  const fromPhase = state?.session?.currentPhase;
+  const workItemId = context.workItemId || workItemIdOf(state);
+  const now = context.now || new Date();
+
+  if (!PHASES.includes(toPhase)) {
+    errors.push(`unknown target phase "${toPhase}"`);
+    return { allowed: false, fromPhase, toPhase, missingGates, staleEvidence, errors };
+  }
+  if (toPhase === fromPhase) {
+    errors.push(`already in phase "${toPhase}"`);
+    return { allowed: false, fromPhase, toPhase, missingGates, staleEvidence, errors };
+  }
+
+  const spec = requiredGates(toPhase);
+  if (!spec) {
+    // Ungated transitions (e.g. context-resolution → requirements) are legal.
+    return { allowed: true, fromPhase, toPhase, missingGates, staleEvidence, errors };
+  }
+  if (spec.from !== fromPhase) {
+    errors.push(`illegal transition "${fromPhase}" → "${toPhase}" (expected from "${spec.from}")`);
+    return { allowed: false, fromPhase, toPhase, missingGates: [...spec.gates], staleEvidence, errors };
+  }
+
+  const exceptions = activeExceptions(state, { workItemId, now });
+  const gates = isPlainObject(state.gates) ? state.gates : {};
+  // Freshness is enforced by default: unless the caller explicitly supplies a
+  // hash, compute the current input-tree hash from each evidence record's own
+  // relevant files. This prevents a caller from silently accepting stale evidence.
+  const rootDir = context.rootDir || process.cwd();
+  const computeTreeHash = context.inputTreeHash === undefined && context.computeFreshness !== false;
+
+  for (const gate of spec.gates) {
+    if (gates[gate] !== true) {
+      // A gate exception may substitute for a gate that is not claimed true.
+      if (exceptions[gate]) continue;
+      missingGates.push(gate);
+      continue;
+    }
+    // Gate is claimed true — require fresh, non-superseded evidence.
+    const evidence = latestEvidenceForGate(state, gate);
+    if (!evidence) {
+      if (exceptions[gate]) continue;
+      missingGates.push(gate);
+      staleEvidence.push({ gate, reason: 'no evidence record for a claimed-true gate' });
+      continue;
+    }
+    let inputTreeHash = context.inputTreeHash !== undefined ? context.inputTreeHash : null;
+    if (computeTreeHash) {
+      const relevant = Array.isArray(evidence.relevantFiles) ? evidence.relevantFiles : [];
+      // An evidence record with no relevant files cannot prove freshness of any
+      // file; the tree hash still captures "nothing relevant changed".
+      inputTreeHash = computeInputTreeHash(rootDir, relevant);
+    }
+    const critHash = context.criteriaHash !== undefined ? context.criteriaHash : null;
+    const { fresh, reasons } = evidenceFreshness(evidence, {
+      now,
+      workItemId,
+      phase: fromPhase,
+      inputTreeHash,
+      criteriaHash: critHash,
+    });
+    if (!fresh && !exceptions[gate]) {
+      missingGates.push(gate);
+      staleEvidence.push({ gate, evidenceId: evidence.evidenceId, reasons });
+    }
+  }
+
+  return {
+    allowed: missingGates.length === 0 && errors.length === 0,
+    fromPhase,
+    toPhase,
+    missingGates,
+    staleEvidence,
+    errors,
+    exceptions: Object.keys(exceptions),
+  };
+}
+
+/**
+ * Apply a legal transition to a state object (returns a new object).
+ * Resets the target transition's gates is NOT done here — gates reset when a new
+ * work item starts (see `resetGatesForNewWorkItem`).
+ */
+export function applyTransition(state, toPhase, { evidenceIds = [], at = new Date(), inputTreeHash = undefined, criteriaHash = undefined, rootDir = undefined } = {}) {
+  const context = { now: at };
+  if (inputTreeHash !== undefined) context.inputTreeHash = inputTreeHash;
+  if (criteriaHash !== undefined) context.criteriaHash = criteriaHash;
+  if (rootDir !== undefined) context.rootDir = rootDir;
+  const evaluation = evaluateTransition(state, toPhase, context);
+  if (!evaluation.allowed) {
+    throw new StateError(
+      `illegal transition to "${toPhase}": ${[...evaluation.errors, ...evaluation.missingGates.map((g) => `missing gate ${g}`)].join('; ')}`,
+      { evaluation }
+    );
+  }
+  return {
+    ...state,
+    version: STATE_VERSION,
+    stateVersion: STATE_VERSION,
+    session: { ...state.session, currentPhase: toPhase },
+    lastTransition: {
+      from: state.session.currentPhase,
+      to: toPhase,
+      at: timestamp(at),
+      evidenceIds,
+    },
+    changeHistory: [
+      ...(Array.isArray(state.changeHistory) ? state.changeHistory : []),
+      { date: timestamp(at), change: `Phase transition ${state.session.currentPhase} → ${toPhase}`, phase: toPhase },
+    ],
+  };
+}
+
+/** Reset all gates to false for a new work item (atomic in the returned copy). */
+export function resetGatesForNewWorkItem(state, { epicId = null, storyId = null, at = new Date() } = {}) {
+  const gates = {};
+  for (const gate of GATES) gates[gate] = false;
+  return {
+    ...state,
+    gates,
+    gateEvidence: [],
+    activeWorkItem: { epicId, storyId },
+    changeHistory: [
+      ...(Array.isArray(state.changeHistory) ? state.changeHistory : []),
+      { date: timestamp(at), change: `Gate reset for new work item ${epicId || 'none'}::${storyId || 'none'}`, phase: state.session?.currentPhase },
+    ],
+  };
+}
+
+// ── File helpers ────────────────────────────────────────────────────────────
+
+export function statePathFor(targetDir) {
+  return join(targetDir, '.cadet', 'state.json');
+}
+
+export function readState(targetDir) {
+  const path = statePathFor(targetDir);
+  if (!existsSync(path)) return { exists: false, path, state: null };
+  try {
+    return { exists: true, path, state: JSON.parse(readFileSync(path, 'utf-8')) };
+  } catch (err) {
+    throw new StateError(`failed to parse ${path}: ${err.message}`);
+  }
+}
+
+/**
+ * Atomically write a JSON document: serialize to a sibling temp file, then
+ * rename into place. A process interruption cannot leave a truncated target.
+ */
+export function writeJsonAtomic(path, value) {
+  const payload = JSON.stringify(value, null, 2) + '\n';
+  // Verify the payload is valid JSON before it can replace the target.
+  JSON.parse(payload);
+  const tmpPath = `${path}.tmp-${process.pid}-${Date.now()}`;
+  try {
+    writeFileSync(tmpPath, payload, 'utf-8');
+    renameSync(tmpPath, path);
+  } catch (err) {
+    try { rmSync(tmpPath, { force: true }); } catch { /* best effort */ }
+    throw new StateError(`failed to write ${path}: ${err.message}`);
+  }
+  return path;
+}
+
+/** Atomically write state.json. */
+export function writeState(targetDir, state) {
+  return writeJsonAtomic(statePathFor(targetDir), state);
+}
+
+export { StateError };

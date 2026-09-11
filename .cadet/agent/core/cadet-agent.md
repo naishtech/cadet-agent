@@ -141,6 +141,7 @@ These files define specific operational workflows. Read them on session start or
 - `.cadet/agent/core/FrameworkSyncGate.md` — Framework update check. Check for framework updates before substantive work.
 - `.cadet/agent/core/KickoffFlow.md` — Full kickoff sequence. Step-by-step sequence for the first interaction in a session.
 - `.cadet/agent/core/FirstResponseFormat.md` — Required response structure. Required format for the first response.
+- `.cadet/agent/core/Harness.md` — **Harness rules.** Budgets, evidence-backed gates, retry classes, context tiers, tool routing, redaction, and escalation. Every skill follows it. The CLI (`cadet-agent state …`, `cadet-agent harness …`) enforces it; see `.cadet/harness.json` for repository overrides.
 
 ## Important Paths
 
@@ -148,6 +149,8 @@ These files define specific operational workflows. Read them on session start or
 - Planning artifacts: `.cadet/agent/project-plans/` — requirements, designs, plans, epics, stories.
 - Session state: `.cadet/state.json` — the single source of truth for workflow progress.
 - Framework manifest: `.cadet/agent/core/FrameworkManifest.json` — packaged version, canonical repository, managed and preserved paths.
+- Harness policy: `.cadet/harness.json` — repository-local budgets and limits (preserved by framework sync). Harness rules: `.cadet/agent/core/Harness.md`.
+- Execution ledger: `.cadet/runs/<runId>.json` — sanitized run records (never contains secrets or raw prompts by default).
 - Reference documentation: `docs/` — full rationale, examples, anti-patterns, and detailed reference. See `docs/index.md` for navigation.
 
 ## Hard Gates Protocol
@@ -177,12 +180,15 @@ These files define specific operational workflows. Read them on session start or
 
 1. Read `gates` from `.cadet/state.json` before phase transition.
 2. Check required gates for the target transition; if any is `false`, block transition and report the failing gate(s).
-3. **For `compileCheckConfirmed` and `unityAnalyzerClean`:** use the `get_errors` tool on the changed files to automatically verify. If `get_errors` returns Unity analyzer diagnostics (UNT*) or compile errors, the gate is not satisfied — fix the issues before proceeding.
-4. Apply reset semantics exactly as current rules define (gates reset to `false` on new story/epic), then re-check before transition.
+3. **Evidence is required.** A gate may only be `true` when backed by a fresh, non-superseded record in `state.json → gateEvidence` (see `.cadet/agent/core/Harness.md`). Evidence from a different work item, a changed input tree, changed acceptance criteria, an expired record, or a superseded record does not satisfy a gate.
+   - Build evidence with `cadet-agent harness verify --gate <gate>` for automated checks, or record a user `manual-confirmation` when automation is unavailable.
+   - `cadet-agent state transition --to <phase>` enforces this mechanically and lists every missing or stale gate.
+4. **For `compileCheckConfirmed` and `unityAnalyzerClean`:** prefer the Unity CLI commands in `.cadet/agent/core/UnityCli.md` (`cadet-agent harness verify` runs them). If Unity CLI is unavailable, record the user's manual confirmation with project path, editor version, timestamp, and scope. The `get_errors` tool may be used as supporting context, but a `manual-confirmation` record is required for the gate.
+5. Apply reset semantics exactly as current rules define (gates reset to `false` on new story/epic), then re-check before transition.
 
 ### Failure to Satisfy a Gate
 
-If a gate cannot be satisfied: STOP immediately. Report which gate failed and why. Do NOT advance the phase until the user provides a resolution path. If the user explicitly directs skipping a gate, record the exception in `changeHistory` with rationale.
+If a gate cannot be satisfied: STOP immediately. Report which gate failed and why. Do NOT advance the phase until the user provides a resolution path. If the user explicitly directs skipping a gate, record a structured `gate-exception` in `changeHistory` with the gate, scope, rationale, and an expiry — scoped to one work item and one transition, never propagated to a new story.
 
 ## Unity-Specific Rules
 
@@ -225,7 +231,10 @@ Before substantive work, treat the packaged framework as a bootstrap snapshot:
 
 ## Context Management
 
-- After each story, ask the user to check token count. If >100k, recommend a fresh chat.
+- The harness governs context and cost. Load Tier 0 first and expand only with a recorded reason per `.cadet/agent/core/Harness.md`. Repeated content is deduplicated by hash before it counts against budget.
+- At a budget warning, record a `budget-warning` span and continue. At a hard stop, stop and escalate; continuation needs a new run or a recorded user-approved override.
+- Run `cadet-agent harness report` to see consumed/remaining context, token, tool, retry, time, and cost budgets for the active run.
+- After each story, if the run report is near the context budget, recommend a fresh chat.
 
 ## Sources
 

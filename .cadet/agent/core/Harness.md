@@ -1,0 +1,201 @@
+# Harness — Canonical Rules
+
+Single source of truth for Cadet's execution harness: budgets, evidence, retries,
+context tiers, privacy, and escalation. Skills and adapters reference this file; they must
+not restate it. The frozen data contract and compatibility invariants live in
+`docs/core/HarnessContract.md`; the machine-readable schemas live in `harness.schema.json`;
+repository overrides live in `.cadet/harness.json`.
+
+## 1. Evidence over assertion
+
+A gate is `true` only when backed by **fresh, structured evidence**.
+
+- `state.json → gates` booleans are a projection of evidence, never the source of truth.
+- Every evidence record carries: `evidenceId`, `workItemId`, `acceptanceCriterionId` (when
+  applicable), `phase`, `gate`, `status`, `command`, `result`, `inputTreeHash`,
+  `criteriaHash`, `relevantFiles`, `createdAt`, and `expiresAt` or `freshnessPolicy`.
+- Evidence statuses: `passed`, `failed`, `blocked`, `manual-confirmation`, `superseded`.
+- Evidence is immutable. Corrections create a new record and mark the old one `superseded`.
+- A hand-edited `true` gate with no evidence is rejected by `cadet-agent state validate` — the gate
+  must have a `passed` or `manual-confirmation` record, and `state validate` also rejects evidence
+  that belongs to a different work item, has a stale input tree hash, or has expired.
+- `state validate` runs the freshness check from the target directory. A caller that validates a
+  state document without a root directory (for example, an in-memory check) receives an explicit
+  `freshness was not verified` warning — a structural-only pass is never presented as a full check.
+  The v1→v2 migration deliberately opts out with `structuralOnly`.
+- Evidence records are schema-validated in full: `command`, `result`, `criteriaHash`, and a freshness
+  bound (`expiresAt` or `freshnessPolicy`) are required, not just the identifier fields.
+- A run record's status is derived from its budget result: exhausted, blocked, or unmeasurable-cost
+  runs cannot be finalized as `ok`.
+- Run ledgers and state are written atomically (temp file + rename), so an interruption cannot
+  truncate a record.
+
+## 2. Freshness
+
+- Default scope: the **current story and current phase**.
+- Evidence is invalidated by any change to a relevant file, an acceptance criterion, the
+  active work item, or the verification command. A new phase invalidates evidence unless the
+  record explicitly allows that phase.
+- `inputTreeHash` = SHA-256 over sorted `(relative path, file hash)` pairs of relevant files,
+  excluding generated run artifacts.
+- A gate exception is scoped to **one work item and one transition**, expires when that
+  transition completes or at `expiresAt`, and never propagates to a new story.
+
+## 3. Budgets
+
+Configured in `.cadet/harness.json`; defaults and hard safety ceilings are in
+`src/harness/policy.mjs`. Defaults:
+
+| Budget | Default | Warning | Hard stop |
+|---|---:|---:|---:|
+| Context tokens | 64,000 | 80% | 100% |
+| Output tokens | 8,000 | 80% | 100% |
+| Tool calls | 80 / run | 75% | 100% |
+| Retries per step | 2 | 1 remaining | 0 remaining |
+| Total retries | 8 / run | 75% | 100% |
+| Wall-clock time | 30 min / run | 80% | 100% |
+| Estimated provider cost | USD 2.00 / run | 80% | 100% |
+| Downloaded archive bytes | 25 MiB | 80% | 100% |
+| Decompressed archive bytes | 100 MiB | 80% | 100% |
+| Archive file count | 2,000 | 80% | 100% |
+
+- **Warning:** record a `budget-warning` span and continue.
+- **Hard stop:** stop the operation, persist the ledger, and return `budget-exhausted`.
+  Continuation requires a **new run** or an **explicit user-approved budget override** recorded
+  in the ledger. A repository may not lower a hard safety ceiling, and may exceed one only with
+  an explicit compatibility flag.
+- **Hard stops are enforced in code**, not advisory: the context loader refuses an item that would
+  exceed the context-token budget, and the verification loop refuses to produce a passing gate once
+  any hard limit is reached.
+- Unknown usage is `unknown`, never silently zero, and cannot satisfy a hard cost budget. When a cost
+  budget is configured but no rate card resolves the cost, the counter is marked **unmeasurable** and
+  the run is blocked (`budget-blocked`) rather than reported as within budget.
+
+## 4. Retries
+
+One classifier, in `src/harness/verification.mjs`. Skills provide policy, never classifications.
+
+| Class | Triggers | Behavior |
+|---|---|---|
+| `deterministic` | usage/config error, assertion/test failure, compile error, analyzer finding, invalid input, reproducible timeout | **no automatic retry** |
+| `transient` | network reset, unavailable service, process launch race, configured flaky signature | retry with backoff 250 ms → 1 s → 4 s, bounded by retry + wall-clock budgets |
+| `repair` | a code/config repair followed by a rerun | one retry per repair; must reference the failed evidence and changed files |
+| `unknown` | anything unrecognized | no automatic retry; escalate; raw error only in the bounded/redacted artifact |
+
+Every attempt gets a span and evidence record. A retry never overwrites a failed attempt.
+
+## 5. Verification contracts
+
+| Gate | Command | Success | Failure |
+|---|---|---|---|
+| `testsPassed` | `npm test` (this repo) / `unity test <project> --format json` | exit 0 + report | nonzero; parse the report (path + hash are evidence) |
+| `compileCheckConfirmed` | `unity build <project> --target StandaloneWindows64 -o <tmp> --format json` or a configured compile command | exit 0 | nonzero |
+| `unityAnalyzerClean` | `unity run <project> --command <analyzer-cmd> --format json` | exit 0 + zero `UNT*` | nonzero or any `UNT*` |
+
+- If Unity CLI is unavailable, `compileCheckConfirmed` may be satisfied by a user
+  `manual-confirmation` record (project path, editor version, timestamp, scope).
+- The analyzer command must be declared in `.cadet/harness.json` before the gate can be automated.
+- **Evidence is bound to relevant files.** `cadet-agent harness verify` hashes the files given by
+  `--files` (or the working tree's changed files by default) into the evidence `inputTreeHash`, so a
+  later edit to any of them invalidates the evidence and blocks the transition.
+- **Freshness cannot be silently skipped.** If Git cannot be queried and no `--files` are given,
+  verification is blocked (`freshness-unavailable`) rather than recorded against an empty input tree.
+  A project may opt out explicitly with `allowEmptyFreshness: true` in `.cadet/harness.json`.
+- **Red-before-green is enforced, not just documented.** A `testsPassed` green result is rejected
+  unless a prior failed (red) record exists for the same work item and gate — either in state or from
+  an earlier attempt in the same loop. A `no_test_required` work item is exempt.
+- **Hard budgets block.** Exceeding a hard limit (context tokens, output tokens, tool calls, wall-clock,
+  cost) stops the operation and can never produce a passing gate. Command output is counted against
+  the output-token budget (estimated from its byte length). When a configured cost budget exists
+  but provider rates are unavailable, the cost is unmeasurable and the envelope cannot be confirmed —
+  the run is blocked rather than treated as within budget.
+- See `.cadet/agent/core/UnityCli.md` for the full command contract.
+
+## 6. Loop contract
+
+1. Prepare the check and record the `inputTreeHash`.
+2. Run once.
+3. Classify the result (§4).
+4. Retry only if the class is retryable **and** budget remains.
+5. Record every attempt and repair action.
+6. Stop on pass, deterministic failure, timeout, or budget exhaustion.
+7. Escalate with an actionable diagnostic and the next required input.
+
+## 7. Context tiers
+
+| Tier | Content | When |
+|---|---|---|
+| 0 | active policy, state, current task, required skill | always |
+| 1 | acceptance criteria, active story/design, changed files, nearby tests | default for implementation/review |
+| 2 | owning abstraction, direct callers/callees | only with a recorded reason |
+| 3 | history, broad docs, distant references | only after an explicit budget check and reason |
+
+- Every loaded item gets a manifest entry: path/reference, tier, reason, authority, content
+  hash, byte/token estimate, load timestamp.
+- Repeated content is deduplicated by hash before budget accounting.
+- Context is stale when a loaded file hash changes, the active work item changes, or the
+  required skill/policy version changes; re-read the affected item before using it as evidence.
+
+## 8. Tool routing
+
+Order: **deterministic CLI** for verification → **repository read/search** for static context →
+**MCP** only for live Unity inspection or mutation. If MCP is unavailable, fall back to static
+context plus CLI verification; **never pretend live inspection occurred**. Live-editor mutation
+requires explicit user confirmation.
+
+- Persisted tool output default: 64 KiB per span. Larger output is written to an artifact and
+  represented by path, hash, byte count, and a 4 KiB diagnostic preview.
+
+## 9. Privacy and redaction
+
+- Never persist secrets, raw prompts, credentials, or unredacted tool output unless explicitly
+  configured. Redaction runs before ledger persistence and before report display.
+- **Artifacts are redacted before they are written.** Oversized tool output and verification
+  command output are redacted, then written, and the artifact hash covers the persisted (redacted)
+  bytes. The inline preview is redacted too.
+- Redaction covers bearer/basic auth headers, API keys and common provider prefixes, JWTs,
+  private keys/certificates, passwords and password-like keys, connection strings, cloud access
+  keys, npm/GitHub tokens, and secret values nested in arrays or objects.
+- Default retention: short-lived run records, keep-on-failure, **no raw prompt retention**.
+
+## 10. Capability boundary
+
+- The CLI enforces state, budgets, verification commands, and its own tool calls. It cannot
+  observe arbitrary model-token usage or every IDE tool call.
+- IDE adapters must emit explicit `harness record` events where hooks are unavailable, and
+  reports must label unavailable runtime telemetry rather than inventing values.
+- Copilot hooks may intercept supported shell invocations. Cursor, Continue, and Claude Code are
+  capability-limited unless their host exposes a compatible hook; this limitation is visible in
+  the run report. Run `cadet-agent harness capabilities` to see the active capability set.
+
+## 11. Skill contract
+
+Every phase skill consumes or emits harness records and blocks when its required evidence or
+budget state is missing.
+
+| Skill | Required inputs | Emitted evidence | Budget scope | Blocks when |
+|---|---|---|---|---|
+| Requirements | Tier 0/1 context | context manifest, assumption notes | per run | policy/state unreadable |
+| Architecture | requirements evidence | context manifest, ADR links, verification plan | per run | requirements not finalized |
+| Spike | unverified assumption | bounded spike evidence artifact | `maxToolCalls`, `maxWallClockMs` | spike budget exhausted |
+| StoryBreakdown | design evidence | per-story verification commands + evidence outputs | per run | acceptance criteria unmapped |
+| TDD | red record, acceptance criterion | `testsPassed` red→green evidence | `maxRetriesPerStep` | no red record for a testable change |
+| Debugging | reproduce record | per-attempt spans, regression evidence | `maxTotalRetries` | deterministic failure retried blindly |
+| CodeReview | run ledger, gate evidence | review decision + findings | per run | gate evidence stale/missing |
+| Resume | active run, ledger | validated next legal transition | per run | illegal/stale transition requested |
+| MCPSetup | Unity CLI/MCP availability | round-trip + mutation-approval evidence | per run | mutation without confirmation |
+| AgentReviewer | full ledger + state | audit decision | per run | evidence-backed gates missing |
+
+## 12. CLI surface
+
+- `cadet-agent state validate` — validate state against the v2 schema.
+- `cadet-agent state migrate` — atomically migrate v1 → v2 (original preserved on failure).
+- `cadet-agent state transition --to <phase>` — enforce the transition matrix + evidence.
+- `cadet-agent harness record` — append a sanitized span/evidence/decision event.
+- `cadet-agent harness verify --gate <gate> [--files a,b]` — run a bounded, classified verification loop. Evidence is bound to the relevant files given by `--files` (or the working tree's changed files). A `testsPassed` green result requires a prior red record. On success it records the new evidence in `state.json → gateEvidence` and flips the gate; prior passing evidence for that gate is marked `superseded`. The full attempt history is written to the run ledger.
+- `cadet-agent harness report` — summarize budget consumption and failures (no secrets).
+- `cadet-agent harness cleanup` — apply the retention policy to `.cadet/runs/`.
+- `cadet-agent harness capabilities` — report available CLI/Unity/MCP/hook/token/cost telemetry.
+
+Every command supports `--format human|json` and returns nonzero for invalid state, failed
+verification, budget exhaustion, stale evidence, or safety rejection. It never prints secrets.

@@ -10,6 +10,8 @@ You are executing the Cadet **MCP Setup** skill. This skill is the primary instr
 ## Gate Check
 
 Before proceeding, read `.cadet/state.json`. MCP setup is a tooling change, not a game-code change — record it under the current phase without advancing workflow gates.
+
+Read `.cadet/agent/core/Harness.md`. MCP is for live Unity inspection or mutation only; the connection must be proven with round-trip evidence, and live-editor mutation requires explicit user approval.
 </instructions>
 
 <context>
@@ -38,8 +40,11 @@ Establish Cadet's connection to Unity so the phase skills (TDD, Debugging, Code 
    - Prefer project-local config where supported: `unity mcp configure <client> --local` (cursor, vscode).
    - Preview with `--dry-run`, then run without it; `--yes` skips the "already exists, update?" prompt.
    - Do NOT hand-write the config JSON — let `unity mcp configure` own the file (it merges and prompts correctly).
-4. Verify the connection: `unity status` shows a connected Editor; `unity command` lists the commands the connected Editor exposes.
-5. Confirm the security boundary: `unity command eval` is token-gated; Pipeline is localhost-only and off by default (dev/QA builds only — never production).
+4. Verify the connection: `unity status` shows a connected Editor; `unity command` lists the commands the connected Editor exposes. Record a **round-trip evidence artifact** (the `unity status` output, or a trivial read command's result with its hash) — a configured client is not proof of a working round-trip.
+5. **Record tool capability:** note which commands the Editor exposes and whether live mutation is available. Run `cadet-agent harness capabilities` and record the MCP availability in the run ledger.
+6. **Mutation approval:** before any live-editor mutation (scene generation, component change, eval that writes), obtain explicit user confirmation and record it. The harness blocks an unconfirmed live mutation.
+7. **Timeout handling:** if a live command times out, classify it per `Harness.md` (a reproducible timeout is deterministic and does not retry); never leave a hung Editor command.
+8. Confirm the security boundary: `unity command eval` is token-gated; Pipeline is localhost-only and off by default (dev/QA builds only — never production).
 </process>
 
 <output>

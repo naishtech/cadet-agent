@@ -8,3 +8,6 @@ node_modules/
 # User-reserved Cadet runtime files (policies and plans are preserved on sync)
 .cadet/agent/project-plans/
 .cadet/cadet-local-config.md
+
+# Harness run ledgers and artifacts (project-local telemetry; preserved by sync, not committed)
+.cadet/runs/

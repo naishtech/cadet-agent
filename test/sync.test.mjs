@@ -1,6 +1,6 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, mkdirSync, writeFileSync, rmSync, existsSync, statSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync, rmSync, existsSync, statSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
@@ -309,5 +309,61 @@ describe('runUpgrades', () => {
   it('handles same from/to version', () => {
     const deleted = runUpgrades('/tmp', '0.15.0', '0.15.0');
     assert.deepEqual(deleted, []);
+  });
+});
+
+// ── Harness preservation across sync (contract invariant C8) ────────────────
+
+describe('sync preserves harness policy and run ledgers', () => {
+  let tmpDir;
+
+  before(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), `cadet-sync-harness-${Date.now()}`));
+    mkdirSync(tmpDir, { recursive: true });
+  });
+
+  after(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('keeps .cadet/harness.json and .cadet/runs untouched', async () => {
+    // Local harness policy and a run ledger the user owns.
+    mkdirSync(join(tmpDir, '.cadet', 'runs'), { recursive: true });
+    writeFileSync(join(tmpDir, '.cadet', 'harness.json'), '{"budgets":{"maxToolCalls":42}}');
+    writeFileSync(join(tmpDir, '.cadet', 'runs', 'run-1.json'), '{"runId":"run-1"}');
+
+    // A managed core update plus a stray file that should be replaced.
+    const manifest = JSON.stringify({
+      frameworkVersion: '0.23.0',
+      managedPaths: ['.cadet/agent/core'],
+      preservedPaths: ['.cadet/agent/policies', '.cadet/agent/project-plans', '.cadet/state.json', '.cadet/harness.json', '.cadet/runs'],
+    });
+    const zip = buildMinimalZip([
+      { name: '.cadet/agent/core/FrameworkManifest.json', content: manifest },
+      { name: '.cadet/agent/core/Harness.md', content: '# harness v2' },
+    ]);
+
+    await extractZipWithManifest(zip, tmpDir, {
+      preserved: ['.cadet/agent/policies', '.cadet/agent/project-plans', '.cadet/state.json', '.cadet/harness.json', '.cadet/runs'],
+      managed: ['.cadet/agent/core'],
+    });
+
+    // The managed file is updated...
+    assert.equal(existsSync(join(tmpDir, '.cadet', 'agent', 'core', 'Harness.md')), true);
+    // ...and local policy/ledgers survive unchanged.
+    assert.equal(readFileSync(join(tmpDir, '.cadet', 'harness.json'), 'utf-8'), '{"budgets":{"maxToolCalls":42}}');
+    assert.equal(readFileSync(join(tmpDir, '.cadet', 'runs', 'run-1.json'), 'utf-8'), '{"runId":"run-1"}');
+  });
+
+  it('the real manifest preserves harness policy and runs', () => {
+    const manifest = JSON.parse(readFileSync(join(__dirname, '..', '.cadet', 'agent', 'core', 'FrameworkManifest.json'), 'utf-8'));
+    const preserved = manifest.preservedPaths.map((p) => p.replace(/\\/g, '/'));
+    assert.ok(preserved.includes('.cadet/harness.json'));
+    assert.ok(preserved.includes('.cadet/runs'));
+    // Preserved paths must not be managed paths.
+    const managed = manifest.managedPaths.map((p) => p.replace(/\\/g, '/'));
+    for (const p of ['.cadet/harness.json', '.cadet/runs']) {
+      assert.equal(managed.includes(p), false, `${p} must not be managed`);
+    }
   });
 });

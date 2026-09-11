@@ -66,3 +66,7 @@ Run `npm test` to validate:
 - No adapter duplicates canonical skill process content.
 - `FrameworkManifest.json` lists every adapter in `managedPaths`.
 - `package-agent.ps1` stages every adapter path.
+
+## Harness pointers
+
+Adapters do not restate harness rules. Each adapter's `Read First` pointer to `.cadet/agent/core/cadet-agent.md` leads to the Harness rules; the canonical harness contract is `.cadet/agent/core/Harness.md`. Capability-limited IDEs (Cursor, Continue, Claude Code) have no native PreToolUse hook — their adapters must state that limitation, and the harness reports it (`cadet-agent harness capabilities`). Copilot hooks (`git-guard.sh` / `git-guard.ps1`) fail closed on malformed input by default; `fail-open` is opt-in only.

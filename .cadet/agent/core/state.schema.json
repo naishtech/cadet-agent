@@ -1,15 +1,20 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://cadet-agent.dev/state-v1.json",
+  "$id": "https://cadet-agent.dev/state-v2.json",
   "title": "Cadet-Agent Session State",
-  "description": "Tracks workflow progress across a session. Updated via git commits at each story completion checkpoint.",
+  "description": "Tracks workflow progress across a session. v2 adds evidence-backed gates, the active run/work item, and legal transition metadata. v1 documents remain valid input and are migrated atomically by `cadet-agent state migrate`. See docs/core/HarnessContract.md.",
   "type": "object",
   "required": ["version", "session", "epics"],
   "properties": {
     "version": {
       "type": "integer",
-      "const": 1,
-      "description": "Schema version. Increment on breaking changes."
+      "enum": [1, 2],
+      "description": "Schema version. v1 is gate-only; v2 adds gateEvidence, activeRunId, activeWorkItem, and lastTransition."
+    },
+    "stateVersion": {
+      "type": "integer",
+      "const": 2,
+      "description": "Present on v2 documents. Redundant with version for tooling that reads stateVersion first."
     },
     "session": {
       "type": "object",
@@ -79,7 +84,7 @@
     },
     "gates": {
       "type": "object",
-      "description": "Mandatory hard gates that must be explicitly satisfied before phase transitions. Reset when moving to a new work item (story/epic). Gates are non-skippable — the agent must confirm each gate before advancing the phase.",
+      "description": "Mandatory hard gates that must be explicitly satisfied before phase transitions. In v2 a gate may be `true` only when backed by fresh evidence in `gateEvidence`; `cadet-agent state validate` rejects unsupported claims. Reset when moving to a new work item.",
       "properties": {
         "codeReviewCompleted": {
           "type": "boolean",
@@ -99,7 +104,7 @@
         "compileCheckConfirmed": {
           "type": "boolean",
           "default": false,
-          "description": "User confirmed Unity project compiles without errors"
+          "description": "Unity compile confirmed — automated via Unity CLI, or a user manual-confirmation record"
         },
         "unityAnalyzerClean": {
           "type": "boolean",
@@ -123,6 +128,48 @@
         }
       }
     },
+    "gateEvidence": {
+      "type": "array",
+      "description": "v2: immutable evidence records backing gate claims. See harness.schema.json#/$defs/evidence.",
+      "items": { "$ref": "harness.schema.json#/$defs/evidence" }
+    },
+    "activeRunId": {
+      "oneOf": [
+        { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+        { "type": "null" }
+      ],
+      "description": "v2: the run currently in progress, or null."
+    },
+    "activeWorkItem": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "epicId": { "type": ["string", "null"] },
+            "storyId": { "type": ["string", "null"] }
+          },
+          "additionalProperties": false
+        },
+        { "type": "null" }
+      ],
+      "description": "v2: the epic/story whose gates and evidence are currently authoritative."
+    },
+    "lastTransition": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["from", "to", "at"],
+          "properties": {
+            "from": { "type": "string" },
+            "to": { "type": "string" },
+            "at": { "type": "string", "format": "date-time" },
+            "evidenceIds": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        { "type": "null" }
+      ],
+      "description": "v2: the most recent legal transition and the evidence that justified it."
+    },
     "spikes": {
       "type": "object",
       "description": "Spike status keyed by spike ID",
@@ -133,14 +180,19 @@
     },
     "changeHistory": {
       "type": "array",
-      "description": "Audit trail of state changes",
+      "description": "Audit trail of state changes. v2 gate exceptions are recorded here with `type: \"gate-exception\"`, a `gate`, `scope`, `rationale`, and an `expiresAt`.",
       "items": {
         "type": "object",
         "required": ["date", "change"],
         "properties": {
           "date": { "type": "string", "format": "date-time" },
           "change": { "type": "string" },
-          "phase": { "type": "string" }
+          "phase": { "type": "string" },
+          "type": { "type": "string", "enum": ["gate-exception", "transition", "resume", "migration"] },
+          "gate": { "type": "string" },
+          "scope": { "type": "string" },
+          "rationale": { "type": "string" },
+          "expiresAt": { "type": "string", "format": "date-time" }
         }
       }
     }
