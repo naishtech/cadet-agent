@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.25.0] — 2026-09-11
+
 ### Added
 
 - **Deep Code support.** Cadet-Agent now integrates with the [Deep Code](https://deepcode.vegamo.cn/) CLI (`deepcode`) as a fifth supported IDE.
