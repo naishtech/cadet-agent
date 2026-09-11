@@ -11,6 +11,21 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ---
 
+## [0.22.0] — 2026-09-11
+
+### Changed
+- **Adapters are now pointers only.** Every IDE adapter (`.claude/`, `.cursor/`, `.continue/`, `.github/`) no longer restates content that lives in `.cadet/agent/core/`.
+  - Removed duplicated identity/persona lines from 22 per-phase and reviewer adapters plus the 9 command prompts in `.continue/config.yaml` (e.g. `You are executing the Cadet **TDD** skill.` and the reviewer's "You do not implement, fix, or generate code"). Core skills already state both, and state them completely.
+  - Thinned the four base/dispatcher adapters, which each re-stated the skill inventory, operational-file list, important-path list, and Git Guard procedure: `.claude/skills/cadet-agent/SKILL.md` 3785 → 1105 bytes, `.cursor/rules/cadet-agent.md` 3531 → 1152, `.continue/rules/cadet-agent.md` 3680 → 1317, `.github/agents/cadet.agent.md` 2432 → 1611.
+  - Net effect: the same instructions are no longer paid for twice on every turn, in every IDE. No behavioral change — gates, dispatch order, and phase names are unchanged.
+
+### Added
+- `cadet-agent.md`: new `## Operational Files` and `## Important Paths` sections, and a `### Kickoff` subsection. These facts previously existed only in adapter files (or in `README.md`), so they were moved into core before the adapters could stop duplicating them.
+- `test/adapters.test.mjs`: four new guard suites — Shape A (base adapters must not re-list canonical blocks), Shape B (adapters must not restate identity/persona/role, derived generically from core `<role>`/`<instructions>` sentences), adapter size budgets, and a discovery guard that mechanically flags any sentence appearing in both an adapter and a core file. The discovery guard includes a self-test proving it can fail.
+
+### Fixed
+- `src/install.mjs`: the Claude Code next-steps output referenced `.claude\skills\cadet-agent.md`, a flat path that does not exist (the file is `.claude\skills\cadet-agent\SKILL.md`).
+
 ## [0.21.0] — 2026-08-14
 
 ### Added

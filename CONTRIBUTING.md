@@ -81,10 +81,18 @@ Fix any broken links before pushing.
 | Type of change | Location |
 |---|---|
 | Framework behavior, workflow, standards, skills, templates | `.cadet/agent/core/` |
-| IDE-specific adapter (Copilot, Cursor, Continue) | IDE-specific root path (e.g. `.github/`, `.cursor/`) |
+| IDE-specific adapter (Copilot, Cursor, Continue, Claude Code) | IDE-specific root path (e.g. `.github/`, `.cursor/`, `.claude/`) |
 | Repository-specific conventions | `.cadet/agent/policies/{RepoName}Policy.md` (not in this repo) |
 | Planning artifacts | `.cadet/agent/project-plans/` (not in this repo) |
 | Setup documentation | [canonical repository docs/](https://github.com/naishtech/cadet-agent) (GitHub Pages) |
+
+### Adapter files are pointers
+
+An adapter file (anything under `.github/`, `.cursor/`, `.continue/`, or `.claude/`) is a **pointer and a registration**. It may contain only IDE-required frontmatter, a pointer to `.cadet/agent/core/` files, and IDE-specific mechanics (slash-command names, hook wiring, tool quirks).
+
+Do **not** put in an adapter: a skill/command inventory, a file or path list, a persona or identity statement (`You are …`), a restatement of a core rule, or any sentence that also appears in `.cadet/agent/core/`.
+
+`npm test` enforces this via Shape A, Shape B, size-budget, and discovery guards in `test/adapters.test.mjs`. **If a change makes those guards fail, the change is wrong — not the test.** Move the content into `.cadet/agent/core/` instead.
 
 ## Questions
 Open a GitHub Discussion or an issue on the [canonical repository](https://github.com/naishtech/cadet-agent) before starting large structural changes so the direction can be agreed before implementation.
