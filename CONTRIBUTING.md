@@ -70,12 +70,13 @@ Remove-Item .\cadet-agent-test -Recurse -Force
 Confirm all expected paths are present and no unexpected files were included.
 
 ### 3. Check markdown links
-The CI `links` job uses [lychee](https://github.com/lycheeverse/lychee) in offline mode to verify all internal markdown links are valid. You can run a local equivalent:
+The CI `links` job uses [lychee](https://github.com/lycheeverse/lychee) in offline mode to verify all internal markdown links are valid. Run the same check locally with:
 ```powershell
-# Using lychee if installed
-lychee --offline --include-fragments '.cadet/agent/core/**/*.md' 'docs/**/*.md' '*.md'
+npm run lint
 ```
-Fix any broken links before pushing.
+This is exactly what CI runs (`lychee --offline --include-fragments "**/*.md"`). `npm run verify` runs the tests and the link check together. Fix any broken links before pushing — `bump-version.ps1` runs this check and refuses to release if it fails.
+
+> Note: `docs/index.md` and similar docs pages link to skills that live only in `.cadet/agent/core/skills/`. When a skill has no docs-page counterpart, link to its canonical GitHub URL (as Resume, MCPSetup, and AgentReviewer do) rather than a non-existent relative path.
 
 ## What to put where
 | Type of change | Location |

@@ -13,6 +13,14 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Added
+
+- **Lint command and pre-release lint gate.** `npm run lint` runs the same offline markdown-link check as CI (`lychee --offline --include-fragments`), and `npm run verify` chains `test` + `lint`. `bump-version.ps1` now runs lint before touching any file and aborts if it fails, so a broken link can never be committed or tagged; pass `-SkipLint` to override.
+
+### Fixed
+
+- **Broken link in `docs/index.md`.** The Planning Review skill entry pointed at a non-existent `docs/core/skills/PlanningReview.md`; it now uses the canonical GitHub URL (the pattern used for Resume/MCPSetup/AgentReviewer), which clears the CI links job.
+
 ## [0.26.0] — 2026-09-11
 
 ### Added

@@ -23,7 +23,8 @@ Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished g
 - `.agents/skills/` contains Deep Code (and cross-client) skill adapters.
 - These IDE folders hold thin integration shims; the core framework logic still lives in `.cadet/agent/core/`.
 - `package-agent.ps1` builds the distributable `cadet-agent.zip` package.
-- `publish-npm.ps1` publishes the CLI to npm using a token from `~/.npm_token`.
+- `bump-version.ps1` bumps the version, updates version-bearing files, commits, tags, and pushes. It runs `npm run lint` first and refuses to release if the link check fails.
+- `npm run lint` checks all markdown links (the same offline check CI runs); `npm run verify` runs tests + lint.
 
 ## Cross-IDE Support
 

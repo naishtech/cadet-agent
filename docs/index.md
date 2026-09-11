@@ -20,7 +20,7 @@ For the condensed agent instruction set, see [cadet-agent.md](https://github.com
 
 Cadet skills are phase-scoped instruction files. When invoked (via `/cadet-<skill>` in Copilot or by reading the skill file directly), the skill becomes the primary instruction context for that turn, making hard gates and workflow steps unavoidable.
 
-- [Planning Review](core/skills/PlanningReview.md)
+- [Planning Review](https://github.com/naishtech/cadet-agent/blob/main/.cadet/agent/core/skills/PlanningReview.md) (canonical skill file)
 - [Requirements](core/skills/Requirements.md)
 - [Architecture](core/skills/Architecture.md)
 - [Spike](core/skills/Spike.md)

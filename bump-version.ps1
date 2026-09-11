@@ -13,6 +13,11 @@
 #   ./bump-version.ps1 -Version 0.24.0 # explicit target version
 #   ./bump-version.ps1 -Bump patch -NoPush
 #   ./bump-version.ps1 -Bump minor -DryRun
+#   ./bump-version.ps1 -Bump minor -SkipLint  # skip the pre-release lint gate
+#
+# Before touching any file, the script runs `npm run lint` (the same offline
+# markdown-link check CI runs) and aborts if it fails, so a broken link can
+# never be committed or tagged. Pass -SkipLint only when lint is unavailable.
 #
 # Version bump policy (see CHANGELOG.md):
 #   patch  wording/doc-only corrections that do not change agent behavior
@@ -30,7 +35,9 @@ param(
 
   [switch]$DryRun,
 
-  [switch]$Force
+  [switch]$Force,
+
+  [switch]$SkipLint
 )
 
 $ErrorActionPreference = "Stop"
@@ -68,6 +75,26 @@ function Invoke-Git {
   if ($LASTEXITCODE -ne 0) {
     Fail "git $($Args -join ' ') failed (exit $LASTEXITCODE)"
   }
+}
+
+# Run the same offline markdown-link check CI runs (`npm run lint`). Aborts the
+# release when it fails, so a broken link is never committed or tagged. Skips
+# with a warning when npm or the lint tool is unavailable (unless -SkipLint is
+# passed, in which case it is skipped silently).
+function Invoke-Lint {
+  Write-Step "Linting (npm run lint)"
+
+  if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+    Write-Host "  ⚠️  npm was not found; skipping lint. Re-run with lint available before releasing." -ForegroundColor Yellow
+    return
+  }
+
+  & npm run lint
+  $code = $LASTEXITCODE
+  if ($code -ne 0) {
+    Fail "Lint failed (npm run lint, exit $code). Fix the reported issues, or pass -SkipLint to override."
+  }
+  Write-Ok "lint passed"
 }
 
 function Get-JsonVersion([string]$Path) {
@@ -196,6 +223,15 @@ try {
   if ($DryRun) {
     Write-Host "`n🧪 Dry run — no files changed, nothing committed or pushed." -ForegroundColor Yellow
     exit 0
+  }
+
+  # ── Lint gate (fail before mutating anything) ─────────────────────────────
+
+  if ($SkipLint) {
+    Write-Host "`n⚠️  Skipping lint (-SkipLint)." -ForegroundColor Yellow
+  }
+  else {
+    Invoke-Lint
   }
 
   # ── Update version-bearing files ──────────────────────────────────────────
