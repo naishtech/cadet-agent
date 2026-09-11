@@ -57,6 +57,22 @@ The permitted prose in an adapter is *connective pointer text* ("Read X, then fo
 | Claude Code | `.claude/skills/cadet-review/SKILL.md` | Phase skill | `.cadet/agent/core/skills/CodeReview.md` |
 | Claude Code | `.claude/skills/cadet-resume/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Resume.md` |
 | Claude Code | `.claude/skills/cadet-mcp-setup/SKILL.md` | Phase skill | `.cadet/agent/core/skills/MCPSetup.md` |
+| Deep Code | `.agents/skills/cadet-agent/SKILL.md` | Base/global skill | `.cadet/agent/core/cadet-agent.md` |
+| Deep Code | `.agents/skills/cadet-agent-reviewer/SKILL.md` | Reviewer skill | `.cadet/agent/core/cadet-agent.md` + `.cadet/agent/core/skills/AgentReviewer.md` |
+| Deep Code | `.agents/skills/cadet-requirements/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Requirements.md` |
+| Deep Code | `.agents/skills/cadet-architecture/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Architecture.md` |
+| Deep Code | `.agents/skills/cadet-spike/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Spike.md` |
+| Deep Code | `.agents/skills/cadet-breakdown/SKILL.md` | Phase skill | `.cadet/agent/core/skills/StoryBreakdown.md` |
+| Deep Code | `.agents/skills/cadet-tdd/SKILL.md` | Phase skill | `.cadet/agent/core/skills/TDD.md` |
+| Deep Code | `.agents/skills/cadet-debug/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Debugging.md` |
+| Deep Code | `.agents/skills/cadet-review/SKILL.md` | Phase skill | `.cadet/agent/core/skills/CodeReview.md` |
+| Deep Code | `.agents/skills/cadet-resume/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Resume.md` |
+| Deep Code | `.agents/skills/cadet-mcp-setup/SKILL.md` | Phase skill | `.cadet/agent/core/skills/MCPSetup.md` |
+| Cross-client | `AGENTS.md` | Root agent-instruction pointer (create-only) | `.cadet/agent/core/cadet-agent.md` |
+
+> Deep Code adapters live under `.agents/skills/` (the cross-client Agent Skills root) rather than a Deep-Code-only `.deepcode/skills/` directory, so the same pointers are discoverable by any client that reads the `.agents/` convention. Deep Code scans `.deepcode/skills/` first, then `.agents/skills/`. See `docs/guidance/DeepCode.md`.
+
+> `AGENTS.md` is a repository-root pointer recognized by multiple agent clients. It is listed in the manifest as a **create-only path** (`createOnlyPaths`): `init`/`sync` create it when absent but never overwrite an existing file, because a consumer repo may already own one. See the "AGENTS.md is create-only" section in `README.md`.
 
 ## Verification
 
@@ -69,4 +85,4 @@ Run `npm test` to validate:
 
 ## Harness pointers
 
-Adapters do not restate harness rules. Each adapter's `Read First` pointer to `.cadet/agent/core/cadet-agent.md` leads to the Harness rules; the canonical harness contract is `.cadet/agent/core/Harness.md`. Capability-limited IDEs (Cursor, Continue, Claude Code) have no native PreToolUse hook — their adapters must state that limitation, and the harness reports it (`cadet-agent harness capabilities`). Copilot hooks (`git-guard.sh` / `git-guard.ps1`) fail closed on malformed input by default; `fail-open` is opt-in only.
+Adapters do not restate harness rules. Each adapter's `Read First` pointer to `.cadet/agent/core/cadet-agent.md` leads to the Harness rules; the canonical harness contract is `.cadet/agent/core/Harness.md`. Capability-limited IDEs (Cursor, Continue, Claude Code) have no native PreToolUse hook — their adapters must state that limitation, and the harness reports it (`cadet-agent harness capabilities`). Deep Code also has no hook; its adapter directs users to `.deepcode/settings.json` `permissions.ask` (`mutate-git-log`) instead. Copilot hooks (`git-guard.sh` / `git-guard.ps1`) fail closed on malformed input by default; `fail-open` is opt-in only.

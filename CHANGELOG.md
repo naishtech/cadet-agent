@@ -13,6 +13,19 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Added
+
+- **Deep Code support.** Cadet-Agent now integrates with the [Deep Code](https://deepcode.vegamo.cn/) CLI (`deepcode`) as a fifth supported IDE.
+  - `.agents/skills/cadet-*/SKILL.md` — 11 thin-pointer skill adapters (base, 9 phase skills, reviewer) discovered from the cross-client `.agents/skills/` root. Deep Code also scans `.deepcode/skills/` first; both roots are supported.
+  - Deep Code has no PreToolUse hook, so the commit/push approval gate is enforced through `.deepcode/settings.json` `permissions.ask` (`mutate-git-log`) rather than the Copilot git-guard scripts. Documented in `docs/guidance/DeepCode.md`.
+  - `FrameworkManifest.json` adds `deepcode` to `supportedIDEs` and the `.agents/skills/*` paths to `managedPaths`; `package-agent.ps1` stages them; the installer prints Deep Code next steps.
+  - `test/adapters.test.mjs` covers the Deep Code adapters with the same Shape A, Shape B, size-budget, discovery, and frontmatter/naming guards as the other IDEs.
+- **`AGENTS.md` is now shipped, but create-only.** A repository-root `AGENTS.md` (thin pointer to `.cadet/agent/core/cadet-agent.md`) is packaged and listed as a new manifest `createOnlyPaths` entry.
+  - `init`/`sync` create it when absent and **never overwrite an existing file**. In a terminal they prompt keep/overwrite/merge (default keep); non-interactive installs always keep.
+  - When kept, the installer prints a tag-pinned link so the user can still reach Cadet's version: `…/blob/vX.Y.Z/AGENTS.md`.
+  - Explicit control: `--agents-md keep|overwrite|merge`; `--yes` disables prompting. `merge` uses `<!-- cadet-agent:begin -->` / `<!-- cadet-agent:end -->` markers and leaves surrounding content untouched.
+  - This is a deliberate reversal of the earlier `AGENTS.md` removal: the risk was overwriting a consumer's file, which the create-only mechanism removes.
+
 ## [0.24.0] — 2026-09-11
 
 ### Added

@@ -13,6 +13,10 @@
 #   .claude\skills\cadet-agent\SKILL.md (Claude Code base skill)
 #   .claude\skills\cadet-agent-reviewer\SKILL.md (Claude Code reviewer)
 #   .claude\skills\cadet-*\SKILL.md (Claude Code per-phase skills)
+#   .agents\skills\cadet-agent\SKILL.md (Deep Code / cross-client base skill)
+#   .agents\skills\cadet-agent-reviewer\SKILL.md (Deep Code reviewer)
+#   .agents\skills\cadet-*\SKILL.md (Deep Code per-phase skills)
+#   AGENTS.md (create-only: never overwrites an existing consumer AGENTS.md)
 # The core folder contains cadet-agent.md (condensed agent instructions),
 # FrameworkManifest.json, and the runtime templates under .cadet/agent/core/templates.
 # Full rationale, guidance, standards, and templates are in the docs/ directory
@@ -165,6 +169,37 @@ foreach ($managedPath in $manifest.managedPaths) {
     }
 }
 
+# Stage only the managed .agents paths (Deep Code / cross-client skills root)
+foreach ($managedPath in $manifest.managedPaths) {
+    if ($managedPath -notlike '.agents/*') { continue }
+    $src = Join-Path $scriptDir ($managedPath -replace '/', '\')
+    $rel = $managedPath.Substring('.agents/'.Length) -replace '/', '\'
+    $dest = Join-Path $staging (Join-Path '.agents' $rel)
+    $destParent = Split-Path $dest -Parent
+    if (-not (Test-Path $destParent)) {
+        New-Item -ItemType Directory -Path $destParent -Force | Out-Null
+    }
+    if ((Get-Item $src).PSIsContainer) {
+        Copy-Item -Path $src -Destination $destParent -Recurse -Force
+    }
+    else {
+        Copy-Item -Path $src -Destination $dest -Force
+    }
+}
+
+# Stage managed root-level files (e.g. AGENTS.md). These are create-only at
+# install time, but they must be present in the package so a fresh install
+# creates them (an existing consumer copy is never overwritten).
+foreach ($managedPath in $manifest.managedPaths) {
+    if ($managedPath -match '/') { continue }   # only top-level files
+    $src = Join-Path $scriptDir $managedPath
+    if (-not (Test-Path $src)) {
+        Write-Error "Managed root file not found: $src"
+        exit 1
+    }
+    Copy-Item -Path $src -Destination (Join-Path $staging $managedPath) -Force
+}
+
 $fileCount = (Get-ChildItem -Path $staging -Recurse -File).Count
 
 Compress-Archive -Path (Join-Path $staging "*") -DestinationPath $outputZip
@@ -194,6 +229,10 @@ Write-Host "    .continue\config.yaml"
 Write-Host "    .claude\skills\cadet-agent\SKILL.md"
 Write-Host "    .claude\skills\cadet-agent-reviewer\SKILL.md"
 Write-Host "    .claude\skills\cadet-*\SKILL.md"
+Write-Host "    .agents\skills\cadet-agent\SKILL.md (Deep Code / cross-client skills root)"
+Write-Host "    .agents\skills\cadet-agent-reviewer\SKILL.md"
+Write-Host "    .agents\skills\cadet-*\SKILL.md"
+Write-Host "    AGENTS.md (only if not already present)"
 if ($outputZip -ne $preferredZip) {
     Write-Host ""
     Write-Host "Note: The primary output zip was in use, so a fallback filename was used for this package."

@@ -1,5 +1,6 @@
-import { readFileSync, unlinkSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, unlinkSync, existsSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { createInterface } from 'node:readline';
 import { runUpgrades } from './upgrades.mjs';
 import {
   extractArchive, readArchiveEntry, findEocd,
@@ -61,10 +62,99 @@ const ARCHIVE_LIMITS = DEFAULT_ARCHIVE_LIMITS;
 
 export { ArchiveError, findEocd };
 
-/** Extract every file entry into targetDir, returning the written paths. */
-export async function extractZip(buf, targetDir) {
-  const { extracted } = extractArchive(buf, targetDir, { limits: ARCHIVE_LIMITS });
-  return extracted;
+// ── Create-only paths (never overwrite an existing consumer file) ─────────────
+//
+// Some packaged files are advisory conveniences that a consumer repository may
+// already own (currently root `AGENTS.md`). These are listed in the manifest as
+// `createOnlyPaths`: written when absent, and never overwritten when present.
+// The canonical copy always remains available at the repository URL below.
+
+const REPO_URL = 'https://github.com/naishtech/cadet-agent';
+
+/** Tag-pinned URL for a create-only file, so the link cannot drift. */
+export function createOnlyUrl(relPath, version) {
+  const tag = version && version !== 'unknown' ? `v${normalizeVersion(version)}` : 'main';
+  return `${REPO_URL}/blob/${tag}/${relPath}`;
+}
+
+function normalizeRel(p) {
+  return p.replace(/^\.?\//, '').replace(/\\/g, '/');
+}
+
+/** Does an absolute-or-relative entry match a create-only path (exact file)? */
+function matchesCreateOnly(entryName, createOnlyPaths) {
+  const n = normalizeRel(entryName);
+  return (createOnlyPaths || []).some((c) => normalizeRel(c) === n);
+}
+
+/**
+ * Decide how to handle a create-only path that already exists on disk.
+ * Returns 'keep' | 'overwrite' | 'merge'.
+ *
+ * Non-interactive (no TTY, --yes, or an explicit policy) always resolves to the
+ * safe 'keep' — a scripted/CI install must never clobber a consumer file.
+ */
+async function resolveExistingCreateOnly({ relPath, mode, interactive }) {
+  if (mode) return mode; // explicit --agents-md=keep|overwrite|merge
+  if (!interactive) return 'keep';
+
+  const answer = await promptLine(
+    `\n⚠️  ${relPath} already exists in this repository.\n` +
+    `   [k] Keep mine (leave it untouched)   [o] Overwrite with Cadet's   [m] Merge Cadet's block\n` +
+    `   Keep yours? (K/o/m): `
+  );
+  const a = (answer || '').trim().toLowerCase();
+  if (a === 'o' || a === 'overwrite') return 'overwrite';
+  if (a === 'm' || a === 'merge') return 'merge';
+  return 'keep';
+}
+
+/** Read one line from stdin. Resolves to '' if stdin ends without an answer. */
+function promptLine(question) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (value) => { if (!settled) { settled = true; resolve(value); } };
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    rl.question(question, (answer) => {
+      done(answer);
+      rl.close();
+    });
+    // Only fall back to '' if the stream closes with no answer (EOF/piped input).
+    rl.on('close', () => done(''));
+  });
+}
+
+/** True when we may prompt: an interactive TTY and not disabled by --yes. */
+export function canPrompt(opts = {}) {
+  if (opts.yes === true) return false;
+  if (opts.interactive === false) return false;
+  return Boolean(process.stdin.isTTY && process.stdout.isTTY);
+}
+
+// Marker block used by the 'merge' resolution. Content between the markers is
+// Cadet-owned and replaced on each sync; everything outside is the consumer's.
+export const AGENTS_MARKER_BEGIN = '<!-- cadet-agent:begin -->';
+export const AGENTS_MARKER_END = '<!-- cadet-agent:end -->';
+
+/** Wrap a body in the Cadet marker block. */
+export function wrapWithMarkers(body) {
+  return `${AGENTS_MARKER_BEGIN}\n${body.trim()}\n${AGENTS_MARKER_END}`;
+}
+
+/**
+ * Merge Cadet's marked block into an existing file's text:
+ * replace the block if present, otherwise append it. Content outside the
+ * markers is preserved verbatim.
+ */
+export function mergeMarkerBlock(existing, cadetBody) {
+  const block = wrapWithMarkers(cadetBody);
+  const begin = existing.indexOf(AGENTS_MARKER_BEGIN);
+  const end = existing.indexOf(AGENTS_MARKER_END);
+  if (begin !== -1 && end !== -1 && end > begin) {
+    return existing.slice(0, begin) + block + existing.slice(end + AGENTS_MARKER_END.length);
+  }
+  const sep = existing.endsWith('\n') ? '\n' : '\n\n';
+  return `${existing}${sep}${block}\n`;
 }
 
 // ── GitHub release download ─────────────────────────────────────────────────
@@ -174,9 +264,16 @@ export async function install(targetDir, opts = {}) {
   const zipBuf = await downloadZip(asset.browser_download_url);
   console.log(`   Downloaded ${(zipBuf.length / 1024).toFixed(0)} KB\n`);
 
-  // 4. Extract
+  // 4. Extract. Create-only paths (e.g. AGENTS.md) must never overwrite an
+  // existing consumer file; if one is skipped, point the user at the source.
   console.log('📂 Extracting...');
-  const extracted = await extractZip(zipBuf, targetDir);
+  const createOnly = readCreateOnlyPathsFromZip(zipBuf);
+  const extracted = await extractZip(zipBuf, targetDir, {
+    ...opts,
+    createOnlyPaths: createOnly,
+    interactive: canPrompt(opts),
+  });
+  reportCreateOnlySkips(createOnly, targetDir, releaseVersion, opts);
 
   // 5. Report
   console.log(`\n✅ Cadet-Agent v${releaseVersion} installed! Extracted ${extracted.length} files.\n`);
@@ -205,6 +302,12 @@ export async function install(targetDir, opts = {}) {
   console.log('      /cadet-breakdown, /cadet-tdd, /cadet-debug, /cadet-review, /cadet-resume');
   console.log('    Reviewer: /cadet-agent-reviewer');
   console.log('    Git guard: manual — see .claude\\skills\\cadet-agent\\SKILL.md for instructions');
+  console.log('  Deep Code:');
+  console.log('    Already active — .agents\\skills\\cadet-agent\\SKILL.md is discovered as a project skill');
+  console.log('    List skills with /skills, then pick a cadet-* skill from the / menu');
+  console.log('    Reviewer: the cadet-agent-reviewer skill');
+  console.log('    Git guard: no hook — approve via .deepcode\\settings.json permissions.ask (mutate-git-log)');
+  console.log('    Docs: https://deepcode.vegamo.cn/');
   console.log('');
 }
 
@@ -282,11 +385,90 @@ function deleteObsoleteManagedFiles(targetDir, managedPaths, zipFilenames) {
   return deleted;
 }
 
-export async function extractZipWithManifest(buf, targetDir, { preserved, managed, limits = ARCHIVE_LIMITS }) {
+/**
+ * Resolve create-only paths against the target directory before extraction.
+ * Returns:
+ *   - skip:    set of normalized paths whose existing copy must be left alone
+ *   - merge:   map of normalized path -> existing text (to merge Cadet's block)
+ *   - created: normalized paths that do not yet exist (write normally)
+ *   - kept:    human-readable list of paths left untouched
+ */
+async function planCreateOnly(createOnlyPaths, targetDir, opts = {}) {
+  const skip = new Set();
+  const merge = new Map();
+  const created = [];
+  const kept = [];
+
+  for (const rel of createOnlyPaths || []) {
+    const n = normalizeRel(rel);
+    const full = join(targetDir, rel.replace(/^\.?\//, ''));
+    if (!existsSync(full)) {
+      created.push(n);
+      continue;
+    }
+    const resolution = await resolveExistingCreateOnly({
+      relPath: n,
+      mode: opts.createOnlyPolicy && opts.createOnlyPolicy[n],
+      interactive: canPrompt(opts),
+    });
+    if (resolution === 'overwrite') continue;             // fall through and write
+    if (resolution === 'merge') {
+      // Remember the consumer's current text; the Cadet body is read from the
+      // archive after extraction (never written over the consumer's file).
+      merge.set(n, readFileSync(full, 'utf-8'));
+      skip.add(n);
+    } else {
+      skip.add(n);
+    }
+    kept.push(n);
+  }
+  return { skip, merge, created, kept };
+}
+
+/** Extract every file entry into targetDir, returning the written paths. */
+export async function extractZip(buf, targetDir, opts = {}) {
+  const createOnlyPaths = opts.createOnlyPaths || [];
+  const plan = await planCreateOnly(createOnlyPaths, targetDir, opts);
+
+  const { extracted } = extractArchive(buf, targetDir, {
+    limits: ARCHIVE_LIMITS,
+    filter: (entry) => {
+      if (plan.skip.has(normalizeRel(entry.filename))) return { skip: true };
+      return true;
+    },
+  });
+
+  applyMerges(plan, targetDir, buf);
+  return extracted;
+}
+
+/**
+ * Merge Cadet's marker block into the existing file for every planned merge.
+ * Cadet's body is read from the archive (its entry was skipped, so the
+ * consumer's file on disk was never touched). Content outside the markers is
+ * preserved.
+ */
+function applyMerges(plan, targetDir, buf) {
+  for (const [rel, existingText] of plan.merge) {
+    const full = join(targetDir, rel);
+    const data = readArchiveEntry(buf, rel, ARCHIVE_LIMITS);
+    if (!data) continue; // archive lacks the file — leave the consumer's text alone
+    const cadetBody = data.toString('utf-8');
+    writeFileSync(full, mergeMarkerBlock(existingText, cadetBody), 'utf-8');
+    plan.merged = plan.merged || [];
+    plan.merged.push(full);
+  }
+}
+
+export async function extractZipWithManifest(buf, targetDir, { preserved, managed, createOnly = [], limits = ARCHIVE_LIMITS, ...opts }) {
   const updated = [];
   const preserved_list = [];
   const added = [];
+  const kept = [];
   const zipFilenames = [];
+
+  const plan = await planCreateOnly(createOnly, targetDir, opts);
+  kept.push(...plan.kept);
 
   const { extracted } = extractArchive(buf, targetDir, {
     limits,
@@ -296,9 +478,14 @@ export async function extractZipWithManifest(buf, targetDir, { preserved, manage
         preserved_list.push(entry.filename);
         return { skip: true };
       }
+      if (plan.skip.has(normalizeRel(entry.filename))) {
+        return { skip: true };
+      }
       return true;
     },
   });
+
+  applyMerges(plan, targetDir, buf);
 
   // `extractArchive` skips directory entries; classify the extracted files.
   for (const outPath of extracted) {
@@ -313,7 +500,7 @@ export async function extractZipWithManifest(buf, targetDir, { preserved, manage
   // Delete obsolete managed files no longer in the zip (renamed/removed managed paths)
   const deleted = deleteObsoleteManagedFiles(targetDir, managed, zipFilenames);
 
-  return { updated, preserved: preserved_list, added, deleted, zipFilenames };
+  return { updated, preserved: preserved_list, added, deleted, kept, zipFilenames };
 }
 
 // ── Removed-managed-path cleanup ─────────────────────────────────────────────
@@ -328,6 +515,37 @@ export function findManagedPathsInZip(buf) {
     // Not a valid zip or manifest not found
   }
   return [];
+}
+
+/** Read `createOnlyPaths` from the manifest inside the zip. */
+export function readCreateOnlyPathsFromZip(buf) {
+  try {
+    const data = readArchiveEntry(buf, '.cadet/agent/core/FrameworkManifest.json', ARCHIVE_LIMITS);
+    if (!data) return [];
+    const manifest = JSON.parse(data.toString('utf-8'));
+    return manifest.createOnlyPaths || [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Print a note for each create-only path that was left untouched, including a
+ * tag-pinned URL so the user can copy the canonical version if they want it.
+ */
+export function reportCreateOnlySkips(createOnlyPaths, targetDir, version, opts = {}) {
+  const skipped = (createOnlyPaths || []).filter((rel) => {
+    const full = join(targetDir, rel.replace(/^\.?\//, ''));
+    return existsSync(full);
+  });
+  for (const rel of skipped) {
+    const n = normalizeRel(rel);
+    const resolution = opts.createOnlyPolicy && opts.createOnlyPolicy[n];
+    if (resolution === 'overwrite') continue; // the user chose to replace it
+    console.log(`   Kept:     ${n} (existing file left untouched)`);
+    console.log(`             Cadet's version: ${createOnlyUrl(n, version)}`);
+  }
+  return skipped;
 }
 
 export function deleteRemovedManagedPaths(targetDir, oldManaged, newManaged) {
@@ -388,11 +606,16 @@ export async function sync(targetDir, opts = {}) {
   const zipBuf = await downloadZip(asset.browser_download_url);
   console.log(`   Downloaded ${(zipBuf.length / 1024).toFixed(0)} KB\n`);
 
-  // 4. Extract with manifest awareness
+  // 4. Extract with manifest awareness. Create-only paths (e.g. AGENTS.md) are
+  // never overwritten when the consumer already has them.
   console.log('📂 Extracting (preserving local policies and plans)...');
+  const createOnly = readCreateOnlyPathsFromZip(zipBuf);
   const result = await extractZipWithManifest(zipBuf, targetDir, {
     preserved: existingManifest.preservedPaths || [],
     managed: existingManifest.managedPaths || [],
+    createOnly,
+    ...opts,
+    interactive: canPrompt(opts),
   });
 
   // 4b. Find new managed paths from the zip and delete any old paths that were removed
@@ -425,6 +648,7 @@ export async function sync(targetDir, opts = {}) {
   if (result.deleted.length > 0) {
     console.log(`   Removed:  ${result.deleted.length} files (no longer managed)`);
   }
+  reportCreateOnlySkips(createOnly, targetDir, newVersion, opts);
   console.log('');
 
   // Print per-IDE next steps

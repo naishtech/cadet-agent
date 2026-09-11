@@ -8,7 +8,8 @@
     "github-copilot",
     "cursor",
     "continue",
-    "claude-code"
+    "claude-code",
+    "deepcode"
   ],
   "managedPaths": [
     ".github/agents/cadet.agent.md",
@@ -41,12 +42,24 @@
     ".claude/skills/cadet-review",
     ".claude/skills/cadet-resume",
     ".claude/skills/cadet-mcp-setup",
+    ".agents/skills/cadet-agent",
+    ".agents/skills/cadet-agent-reviewer",
+    ".agents/skills/cadet-requirements",
+    ".agents/skills/cadet-architecture",
+    ".agents/skills/cadet-spike",
+    ".agents/skills/cadet-breakdown",
+    ".agents/skills/cadet-tdd",
+    ".agents/skills/cadet-debug",
+    ".agents/skills/cadet-review",
+    ".agents/skills/cadet-resume",
+    ".agents/skills/cadet-mcp-setup",
     ".cadet/agent/core",
     ".cadet/agent/core/templates",
     ".cadet/agent/core/skills",
     ".cadet/agent/core/state.schema.json",
     ".cadet/agent/core/Harness.md",
-    ".cadet/agent/core/harness.schema.json"
+    ".cadet/agent/core/harness.schema.json",
+    "AGENTS.md"
   ],
   "preservedPaths": [
     ".cadet/agent/policies",
@@ -54,6 +67,9 @@
     ".cadet/state.json",
     ".cadet/harness.json",
     ".cadet/runs"
+  ],
+  "createOnlyPaths": [
+    "AGENTS.md"
   ],
   "notes": [
     "Use this manifest to decide which packaged files Cadet may update during bootstrap sync.",

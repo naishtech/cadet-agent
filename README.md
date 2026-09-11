@@ -2,7 +2,7 @@
 
 Cadet-Agent is an **opinionated** cross-IDE agent framework for game-development workflows. It is built on foundational software engineering practices and real-world game-development experience, with the goal of **guiding you through the entire development process** — from requirements and technical design through TDD, implementation, and review.
 
-Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished game from a single prompt. Instead, it walks you through each phase methodically: calibrating the learner model, scoping work into epics and stories, planning architecture, writing tests first, and iterating on feedback. The shared framework core integrates with GitHub Copilot, Cursor, Continue, and Claude Code.
+Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished game from a single prompt. Instead, it walks you through each phase methodically: calibrating the learner model, scoping work into epics and stories, planning architecture, writing tests first, and iterating on feedback. The shared framework core integrates with GitHub Copilot, Cursor, Continue, Claude Code, and Deep Code.
 
 ## Repository Layout
 - `.cadet/agent/core/` contains the shared Cadet-Agent framework documents.
@@ -20,31 +20,32 @@ Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished g
 - `.cursor/` contains Cursor-specific authored files.
 - `.continue/` contains Continue-specific authored files.
 - `.claude/` contains Claude Code-specific authored files.
+- `.agents/skills/` contains Deep Code (and cross-client) skill adapters.
 - These IDE folders hold thin integration shims; the core framework logic still lives in `.cadet/agent/core/`.
 - `package-agent.ps1` builds the distributable `cadet-agent.zip` package.
 - `publish-npm.ps1` publishes the CLI to npm using a token from `~/.npm_token`.
 
 ## Cross-IDE Support
 
-Cadet-Agent provides full workflow parity across four IDEs. The same 9 skills + reviewer are available in each:
+Cadet-Agent provides full workflow parity across five IDEs. The same 9 skills + reviewer are available in each:
 
-| Feature | GitHub Copilot | Cursor | Continue | Claude Code |
-|---|---|---|---|---|
-| Auto-load rules | Agent definition | `alwaysApply` rule | Project rule | Project skill |
-| Skill dispatch | `/cadet-<skill>` prompts | Natural language | `/cadet-<skill>` commands | `/cadet-<skill>` skills |
-| Requirements | ✅ | ✅ | ✅ | ✅ |
-| Architecture | ✅ | ✅ | ✅ | ✅ |
-| Spike | ✅ | ✅ | ✅ | ✅ |
-| Story Breakdown | ✅ | ✅ | ✅ | ✅ |
-| TDD | ✅ | ✅ | ✅ | ✅ |
-| Debugging | ✅ | ✅ | ✅ | ✅ |
-| Code Review | ✅ | ✅ | ✅ | ✅ |
-| Resume | ✅ | ✅ | ✅ | ✅ |
-| MCP Setup | ✅ | ✅ | ✅ | ✅ |
-| Reviewer mode | Agent picker | Rule toggle | `/cadet-agent-reviewer` | `/cadet-agent-reviewer` |
-| Git guard | PreToolUse hook | Manual | Manual | Manual |
+| Feature | GitHub Copilot | Cursor | Continue | Claude Code | Deep Code |
+|---|---|---|---|---|---|
+| Auto-load rules | Agent definition | `alwaysApply` rule | Project rule | Project skill | Project skill (`.agents/skills/`) |
+| Skill dispatch | `/cadet-<skill>` prompts | Natural language | `/cadet-<skill>` commands | `/cadet-<skill>` skills | `/skills` menu (`/`) |
+| Requirements | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Architecture | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Spike | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Story Breakdown | ✅ | ✅ | ✅ | ✅ | ✅ |
+| TDD | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Debugging | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Code Review | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Resume | ✅ | ✅ | ✅ | ✅ | ✅ |
+| MCP Setup | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Reviewer mode | Agent picker | Rule toggle | `/cadet-agent-reviewer` | `/cadet-agent-reviewer` | `cadet-agent-reviewer` skill |
+| Git guard | PreToolUse hook | Manual | Manual | Manual | `permissions.ask` (`mutate-git-log`) |
 
-All adapters delegate to the canonical files under `.cadet/agent/core/` — no duplicated rules or skills. See `ADAPTERS.md` for the full inventory.
+All adapters delegate to the canonical files under `.cadet/agent/core/` — no duplicated rules or skills. See `ADAPTERS.md` for the full inventory and `docs/guidance/DeepCode.md` for Deep Code setup.
 
 ## Quick Install
 
@@ -70,6 +71,20 @@ To sync a specific directory:
 
 ```bash
 npx cadet-agent@latest sync --target ./my-unity-project
+```
+
+#### AGENTS.md is create-only
+
+Cadet ships a repository-root `AGENTS.md` (a thin pointer to `.cadet/agent/core/cadet-agent.md`). If your repo already has one, Cadet **never overwrites it**:
+
+- In a terminal, `init`/`sync` ask whether to keep, overwrite, or merge (default: keep).
+- Non-interactive installs (CI, `--yes`, piped output) always **keep** and print a tag-pinned link to Cadet's copy.
+- Control it explicitly with `--agents-md keep|overwrite|merge`.
+- `merge` inserts Cadet's text between `<!-- cadet-agent:begin -->` / `<!-- cadet-agent:end -->` markers and leaves the rest of your file untouched.
+
+```bash
+npx cadet-agent@latest sync --agents-md keep       # never touch an existing AGENTS.md
+npx cadet-agent@latest sync --yes                  # non-interactive; keeps existing files
 ```
 
 ## Manual Install (fallback)
@@ -226,6 +241,26 @@ Create a requirements outline for a single-player time-trial mode with ghost rep
 ```
 
 The Continue rule in `.continue/rules/cadet-agent.md` should steer the response back through the shared Cadet framework.
+
+### Deep Code request
+With [Deep Code](https://deepcode.vegamo.cn/) installed (`npm install -g @vegamo/deepcode-cli`), run `deepcode` in the repository and use `/skills` to confirm the `cadet-*` skills are discovered from `.agents/skills/`. Then pick a phase skill from the `/` menu (there is no `/cadet-<skill>` command — select it by name, or ask for the phase in plain language):
+
+```text
+Run the TDD skill for the ghost-replay story.
+```
+
+Because Deep Code has no PreToolUse hook, enforce the commit/push approval gate in `.deepcode/settings.json`:
+
+```json
+{
+  "permissions": {
+    "ask": ["mutate-git-log", "network"],
+    "defaultMode": "askAll"
+  }
+}
+```
+
+See `docs/guidance/DeepCode.md` for the full setup, MCP wiring, and configuration reference.
 
 ### Repository policy example
 If a specific game repository needs local conventions, add a policy file under `.cadet/agent/policies` using `.cadet/agent/core/Templates/PolicyTemplate.md`. For example, a repository policy could define:

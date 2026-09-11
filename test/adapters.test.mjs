@@ -78,6 +78,23 @@ const ideAdapters = {
     },
     extraSkills: ['cadet-resume/SKILL.md'],
   },
+  deepcode: {
+    baseDir: join(repoRoot, '.agents'),
+    skillsDir: join(repoRoot, '.agents', 'skills'),
+    skillFile: '.agents/skills/cadet-agent/SKILL.md',
+    reviewerFile: '.agents/skills/cadet-agent-reviewer/SKILL.md',
+    skillToFile: {
+      'Requirements.md': 'cadet-requirements/SKILL.md',
+      'Architecture.md': 'cadet-architecture/SKILL.md',
+      'Spike.md': 'cadet-spike/SKILL.md',
+      'StoryBreakdown.md': 'cadet-breakdown/SKILL.md',
+      'TDD.md': 'cadet-tdd/SKILL.md',
+      'Debugging.md': 'cadet-debug/SKILL.md',
+      'CodeReview.md': 'cadet-review/SKILL.md',
+      'MCPSetup.md': 'cadet-mcp-setup/SKILL.md',
+    },
+    extraSkills: ['cadet-resume/SKILL.md'],
+  },
 };
 
 // ── Helper ──────────────────────────────────────────────────────────────────
@@ -408,6 +425,111 @@ describe('Adapter inventory', () => {
     });
   });
 
+  // ── Deep Code adapters ─────────────────────────────────────────────────
+
+  describe('Deep Code', () => {
+    const deepcode = ideAdapters['deepcode'];
+
+    it('has base skill file', () => {
+      assert.ok(fileExists(deepcode.skillFile), 'missing cadet-agent.md skill');
+    });
+
+    it('base skill references cadet-agent.md', () => {
+      const content = readFile(deepcode.skillFile);
+      assert.ok(
+        content.includes('.cadet/agent/core/cadet-agent.md'),
+        'Deep Code base skill must reference cadet-agent.md'
+      );
+    });
+
+    it('base skill references state.json', () => {
+      const content = readFile(deepcode.skillFile);
+      assert.ok(
+        content.includes('.cadet/state.json') || content.includes('state.json'),
+        'Deep Code base skill must reference state.json'
+      );
+    });
+
+    it('base skill has YAML frontmatter with name', () => {
+      const content = readFile(deepcode.skillFile);
+      assert.ok(content.startsWith('---'), 'Deep Code base skill must start with YAML frontmatter');
+      assert.ok(content.includes('name:'), 'Deep Code base skill frontmatter must include name');
+    });
+
+    it('base skill documents the permissions-based Git Guard (no hook)', () => {
+      const content = readFile(deepcode.skillFile);
+      assert.ok(
+        content.includes('permissions'),
+        'Deep Code base skill must direct users to permissions for Git Guard'
+      );
+      assert.ok(
+        content.includes('mutate-git-log'),
+        'Deep Code base skill must name the mutate-git-log scope'
+      );
+    });
+
+    for (const [skill, skillFile] of Object.entries(deepcode.skillToFile)) {
+      const fullPath = join(deepcode.skillsDir, skillFile);
+
+      it(`has per-phase skill for ${skill}`, () => {
+        assert.ok(fileExists(fullPath), `missing Deep Code skill: ${fullPath}`);
+      });
+
+      it(`skill ${skillFile} references its canonical source`, () => {
+        const content = readFile(fullPath);
+        assert.ok(
+          content.includes(`.cadet/agent/core/skills/${skill}`),
+          `${skillFile} must reference .cadet/agent/core/skills/${skill}`
+        );
+      });
+
+      it(`skill ${skillFile} has YAML frontmatter with name`, () => {
+        const content = readFile(fullPath);
+        assert.ok(content.startsWith('---'), `${skillFile} must start with YAML frontmatter`);
+        assert.ok(content.includes('name:'), `${skillFile} frontmatter must include name`);
+        assert.ok(content.includes('description:'), `${skillFile} frontmatter must include description`);
+      });
+    }
+
+    for (const extra of deepcode.extraSkills) {
+      it(`has extra skill ${extra}`, () => {
+        const path = join(deepcode.skillsDir, extra);
+        assert.ok(fileExists(path), `missing extra Deep Code skill: ${path}`);
+      });
+    }
+
+    it('has reviewer skill', () => {
+      assert.ok(fileExists(deepcode.reviewerFile), 'missing cadet-agent-reviewer.md skill');
+    });
+
+    it('reviewer references cadet-agent.md', () => {
+      const content = readFile(deepcode.reviewerFile);
+      assert.ok(
+        content.includes('.cadet/agent/core/cadet-agent.md'),
+        'Deep Code reviewer must reference cadet-agent.md'
+      );
+    });
+
+    it('skill frontmatter names are lowercase kebab-case and match folder names', () => {
+      const entries = [
+        deepcode.skillFile,
+        deepcode.reviewerFile,
+        ...Object.values(deepcode.skillToFile).map((f) => `.agents/skills/${f}`),
+        ...deepcode.extraSkills.map((f) => `.agents/skills/${f}`),
+      ];
+      for (const rel of entries) {
+        const content = readFile(rel);
+        const nameMatch = content.match(/^name:\s*(\S+)\s*$/m);
+        assert.ok(nameMatch, `${rel} must declare a name in frontmatter`);
+        const name = nameMatch[1];
+        assert.match(name, /^[a-z0-9]+(-[a-z0-9]+)*$/, `${rel} name "${name}" must be lowercase kebab-case`);
+        assert.ok(name.length <= 64, `${rel} name must be <= 64 chars`);
+        const folder = rel.split('/').slice(-2)[0];
+        assert.equal(name, folder, `${rel} frontmatter name must match its folder name`);
+      }
+    });
+  });
+
   // ── DRY guard: adapters must not duplicate canonical content ───────────
 
   describe('Adapters do not duplicate canonical content', () => {
@@ -420,6 +542,10 @@ describe('Adapter inventory', () => {
       '.claude/skills/cadet-agent-reviewer/SKILL.md',
       ...Object.values(ideAdapters['claude-code'].skillToFile).map((f) => `.claude/skills/${f}`),
       ...ideAdapters['claude-code'].extraSkills.map((f) => `.claude/skills/${f}`),
+      '.agents/skills/cadet-agent/SKILL.md',
+      '.agents/skills/cadet-agent-reviewer/SKILL.md',
+      ...Object.values(ideAdapters['deepcode'].skillToFile).map((f) => `.agents/skills/${f}`),
+      ...ideAdapters['deepcode'].extraSkills.map((f) => `.agents/skills/${f}`),
       '.continue/rules/cadet-agent.md',
       '.continue/rules/cadet-agent-reviewer.md',
       '.continue/config.yaml',
@@ -471,10 +597,14 @@ describe('Adapter inventory', () => {
     const allAdapters = [
       ...Object.values(ideAdapters['claude-code'].skillToFile).map((f) => `.claude/skills/${f}`),
       ...ideAdapters['claude-code'].extraSkills.map((f) => `.claude/skills/${f}`),
-      ...Object.values(ideAdapters['github-copilot'].skillToPrompt).map((p) => `.github/prompts/${p}`),
-      ...ideAdapters['github-copilot'].extraPrompts.map((p) => `.github/prompts/${p}`),
       '.claude/skills/cadet-agent/SKILL.md',
       '.claude/skills/cadet-agent-reviewer/SKILL.md',
+      ...Object.values(ideAdapters['deepcode'].skillToFile).map((f) => `.agents/skills/${f}`),
+      ...ideAdapters['deepcode'].extraSkills.map((f) => `.agents/skills/${f}`),
+      '.agents/skills/cadet-agent/SKILL.md',
+      '.agents/skills/cadet-agent-reviewer/SKILL.md',
+      ...Object.values(ideAdapters['github-copilot'].skillToPrompt).map((p) => `.github/prompts/${p}`),
+      ...ideAdapters['github-copilot'].extraPrompts.map((p) => `.github/prompts/${p}`),
       '.cursor/rules/cadet-agent.md',
       '.cursor/rules/cadet-agent-reviewer.md',
       '.continue/rules/cadet-agent.md',
@@ -550,6 +680,7 @@ describe('Adapter inventory', () => {
   describe('Shape A: base adapters do not re-state canonical blocks', () => {
     const baseAdapters = [
       '.claude/skills/cadet-agent/SKILL.md',
+      '.agents/skills/cadet-agent/SKILL.md',
       '.cursor/rules/cadet-agent.md',
       '.continue/rules/cadet-agent.md',
       '.github/agents/cadet.agent.md',
@@ -611,6 +742,7 @@ describe('Adapter inventory', () => {
   describe('Adapter size budgets', () => {
     const baseAdapters = {
       '.claude/skills/cadet-agent/SKILL.md': { max: 1400, label: 'Claude base skill' },
+      '.agents/skills/cadet-agent/SKILL.md': { max: 1400, label: 'Deep Code base skill' },
       '.cursor/rules/cadet-agent.md': { max: 1400, label: 'Cursor rule' },
       '.continue/rules/cadet-agent.md': { max: 1600, label: 'Continue rule' },
       '.github/agents/cadet.agent.md': { max: 2000, label: 'Copilot agent' },
@@ -629,6 +761,7 @@ describe('Adapter inventory', () => {
     it('per-phase adapters stay under 700 bytes', () => {
       const perPhase = [
         ...Object.values(ideAdapters['claude-code'].skillToFile).map((f) => `.claude/skills/${f}`),
+        ...Object.values(ideAdapters['deepcode'].skillToFile).map((f) => `.agents/skills/${f}`),
       ];
       for (const rel of perPhase) {
         const size = Buffer.byteLength(readFile(rel), 'utf-8');
@@ -694,6 +827,10 @@ describe('Adapter inventory', () => {
       '.claude/skills/cadet-agent-reviewer/SKILL.md',
       ...Object.values(ideAdapters['claude-code'].skillToFile).map((f) => `.claude/skills/${f}`),
       ...ideAdapters['claude-code'].extraSkills.map((f) => `.claude/skills/${f}`),
+      '.agents/skills/cadet-agent/SKILL.md',
+      '.agents/skills/cadet-agent-reviewer/SKILL.md',
+      ...Object.values(ideAdapters['deepcode'].skillToFile).map((f) => `.agents/skills/${f}`),
+      ...ideAdapters['deepcode'].extraSkills.map((f) => `.agents/skills/${f}`),
       ...Object.values(ideAdapters['github-copilot'].skillToPrompt).map((p) => `.github/prompts/${p}`),
       ...ideAdapters['github-copilot'].extraPrompts.map((p) => `.github/prompts/${p}`),
       '.github/agents/cadet.agent.md',
@@ -789,6 +926,18 @@ describe('Adapter inventory', () => {
       '.claude/skills/cadet-review',
       '.claude/skills/cadet-resume',
       '.claude/skills/cadet-mcp-setup',
+      // Deep Code (cross-client skills root)
+      '.agents/skills/cadet-agent',
+      '.agents/skills/cadet-agent-reviewer',
+      '.agents/skills/cadet-requirements',
+      '.agents/skills/cadet-architecture',
+      '.agents/skills/cadet-spike',
+      '.agents/skills/cadet-breakdown',
+      '.agents/skills/cadet-tdd',
+      '.agents/skills/cadet-debug',
+      '.agents/skills/cadet-review',
+      '.agents/skills/cadet-resume',
+      '.agents/skills/cadet-mcp-setup',
       // Core
       '.cadet/agent/core',
       '.cadet/agent/core/templates',
@@ -810,6 +959,46 @@ describe('Adapter inventory', () => {
       assert.ok(preserved.includes('.cadet/agent/policies'), 'policies must be preserved');
       assert.ok(preserved.includes('.cadet/agent/project-plans'), 'project-plans must be preserved');
       assert.ok(preserved.includes('.cadet/state.json'), 'state.json must be preserved');
+    });
+
+    // Mechanical drift guard: every adapter directory that exists on disk must be
+    // listed in managedPaths, and every managed adapter path must exist. This is
+    // stronger than the hand-maintained `allExpected` list above — it catches a
+    // new adapter that was added to the tree but forgotten in the manifest (which
+    // would silently drop it from the shipped package).
+    for (const skillsRoot of ['.claude/skills', '.agents/skills']) {
+      const abs = join(repoRoot, skillsRoot.replace(/\//g, '/'));
+      const dirs = readdirSync(abs, { withFileTypes: true })
+        .filter((e) => e.isDirectory())
+        .map((e) => `${skillsRoot}/${e.name}`);
+
+      it(`every directory under ${skillsRoot} is in managedPaths`, () => {
+        const missing = dirs.filter((d) => !managed.includes(d));
+        assert.deepEqual(missing, [], `FrameworkManifest.json missing managed paths: ${missing.join(', ')}`);
+      });
+
+      it(`every managed path under ${skillsRoot} exists on disk`, () => {
+        const declared = managed.filter((m) => m.startsWith(`${skillsRoot}/`));
+        const absent = declared.filter((m) => !existsSync(resolvePath(m)));
+        assert.deepEqual(absent, [], `managed paths missing from the source tree: ${absent.join(', ')}`);
+      });
+    }
+
+    it('ships AGENTS.md but marks it create-only (never overwrites a consumer copy)', () => {
+      assert.ok(
+        managed.includes('AGENTS.md'),
+        'AGENTS.md must be managed so fresh installs create it'
+      );
+      const createOnly = (manifest.createOnlyPaths || []).map((p) => p.replace(/\\/g, '/'));
+      assert.ok(
+        createOnly.includes('AGENTS.md'),
+        'AGENTS.md must be listed in createOnlyPaths: install/sync must never overwrite a consumer copy'
+      );
+      // Every create-only path must also be managed, otherwise the package would
+      // not contain the file to create.
+      for (const p of createOnly) {
+        assert.ok(managed.includes(p), `createOnly path "${p}" must also be in managedPaths`);
+      }
     });
   });
 
@@ -873,6 +1062,10 @@ describe('Adapter inventory', () => {
 
     it('Claude Code base skill does not duplicate skill content', () => {
       checkNoDuplication('.claude/skills/cadet-agent/SKILL.md', 'Claude base skill');
+    });
+
+    it('Deep Code base skill does not duplicate skill content', () => {
+      checkNoDuplication('.agents/skills/cadet-agent/SKILL.md', 'Deep Code base skill');
     });
   });
 });

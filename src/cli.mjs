@@ -51,6 +51,8 @@ function showHelp() {
     --gate         Gate name (harness verify)
     --command      Command override (harness verify)
     --files        Comma-separated relevant files to bind evidence to (harness verify)
+    --agents-md    keep|overwrite|merge for an existing AGENTS.md (init/sync)
+    --yes, -y      Never prompt; keep existing files (non-interactive installs)
     --help, -h    Show this help
     --version, -v Show version number
 `);
@@ -77,6 +79,8 @@ function parseArgs(argv) {
       case '--evidence-status': opts.evidenceStatus = argv[++i]; break;
       case '--files': opts.files = (argv[++i] || '').split(',').map((s) => s.trim()).filter(Boolean); break;
       case '--older-than-ms': opts.olderThanMs = Number(argv[++i]); break;
+      case '--agents-md': opts.agentsMd = argv[++i]; break;
+      case '--yes': case '-y': opts.yes = true; break;
       default: opts.rest.push(a);
     }
   }
@@ -381,13 +385,25 @@ export async function run(argv) {
   const command = argv[2];
   const opts = parseArgs(argv);
 
+  // Validate the create-only policy flag early so a typo fails loudly.
+  const AGENTS_MD_MODES = ['keep', 'overwrite', 'merge'];
+  if (opts.agentsMd !== undefined && !AGENTS_MD_MODES.includes(opts.agentsMd)) {
+    console.error(`Invalid --agents-md value "${opts.agentsMd}" (expected: ${AGENTS_MD_MODES.join('|')})`);
+    process.exit(1);
+  }
+  const installOpts = {
+    sourceUrl: opts.sourceUrl,
+    yes: opts.yes === true,
+    createOnlyPolicy: opts.agentsMd ? { 'AGENTS.md': opts.agentsMd } : undefined,
+  };
+
   try {
     switch (command) {
       case 'init':
-        await install(opts.targetDir, { sourceUrl: opts.sourceUrl });
+        await install(opts.targetDir, installOpts);
         break;
       case 'sync':
-        await sync(opts.targetDir, { sourceUrl: opts.sourceUrl });
+        await sync(opts.targetDir, installOpts);
         break;
       case 'state':
         await cmdState(opts);

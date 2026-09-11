@@ -1,6 +1,6 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { deflateRawSync } from 'node:zlib';
@@ -9,7 +9,10 @@ import {
   extractArchive, readEntries, readArchiveEntry, assertContained, crc32,
   ArchiveError, DEFAULT_ARCHIVE_LIMITS, findEocd,
 } from '../src/harness/archive.mjs';
-import { extractZip, extractZipWithManifest, findManagedPathsInZip } from '../src/install.mjs';
+import {
+  extractZip, extractZipWithManifest, findManagedPathsInZip,
+  readCreateOnlyPathsFromZip, createOnlyUrl, mergeMarkerBlock, AGENTS_MARKER_BEGIN, AGENTS_MARKER_END,
+} from '../src/install.mjs';
 
 const SIG_LFH = 0x04034b50;
 const SIG_CD = 0x02014b50;
@@ -252,3 +255,105 @@ describe('archive — install.mjs hardening integration', () => {
     assert.deepEqual(findManagedPathsInZip(zip), []);
   });
 });
+
+// ── Create-only paths (AGENTS.md must never overwrite a consumer copy) ────────
+
+describe('create-only extraction (AGENTS.md)', () => {
+  let dir;
+  before(() => { dir = mkdtempSync(join(tmpdir(), 'cadet-createonly-')); });
+  after(() => rmSync(dir, { recursive: true, force: true }));
+
+  const cadetAgents = '# AGENTS.md\n\nCadet pointer.\n';
+  const manifest = JSON.stringify({ managedPaths: ['AGENTS.md'], createOnlyPaths: ['AGENTS.md'] });
+  function zipWithAgents() {
+    return buildZip([
+      { name: 'AGENTS.md', content: cadetAgents },
+      { name: '.cadet/agent/core/FrameworkManifest.json', content: manifest },
+    ]);
+  }
+
+  it('readCreateOnlyPathsFromZip reads the manifest field', () => {
+    assert.deepEqual(readCreateOnlyPathsFromZip(zipWithAgents()), ['AGENTS.md']);
+  });
+
+  it('creates AGENTS.md when the consumer does not have one', async () => {
+    const d = mkdtempSync(join(tmpdir(), 'cadet-co-new-'));
+    try {
+      const extracted = await extractZip(zipWithAgents(), d, { createOnlyPaths: ['AGENTS.md'], interactive: false });
+      assert.ok(existsSync(join(d, 'AGENTS.md')), 'AGENTS.md should be created');
+      assert.equal(readFileSync(join(d, 'AGENTS.md'), 'utf-8'), cadetAgents);
+      assert.ok(extracted.some((p) => p.endsWith('AGENTS.md')));
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it('never overwrites an existing AGENTS.md (non-interactive default)', async () => {
+    const d = mkdtempSync(join(tmpdir(), 'cadet-co-keep-'));
+    try {
+      const mine = '# AGENTS.md\n\nMy own instructions.\n';
+      writeFileSync(join(d, 'AGENTS.md'), mine);
+      await extractZip(zipWithAgents(), d, { createOnlyPaths: ['AGENTS.md'], interactive: false });
+      assert.equal(readFileSync(join(d, 'AGENTS.md'), 'utf-8'), mine, 'existing file must be untouched');
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it('overwrites only when the policy is explicitly "overwrite"', async () => {
+    const d = mkdtempSync(join(tmpdir(), 'cadet-co-ow-'));
+    try {
+      writeFileSync(join(d, 'AGENTS.md'), 'mine');
+      await extractZip(zipWithAgents(), d, {
+        createOnlyPaths: ['AGENTS.md'],
+        createOnlyPolicy: { 'AGENTS.md': 'overwrite' },
+        interactive: false,
+      });
+      assert.equal(readFileSync(join(d, 'AGENTS.md'), 'utf-8'), cadetAgents);
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it('merge keeps the consumer content and adds the Cadet marker block', async () => {
+    const d = mkdtempSync(join(tmpdir(), 'cadet-co-merge-'));
+    try {
+      const mine = '# AGENTS.md\n\nMy own instructions.\n';
+      writeFileSync(join(d, 'AGENTS.md'), mine);
+      await extractZip(zipWithAgents(), d, {
+        createOnlyPaths: ['AGENTS.md'],
+        createOnlyPolicy: { 'AGENTS.md': 'merge' },
+        interactive: false,
+      });
+      const merged = readFileSync(join(d, 'AGENTS.md'), 'utf-8');
+      assert.ok(merged.startsWith(mine.trimEnd()), 'consumer content must be preserved');
+      assert.ok(merged.includes(AGENTS_MARKER_BEGIN) && merged.includes(AGENTS_MARKER_END), 'Cadet block must be present');
+      assert.ok(merged.includes('Cadet pointer.'), "Cadet's body must be inside the block");
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it('extractZipWithManifest respects create-only and reports it as kept', async () => {
+    const d = mkdtempSync(join(tmpdir(), 'cadet-co-manifest-'));
+    try {
+      writeFileSync(join(d, 'AGENTS.md'), 'mine');
+      const result = await extractZipWithManifest(zipWithAgents(), d, {
+        preserved: [], managed: ['AGENTS.md'], createOnly: ['AGENTS.md'], interactive: false,
+      });
+      assert.equal(readFileSync(join(d, 'AGENTS.md'), 'utf-8'), 'mine');
+      assert.ok(result.kept.includes('AGENTS.md'), 'skipped create-only path must be reported');
+      assert.ok(!result.updated.some((p) => p.endsWith('AGENTS.md')), 'kept file must not be reported updated');
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it('createOnlyUrl is tag-pinned so the fallback link cannot drift', () => {
+    assert.equal(
+      createOnlyUrl('AGENTS.md', '0.25.0'),
+      'https://github.com/naishtech/cadet-agent/blob/v0.25.0/AGENTS.md'
+    );
+    assert.match(createOnlyUrl('AGENTS.md', 'unknown'), /\/blob\/main\/AGENTS\.md$/);
+  });
+
+  it('mergeMarkerBlock replaces an existing block rather than duplicating it', () => {
+    const existing = `# Mine\n\n${AGENTS_MARKER_BEGIN}\nOLD\n${AGENTS_MARKER_END}\n\nTail.\n`;
+    const merged = mergeMarkerBlock(existing, 'NEW');
+    assert.ok(!merged.includes('OLD'), 'old block content must be replaced');
+    assert.ok(merged.includes('NEW'));
+    assert.equal(merged.match(new RegExp(AGENTS_MARKER_BEGIN, 'g')).length, 1, 'block must not be duplicated');
+    assert.ok(merged.includes('Tail.'), 'content after the block must be preserved');
+  });
+});
+
