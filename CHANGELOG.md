@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.24.0] — 2026-09-11
+
 ### Added
 
 - **Harness modernization.** Cadet-Agent now runs under an observable, bounded, evidence-backed harness while preserving every existing phase, gate, dispatch order, and approval rule.
