@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.26.0] — 2026-09-11
+
 ### Added
 
 - **Planning Review skill.** New `PlanningReview` skill (`/cadet-planning-review`) clarifies a fuzzy, ambiguous, or contested plan before Requirements/Architecture.
