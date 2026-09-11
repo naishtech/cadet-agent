@@ -106,6 +106,7 @@ Cadet workflows are implemented as scoped skills. The global directive decides *
 
 | Skill | Invocation | When to dispatch |
 |---|---|---|
+| **Planning Review** | `/cadet-planning-review` | When a plan is fuzzy, ambiguous, or contested — before Requirements/Architecture. |
 | **Requirements** | `/cadet-requirements` | Large changes, after workflow classification. |
 | **Architecture** | `/cadet-architecture` | Large changes, after requirements are finalized. |
 | **Spike** | `/cadet-spike` | When requirements or design contain unverified assumptions. |

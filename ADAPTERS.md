@@ -32,6 +32,7 @@ The permitted prose in an adapter is *connective pointer text* ("Read X, then fo
 | GitHub Copilot | `.github/agents/cadet.agent.md` | Agent definition | `.cadet/agent/core/cadet-agent.md` |
 | GitHub Copilot | `.github/agents/cadet-agent-reviewer.agent.md` | Reviewer agent | `.cadet/agent/core/cadet-agent.md` + `.cadet/agent/core/skills/AgentReviewer.md` |
 | GitHub Copilot | `.github/prompts/cadet-requirements.prompt.md` | Slash-command prompt | `.cadet/agent/core/skills/Requirements.md` |
+| GitHub Copilot | `.github/prompts/cadet-planning-review.prompt.md` | Slash-command prompt | `.cadet/agent/core/skills/PlanningReview.md` |
 | GitHub Copilot | `.github/prompts/cadet-architecture.prompt.md` | Slash-command prompt | `.cadet/agent/core/skills/Architecture.md` |
 | GitHub Copilot | `.github/prompts/cadet-spike.prompt.md` | Slash-command prompt | `.cadet/agent/core/skills/Spike.md` |
 | GitHub Copilot | `.github/prompts/cadet-breakdown.prompt.md` | Slash-command prompt | `.cadet/agent/core/skills/StoryBreakdown.md` |
@@ -43,12 +44,15 @@ The permitted prose in an adapter is *connective pointer text* ("Read X, then fo
 | GitHub Copilot | `.github/hooks/git-guard.json` | PreToolUse hook config | n/a (infrastructure) |
 | Cursor | `.cursor/rules/cadet-agent.md` | Always-apply rule | `.cadet/agent/core/cadet-agent.md` |
 | Cursor | `.cursor/rules/cadet-agent-reviewer.md` | Reviewer rule | `.cadet/agent/core/cadet-agent.md` + `.cadet/agent/core/skills/AgentReviewer.md` |
+| Cursor | `.cursor/rules/cadet-planning-review.md` | Phase rule | `.cadet/agent/core/skills/PlanningReview.md` |
 | Continue | `.continue/rules/cadet-agent.md` | System rule | `.cadet/agent/core/cadet-agent.md` |
 | Continue | `.continue/rules/cadet-agent-reviewer.md` | Reviewer rule | `.cadet/agent/core/cadet-agent.md` + `.cadet/agent/core/skills/AgentReviewer.md` |
+| Continue | `.continue/rules/cadet-planning-review.md` | Phase rule | `.cadet/agent/core/skills/PlanningReview.md` |
 | Continue | `.continue/config.yaml` | Custom commands | `.cadet/agent/core/skills/*.md` |
 | Claude Code | `.claude/skills/cadet-agent/SKILL.md` | Base/global skill | `.cadet/agent/core/cadet-agent.md` |
 | Claude Code | `.claude/skills/cadet-agent-reviewer/SKILL.md` | Reviewer skill | `.cadet/agent/core/cadet-agent.md` + `.cadet/agent/core/skills/AgentReviewer.md` |
 | Claude Code | `.claude/skills/cadet-requirements/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Requirements.md` |
+| Claude Code | `.claude/skills/cadet-planning-review/SKILL.md` | Phase skill | `.cadet/agent/core/skills/PlanningReview.md` |
 | Claude Code | `.claude/skills/cadet-architecture/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Architecture.md` |
 | Claude Code | `.claude/skills/cadet-spike/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Spike.md` |
 | Claude Code | `.claude/skills/cadet-breakdown/SKILL.md` | Phase skill | `.cadet/agent/core/skills/StoryBreakdown.md` |
@@ -60,6 +64,7 @@ The permitted prose in an adapter is *connective pointer text* ("Read X, then fo
 | Deep Code | `.agents/skills/cadet-agent/SKILL.md` | Base/global skill | `.cadet/agent/core/cadet-agent.md` |
 | Deep Code | `.agents/skills/cadet-agent-reviewer/SKILL.md` | Reviewer skill | `.cadet/agent/core/cadet-agent.md` + `.cadet/agent/core/skills/AgentReviewer.md` |
 | Deep Code | `.agents/skills/cadet-requirements/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Requirements.md` |
+| Deep Code | `.agents/skills/cadet-planning-review/SKILL.md` | Phase skill | `.cadet/agent/core/skills/PlanningReview.md` |
 | Deep Code | `.agents/skills/cadet-architecture/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Architecture.md` |
 | Deep Code | `.agents/skills/cadet-spike/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Spike.md` |
 | Deep Code | `.agents/skills/cadet-breakdown/SKILL.md` | Phase skill | `.cadet/agent/core/skills/StoryBreakdown.md` |

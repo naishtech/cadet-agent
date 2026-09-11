@@ -10,6 +10,7 @@ Purpose: Navigation entry point for Cadet-Agent.
 
 Workflow phases are implemented as scoped skills under **[skills/](skills/)**. When a phase is dispatched, the matching skill becomes the primary instruction context:
 
+- [PlanningReview](skills/PlanningReview.md)
 - [Requirements](skills/Requirements.md)
 - [Architecture](skills/Architecture.md)
 - [Spike](skills/Spike.md)

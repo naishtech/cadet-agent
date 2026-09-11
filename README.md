@@ -9,7 +9,7 @@ Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished g
   - `cadet-agent.md` is the thin global directive: identity, non-negotiable rules, workflow routing, hard-gate protocol, and skill dispatch.
   - `Harness.md` is the canonical harness contract: budgets, evidence-backed gates, retries, context tiers, tool routing, privacy, and escalation.
   - `harness.schema.json` and `state.schema.json` are the machine-readable schemas for harness records and session state.
-  - `skills/` contains scoped workflow-phase skills (Requirements, Architecture, Spike, StoryBreakdown, TDD, Debugging, CodeReview, Resume, MCPSetup, AgentReviewer).
+  - `skills/` contains scoped workflow-phase skills (PlanningReview, Requirements, Architecture, Spike, StoryBreakdown, TDD, Debugging, CodeReview, Resume, MCPSetup, AgentReviewer).
   - `templates/` contains runtime templates for planning artifacts.
 - `.cadet/harness.json` holds repository-local budget/policy overrides (preserved by sync).
 - `.cadet/runs/` holds sanitized run ledgers (preserved by sync; no secrets or raw prompts by default).
@@ -27,12 +27,13 @@ Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished g
 
 ## Cross-IDE Support
 
-Cadet-Agent provides full workflow parity across five IDEs. The same 9 skills + reviewer are available in each:
+Cadet-Agent provides full workflow parity across five IDEs. The same 10 skills + reviewer are available in each:
 
 | Feature | GitHub Copilot | Cursor | Continue | Claude Code | Deep Code |
 |---|---|---|---|---|---|
 | Auto-load rules | Agent definition | `alwaysApply` rule | Project rule | Project skill | Project skill (`.agents/skills/`) |
 | Skill dispatch | `/cadet-<skill>` prompts | Natural language | `/cadet-<skill>` commands | `/cadet-<skill>` skills | `/skills` menu (`/`) |
+| Planning Review | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Requirements | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Architecture | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Spike | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -111,6 +112,7 @@ flowchart TD
     REPORT["Report current phase,<br/>epics, stories & gates"]
     CR["🔍 Context Resolution<br/>classify change size,<br/>calibrate learner,<br/>detect policy"]
     REQ["📋 Requirements<br/>Given/When/Then criteria<br/>assumption audit"]
+    PLANREV["🧩 Planning Review<br/>interview one question<br/>at a time · decision tree"]
     ARCH["🏗️ Architecture<br/>technical design,<br/>ADR decisions"]
     SPIKE["🧪 Spikes<br/>resolve unverified<br/>assumptions"]
     BREAKDOWN["📐 Story Breakdown<br/>epics → testable stories"]
@@ -125,7 +127,10 @@ flowchart TD
     RESUME -->|"yes"| REPORT --> CR
 
     CR -->|"large change"| REQ
+    CR -->|"plan fuzzy or contested"| PLANREV
     CR -->|"small / no_test_required"| IMPL
+
+    PLANREV -->|"shared understanding reached"| REQ
 
     REQ --> ARCH
     ARCH -->|"unverified assumptions"| SPIKE
@@ -143,6 +148,7 @@ flowchart TD
     style START fill:#4a9,stroke:#333,color:#fff
     style CLOSED fill:#4a9,stroke:#333,color:#fff
     style RESUME fill:#e8a840,stroke:#333,color:#000
+    style PLANREV fill:#8a7ae8,stroke:#333,color:#fff
     style REVIEW fill:#e87440,stroke:#333,color:#fff
     style VALIDATE fill:#e87440,stroke:#333,color:#fff
 ```
@@ -205,6 +211,11 @@ Run `npx cadet-agent@latest init` in your Unity project root, then open the repo
 Cadet Agent will classify the change, check `.cadet/state.json` for blocking gates, and invoke the appropriate skill.
 
 **Skill mode:** For a specific workflow phase, use the matching slash command so the skill becomes the primary instruction context:
+
+```text
+/cadet-planning-review
+clarify the plan for a co-op loot system before I write the design
+```
 
 ```text
 /cadet-requirements

@@ -13,6 +13,14 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Added
+
+- **Planning Review skill.** New `PlanningReview` skill (`/cadet-planning-review`) clarifies a fuzzy, ambiguous, or contested plan before Requirements/Architecture.
+  - `.cadet/agent/core/skills/PlanningReview.md` — interviews the user one question at a time and never stops until a shared understanding is reached.
+  - Core mechanism: candidate questions are mapped into a **decision tree** whose edges record answer-to-question dependencies, and the tree is **re-pruned after every answer** (reachability, implicit-answer, dominance/redundancy, then re-rank), so the fewest questions are asked. Discovery-answerable questions are resolved by the agent rather than asked of the user.
+  - Produces a Shared Understanding Document that feeds Requirements (large changes) or Architecture, with pruning evidence and a named riskiest assumption.
+  - Adapters added for all five IDEs: Copilot prompt, Cursor rule, Continue rule + `config.yaml` command, Claude Code skill, and Deep Code skill; registered in the Skill Inventory and `FrameworkManifest.json`.
+
 ## [0.25.0] — 2026-09-11
 
 ### Added

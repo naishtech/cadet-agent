@@ -24,6 +24,7 @@ const expectedSkills = [
   'CodeReview.md',
   'Resume.md',
   'MCPSetup.md',
+  'PlanningReview.md',
 ];
 
 // ── Per-IDE expected adapter files ──────────────────────────────────────────
@@ -46,13 +47,14 @@ const ideAdapters = {
       'CodeReview.md': 'cadet-review.prompt.md',
       'MCPSetup.md': 'cadet-mcp-setup.prompt.md',
     },
-    extraPrompts: ['cadet-resume.prompt.md'],
+    extraPrompts: ['cadet-resume.prompt.md', 'cadet-planning-review.prompt.md'],
   },
   cursor: {
     baseDir: join(repoRoot, '.cursor'),
     rulesDir: '.cursor/rules',
     ruleFile: '.cursor/rules/cadet-agent.md',
     reviewerFile: '.cursor/rules/cadet-agent-reviewer.md',
+    extraRules: ['.cursor/rules/cadet-planning-review.md'],
   },
   continue: {
     baseDir: join(repoRoot, '.continue'),
@@ -60,6 +62,7 @@ const ideAdapters = {
     ruleFile: '.continue/rules/cadet-agent.md',
     reviewerFile: '.continue/rules/cadet-agent-reviewer.md',
     configFile: '.continue/config.yaml',
+    extraRules: ['.continue/rules/cadet-planning-review.md'],
   },
   'claude-code': {
     baseDir: join(repoRoot, '.claude'),
@@ -75,6 +78,7 @@ const ideAdapters = {
       'Debugging.md': 'cadet-debug/SKILL.md',
       'CodeReview.md': 'cadet-review/SKILL.md',
       'MCPSetup.md': 'cadet-mcp-setup/SKILL.md',
+      'PlanningReview.md': 'cadet-planning-review/SKILL.md',
     },
     extraSkills: ['cadet-resume/SKILL.md'],
   },
@@ -92,6 +96,7 @@ const ideAdapters = {
       'Debugging.md': 'cadet-debug/SKILL.md',
       'CodeReview.md': 'cadet-review/SKILL.md',
       'MCPSetup.md': 'cadet-mcp-setup/SKILL.md',
+      'PlanningReview.md': 'cadet-planning-review/SKILL.md',
     },
     extraSkills: ['cadet-resume/SKILL.md'],
   },
@@ -333,6 +338,7 @@ describe('Adapter inventory', () => {
         'cadet-requirements', 'cadet-architecture', 'cadet-spike',
         'cadet-breakdown', 'cadet-tdd', 'cadet-debug', 'cadet-review',
         'cadet-resume', 'cadet-mcp-setup', 'cadet-agent-reviewer',
+        'cadet-planning-review',
       ];
       for (const name of skillNames) {
         assert.ok(
@@ -349,6 +355,39 @@ describe('Adapter inventory', () => {
         'config.yaml commands must reference canonical skill files'
       );
     });
+  });
+
+  // ── Extra rule adapters (Cursor / Continue additional phase rules) ───────
+
+  describe('Extra phase rules (Cursor / Continue)', () => {
+    const extras = [
+      ...(ideAdapters['cursor'].extraRules || []),
+      ...(ideAdapters['continue'].extraRules || []),
+    ];
+
+    it('has at least one extra phase rule', () => {
+      assert.ok(extras.length >= 2, 'expected extra Cursor/Continue phase rules');
+    });
+
+    for (const rel of extras) {
+      it(`extra rule ${rel} exists`, () => {
+        assert.ok(fileExists(rel), `missing extra rule: ${rel}`);
+      });
+
+      it(`extra rule ${rel} has YAML frontmatter`, () => {
+        const content = readFile(rel);
+        assert.ok(content.startsWith('---'), `${rel} must start with YAML frontmatter`);
+        assert.ok(content.includes('description:'), `${rel} frontmatter must include description`);
+      });
+
+      it(`extra rule ${rel} references its canonical skill`, () => {
+        const content = readFile(rel);
+        assert.ok(
+          content.includes('.cadet/agent/core/skills/PlanningReview.md'),
+          `${rel} must reference .cadet/agent/core/skills/PlanningReview.md`
+        );
+      });
+    }
   });
 
   // ── Claude Code adapters ───────────────────────────────────────────────
@@ -548,9 +587,11 @@ describe('Adapter inventory', () => {
       ...ideAdapters['deepcode'].extraSkills.map((f) => `.agents/skills/${f}`),
       '.continue/rules/cadet-agent.md',
       '.continue/rules/cadet-agent-reviewer.md',
+      ...(ideAdapters['continue'].extraRules || []),
       '.continue/config.yaml',
       '.cursor/rules/cadet-agent.md',
       '.cursor/rules/cadet-agent-reviewer.md',
+      ...(ideAdapters['cursor'].extraRules || []),
     ];
 
     const forbiddenStrings = [
@@ -607,8 +648,10 @@ describe('Adapter inventory', () => {
       ...ideAdapters['github-copilot'].extraPrompts.map((p) => `.github/prompts/${p}`),
       '.cursor/rules/cadet-agent.md',
       '.cursor/rules/cadet-agent-reviewer.md',
+      ...(ideAdapters['cursor'].extraRules || []),
       '.continue/rules/cadet-agent.md',
       '.continue/rules/cadet-agent-reviewer.md',
+      ...(ideAdapters['continue'].extraRules || []),
       '.github/agents/cadet.agent.md',
       '.github/agents/cadet-agent-reviewer.agent.md',
     ];
@@ -837,8 +880,10 @@ describe('Adapter inventory', () => {
       '.github/agents/cadet-agent-reviewer.agent.md',
       '.cursor/rules/cadet-agent.md',
       '.cursor/rules/cadet-agent-reviewer.md',
+      ...(ideAdapters['cursor'].extraRules || []),
       '.continue/rules/cadet-agent.md',
       '.continue/rules/cadet-agent-reviewer.md',
+      ...(ideAdapters['continue'].extraRules || []),
     ];
 
     it('reports zero un-allowlisted adapter/core sentence overlaps', () => {
@@ -907,16 +952,20 @@ describe('Adapter inventory', () => {
       '.github/prompts/cadet-review.prompt.md',
       '.github/prompts/cadet-resume.prompt.md',
       '.github/prompts/cadet-mcp-setup.prompt.md',
+      '.github/prompts/cadet-planning-review.prompt.md',
       // Cursor
       '.cursor/rules/cadet-agent.md',
       '.cursor/rules/cadet-agent-reviewer.md',
+      '.cursor/rules/cadet-planning-review.md',
       // Continue
       '.continue/rules/cadet-agent.md',
       '.continue/rules/cadet-agent-reviewer.md',
+      '.continue/rules/cadet-planning-review.md',
       '.continue/config.yaml',
       // Claude Code
       '.claude/skills/cadet-agent',
       '.claude/skills/cadet-agent-reviewer',
+      '.claude/skills/cadet-planning-review',
       '.claude/skills/cadet-requirements',
       '.claude/skills/cadet-architecture',
       '.claude/skills/cadet-spike',
@@ -938,6 +987,7 @@ describe('Adapter inventory', () => {
       '.agents/skills/cadet-review',
       '.agents/skills/cadet-resume',
       '.agents/skills/cadet-mcp-setup',
+      '.agents/skills/cadet-planning-review',
       // Core
       '.cadet/agent/core',
       '.cadet/agent/core/templates',
