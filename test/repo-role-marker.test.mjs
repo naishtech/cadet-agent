@@ -2,10 +2,14 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 
 import { writeRepoRoleMarker, readRepoRoleMarker } from '../src/install.mjs';
 import { REPO_ROLES, REPO_ROLE_MARKER, detectRepoRole } from '../src/harness/repo-role.mjs';
+
+// `import.meta.dirname` is Node >= 20.11 only; CI runs Node 18.
+const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 
 function tmpDir() {
   return mkdtempSync(join(tmpdir(), 'cadet-role-marker-'));
@@ -52,7 +56,7 @@ describe('install — repo-role marker', () => {
   });
 
   it('the marker file is never a managed path (sync must not delete or overwrite it)', () => {
-    const manifest = JSON.parse(readFileSync(join(import.meta.dirname, '..', '.cadet', 'agent', 'core', 'FrameworkManifest.json'), 'utf-8'));
+    const manifest = JSON.parse(readFileSync(join(repoRoot, '.cadet', 'agent', 'core', 'FrameworkManifest.json'), 'utf-8'));
     const managed = manifest.managedPaths.map((p) => p.replace(/\\/g, '/'));
     assert.equal(managed.includes(REPO_ROLE_MARKER), false);
     const preserved = (manifest.preservedPaths || []).map((p) => p.replace(/\\/g, '/'));
@@ -64,7 +68,7 @@ describe('install — repo-role marker', () => {
 
 describe('contract C9 — repository role', () => {
   it('is recorded verbatim in the frozen harness contract', () => {
-    const contract = readFileSync(join(import.meta.dirname, '..', 'docs', 'core', 'HarnessContract.md'), 'utf-8');
+    const contract = readFileSync(join(repoRoot, 'docs', 'core', 'HarnessContract.md'), 'utf-8');
     assert.ok(/^\|\s*C9\s*\|/m.test(contract), 'HarnessContract.md must define invariant C9');
     assert.ok(contract.includes(REPO_ROLE_MARKER), 'C9 must name .cadet/.repo-role');
   });
