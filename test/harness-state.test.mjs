@@ -91,6 +91,108 @@ describe('state — validation', () => {
     const r = validateState(v2State({ activeRunId: 'not-a-uuid' }));
     assert.equal(r.valid, false);
   });
+
+  // ------------------------------------------------------------------
+  // Gate exceptions vs validation (defect A2).
+  //
+  // A stale gate may be covered by a scoped, unexpired gate-exception. The
+  // transition path honours that; validation used to ignore it, so the two
+  // official commands disagreed about the SAME state document - `state transition`
+  // reported staleEvidence: [] while `state validate` reported those gates as
+  // errors. A consumer could not tell "correctly excepted" from "evidence broken".
+  // ------------------------------------------------------------------
+
+  it('honors a scoped, unexpired gate exception when validating', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cadet-exc-'));
+    try {
+      const rel = 'relevant.txt';
+      writeFileSync(join(dir, rel), 'original');
+      const treeHash = computeInputTreeHash(dir, [rel]);
+
+      const ev = { ...passingEvidence('testsPassed', { treeHash }), relevantFiles: [rel] };
+      const state = v2State({
+        gates: { testsPassed: true },
+        gateEvidence: [ev],
+        changeHistory: [{
+          type: 'gate-exception',
+          gate: 'testsPassed',
+          scope: 'epic-1::story-1.md',
+          expiresAt: new Date(Date.now() + 60000).toISOString(),
+          rationale: 'follow-up chore touched a file this evidence was bound to',
+        }],
+      });
+
+      // Make the evidence stale: the file changed after the record was written.
+      writeFileSync(join(dir, rel), 'changed');
+
+      // Sanity: without the exception this state IS invalid, which is what makes
+      // the assertion below meaningful rather than vacuous.
+      const withoutException = { ...state, changeHistory: [] };
+      assert.equal(validateState(withoutException, { rootDir: dir }).valid, false);
+
+      const r = validateState(state, { rootDir: dir });
+      assert.equal(r.valid, true, `expected valid, got errors: ${JSON.stringify(r.errors)}`);
+      assert.deepEqual(r.errors, []);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('still rejects a stale gate when the exception is out of scope', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cadet-exc-'));
+    try {
+      const rel = 'relevant.txt';
+      writeFileSync(join(dir, rel), 'original');
+      const treeHash = computeInputTreeHash(dir, [rel]);
+      const ev = { ...passingEvidence('testsPassed', { treeHash }), relevantFiles: [rel] };
+
+      const state = v2State({
+        gates: { testsPassed: true },
+        gateEvidence: [ev],
+        changeHistory: [{
+          type: 'gate-exception',
+          gate: 'testsPassed',
+          scope: 'epic-9::story-9.md',   // different work item
+          rationale: 'unrelated',
+        }],
+      });
+      writeFileSync(join(dir, rel), 'changed');
+
+      const r = validateState(state, { rootDir: dir });
+      assert.equal(r.valid, false,
+        'an exception scoped to another work item must not excuse this one');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('still rejects a stale gate when the exception has expired', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cadet-exc-'));
+    try {
+      const rel = 'relevant.txt';
+      writeFileSync(join(dir, rel), 'original');
+      const treeHash = computeInputTreeHash(dir, [rel]);
+      const ev = { ...passingEvidence('testsPassed', { treeHash }), relevantFiles: [rel] };
+
+      const state = v2State({
+        gates: { testsPassed: true },
+        gateEvidence: [ev],
+        changeHistory: [{
+          type: 'gate-exception',
+          gate: 'testsPassed',
+          scope: 'epic-1::story-1.md',
+          expiresAt: new Date(Date.now() - 60000).toISOString(),   // already expired
+          rationale: 'expired',
+        }],
+      });
+      writeFileSync(join(dir, rel), 'changed');
+
+      const r = validateState(state, { rootDir: dir });
+      assert.equal(r.valid, false, 'an expired exception must not excuse a stale gate');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('state — migration', () => {

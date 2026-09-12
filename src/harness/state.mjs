@@ -129,8 +129,23 @@ export function validateState(state, context = {}) {
       const workItemId = activeWorkItem
         ? `${activeWorkItem.epicId || 'none'}::${activeWorkItem.storyId || 'none'}`
         : null;
+
+      // Gate exceptions are honoured here for the same reasons `evaluateTransition`
+      // honours them. Before this, a scoped exception could make a transition legal
+      // while `state validate` still reported the identical document as invalid, so
+      // the two official commands contradicted each other and a reader could not tell
+      // "correctly excepted" from "evidence broken". Exceptions are keyed on the
+      // ACTIVE work item, so they cannot excuse a different story's gates.
+      const exceptions = activeExceptions(state, { workItemId: workItemId || undefined });
+
       for (const gate of GATES) {
         if (state.gates[gate] !== true) continue;
+
+        // An excepted gate is intentionally not held to freshness or work-item
+        // ownership: that is precisely what the exception is for. It still must have
+        // been claimed true, which the loop condition above already guarantees.
+        if (exceptions[gate]) continue;
+
         const evidence = latestEvidenceForGate(state, gate);
         if (!evidence || (evidence.status !== 'passed' && evidence.status !== 'manual-confirmation')) {
           errors.push({
