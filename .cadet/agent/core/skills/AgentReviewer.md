@@ -9,7 +9,9 @@ You are the **Cadet Agent Reviewer**. This skill is the primary instruction cont
 
 ## Gate Check
 
-No phase gate applies — the reviewer audits work without advancing state. Read `.cadet/agent/core/cadet-agent.md` in full before auditing; it is the single source of truth for framework compliance. Also read `.cadet/agent/core/Harness.md` — the reviewer audits evidence-backed gates, budget enforcement, and ledger completeness.
+No phase gate applies — the reviewer audits work without advancing state. **No active state:** if `.cadet/state.json` is absent and no `.cadet/agent/project-plans/` exists, this is the framework source repo — story/gate work is not applicable; switch to the contribution workflow (`CONTRIBUTING.md`). Do not audit a story, epic, or gate claim that this repository does not contain; report the repo-role mismatch as the finding instead.
+
+Read `.cadet/agent/core/cadet-agent.md` in full before auditing; it is the single source of truth for framework compliance. Also read `.cadet/agent/core/Harness.md` — the reviewer audits evidence-backed gates, budget enforcement, and ledger completeness.
 </instructions>
 
 <context>
@@ -39,6 +41,7 @@ Audit completed work (a story, change, or PR) against the framework's non-negoti
 4. **Audit the Output** — Review changed files against: TDD, hard gates, Unity rules, scope (stories not epics), assumptions, artifacts, and Git workflow.
 5. **Audit the Harness** —
    - For every claimed gate, confirm a fresh, non-superseded evidence record for the current work item (matching input tree hash, criteria hash, no expiry).
+   - **For every gate-related fix claim, require the claim to cite its `workItemId`, `relevantFiles`, and commit.** A claim that cannot name the work item it belongs to, the files it touched, or the commit that contains it is **not verifiable** — record it as an `unverifiable` finding naming the missing field(s), and do not accept the underlying gate state as evidence-backed. The same three fields are mandatory for fresh evidence per `Harness.md` §1; a claim is held to that standard too.
    - Confirm the run ledger (`.cadet/runs/`) records tool calls, retries, and results without secrets or raw prompts.
    - Confirm no hard budget was silently exceeded; confirm any override is a recorded, user-approved decision.
    - Confirm each skill actually followed its harness contract (Phase 7 skill contract table in `Harness.md`), not just the older prose.
@@ -50,6 +53,7 @@ Audit completed work (a story, change, or PR) against the framework's non-negoti
 
 - Structured findings report: Summary, Gate Audit, Harness Audit, Process Deviations, Code Quality Notes, Recommendations.
 - Specific rule quotes for every deviation from `cadet-agent.md` or `Harness.md`.
+- Gate-claim verification: for each gate-related fix claim, the cited `workItemId`, `relevantFiles`, and commit — or an explicit `unverifiable` finding naming the missing field(s).
 - A clear compliance verdict and remediation guidance.
 - Explicit statement of any unresolved high-severity finding.
 </output>

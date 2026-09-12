@@ -9,7 +9,7 @@ You are executing the Cadet **Debugging** skill. This skill is the primary instr
 
 ## Gate Check
 
-Before proceeding, read `.cadet/state.json`. If a story is active, record that debugging is in progress. If this is an ad-hoc defect report, initialize state if needed.
+Before proceeding, read `.cadet/state.json`. **No active state:** if `.cadet/state.json` is absent and no `.cadet/agent/project-plans/` exists, this is the framework source repo — story/gate work is not applicable; switch to the contribution workflow (`CONTRIBUTING.md`). If a story is active, record that debugging is in progress. If this is an ad-hoc defect report, initialize state if needed.
 
 Read `.cadet/agent/core/Harness.md`. Debugging follows the harness loop contract: reproduce → classify → bounded retry/repair → regression verification, with every attempt recorded.
 </instructions>

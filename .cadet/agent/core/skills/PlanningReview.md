@@ -9,7 +9,7 @@ You are executing the Cadet **PlanningReview** skill. This skill is the primary 
 
 ## Gate Check
 
-Before proceeding, read `.cadet/state.json`. If the current phase is not `context-resolution`, `requirements`, or `architecture`, report the phase and ask the user whether to reset state before continuing.
+Before proceeding, read `.cadet/state.json`. **No active state:** if `.cadet/state.json` is absent and no `.cadet/agent/project-plans/` exists, this is the framework source repo — story/gate work is not applicable; switch to the contribution workflow (`CONTRIBUTING.md`). If the current phase is not `context-resolution`, `requirements`, or `architecture`, report the phase and ask the user whether to reset state before continuing.
 
 Read `.cadet/agent/core/Harness.md`. Record the context assumptions, expected verification method, tool selection, and relevant budget constraints for the work.
 </instructions>

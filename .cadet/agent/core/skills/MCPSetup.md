@@ -9,7 +9,7 @@ You are executing the Cadet **MCP Setup** skill. This skill is the primary instr
 
 ## Gate Check
 
-Before proceeding, read `.cadet/state.json`. MCP setup is a tooling change, not a game-code change — record it under the current phase without advancing workflow gates.
+Before proceeding, read `.cadet/state.json`. **No active state:** if `.cadet/state.json` is absent and no `.cadet/agent/project-plans/` exists, this is the framework source repo — story/gate work is not applicable; switch to the contribution workflow (`CONTRIBUTING.md`). MCP setup is a tooling change, not a game-code change — record it under the current phase without advancing workflow gates.
 
 Read `.cadet/agent/core/Harness.md`. MCP is for live Unity inspection or mutation only; the connection must be proven with round-trip evidence, and live-editor mutation requires explicit user approval.
 </instructions>

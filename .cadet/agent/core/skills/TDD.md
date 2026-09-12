@@ -9,7 +9,7 @@ You are executing the Cadet **TDD** skill. This skill is the primary instruction
 
 ## Gate Check
 
-Before proceeding, read `.cadet/state.json`. The current story must be active (`currentPhase` is `implementation`). If this is a small change without tracking, confirm the change classification is `small` or `no_test_required` and adapt accordingly.
+Before proceeding, read `.cadet/state.json`. **No active state:** if `.cadet/state.json` is absent and no `.cadet/agent/project-plans/` exists, this is the framework source repo — story/gate work is not applicable; switch to the contribution workflow (`CONTRIBUTING.md`). The current story must be active (`currentPhase` is `implementation`). If this is a small change without tracking, confirm the change classification is `small` or `no_test_required` and adapt accordingly.
 
 Read `.cadet/agent/core/Harness.md`. TDD runs inside the harness: every red/green cycle produces evidence, retries are bounded, and `testsPassed` is satisfied only by fresh evidence.
 </instructions>

@@ -22,6 +22,7 @@ These are frozen as requirements. Later phases may add fields but must not chang
 | C6 | Existing v1 `state.json` files either validate unchanged after migration or receive a documented, atomic migration that leaves the original untouched on failure. | `harness-state.test.mjs` |
 | C7 | Adapters remain thin pointers; no adapter restates canonical content. | `adapters.test.mjs` |
 | C8 | `sync` preserves `.cadet/harness.json`, `.cadet/runs/`, `.cadet/agent/policies/`, `.cadet/agent/project-plans/`, `.cadet/state.json`. | `sync.test.mjs` |
+| C9 | `.cadet/.repo-role` is neither a managed nor a preserved path, and `init`/`sync` write it as `consumer-project`; `detectRepoRole` reports `framework-source` for a tree with a manifest but no state and no project-plans. | `repo-role-marker.test.mjs`, `harness-repo-role.test.mjs` |
 
 ## 2. Identifiers, hashes, freshness
 
@@ -163,3 +164,4 @@ Redaction runs before ledger persistence and before report display.
 | Hook payloads | recognized write → ask | malformed JSON → hook-error | `harness-hook.test.mjs` |
 | Adapter/skill pointers | pointers resolve | adapter restates canonical content | `adapters.test.mjs`, `skills.test.mjs` |
 | Accounting | exact + estimated usage | unknown usage never satisfies budget | `harness-ledger.test.mjs` |
+| Repository role | marker/structural detection resolves the role | malformed marker falls through; marker is not managed/preserved | `harness-repo-role.test.mjs`, `repo-role-marker.test.mjs` |

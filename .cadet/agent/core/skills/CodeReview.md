@@ -11,6 +11,8 @@ You are executing the Cadet **Code Review** skill. This skill is the primary ins
 
 **This gate cannot be bypassed.** Before transitioning from `implementation` to `review`, confirm `testsPassed`, `compileCheckConfirmed`, `unityAnalyzerClean`, and `storyTrackingUpdated` are all `true` in `.cadet/state.json` **and each is backed by fresh evidence**. If any is `false`, stale, missing, or superseded, STOP, state the failing gate, and do not proceed.
 
+**No active state:** if `.cadet/state.json` is absent and no `.cadet/agent/project-plans/` exists, this is the framework source repo — story/gate work is not applicable; switch to the contribution workflow (`CONTRIBUTING.md`). Do not name or reason about a story, epic, or gate that this repository does not contain.
+
 After review, set `codeReviewCompleted`, `securityReviewPassed`, and `acceptanceCriteriaValidated` to `true` before advancing to `validation`.
 
 Read `.cadet/agent/core/Harness.md`. Review the run ledger, gate evidence freshness, and budget status as first-class inputs.
@@ -43,7 +45,7 @@ Identify defects, regressions, security concerns, and process drift before chang
 
 <process>
 1. Review for functional correctness against acceptance criteria.
-2. **Audit gate evidence:** for every claimed gate, confirm a fresh, non-superseded evidence record exists for the current work item with a matching input tree hash. Reject hand-edited `true` gates.
+2. **Audit gate evidence:** for every claimed gate, confirm a fresh, non-superseded evidence record exists for the current work item with a matching input tree hash. Reject hand-edited `true` gates. **For every gate-related fix claim, require the citing fields — `workItemId`, `relevantFiles`, and a commit reference.** A claim that cannot name the work item it belongs to, the files it touched, or the commit that contains it is not verifiable and must be rejected (see the finding template in the output section).
 3. **Audit the run ledger:** confirm spans record sanitized tool identity, result, duration, output size, and retry number; confirm no secrets appear anywhere in the ledger.
 4. **Audit budget status:** confirm the run did not silently exceed a hard budget and that any warning or override is recorded as a decision.
 5. Verify test coverage relevance and red/green evidence where required.
@@ -70,6 +72,7 @@ Identify defects, regressions, security concerns, and process drift before chang
 
 - Prioritized findings (bugs, risks, regressions, security issues).
 - Gate audit: per gate, the evidence ID, freshness verdict, and pass/fail.
+- **Gate-claim verification:** for every gate-related fix claim, the cited `workItemId`, `relevantFiles`, and commit — or an explicit `unverifiable` finding when any of the three is missing. The finding must name which field is absent and why the claim cannot be traced to this work item.
 - Ledger audit: completeness and redaction verdict.
 - Budget audit: consumed vs. remaining, and any recorded override.
 - Clear pass/fail or ready/not-ready recommendation.

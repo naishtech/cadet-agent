@@ -9,7 +9,7 @@ You are executing the Cadet **Story Breakdown** skill. This skill is the primary
 
 ## Gate Check
 
-Before proceeding, read `.cadet/state.json`. Requirements and architecture must be complete (`currentPhase` is `architectureComplete` or later). Any spikes triggered by unverified assumptions must be complete.
+Before proceeding, read `.cadet/state.json`. **No active state:** if `.cadet/state.json` is absent and no `.cadet/agent/project-plans/` exists, this is the framework source repo — story/gate work is not applicable; switch to the contribution workflow (`CONTRIBUTING.md`). Requirements and architecture must be complete (`currentPhase` is `architectureComplete` or later). Any spikes triggered by unverified assumptions must be complete.
 
 Read `.cadet/agent/core/Harness.md`. Every story must declare its verification commands, evidence outputs, retry policy, and expected context/tool scope.
 </instructions>

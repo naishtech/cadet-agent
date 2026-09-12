@@ -58,3 +58,7 @@ export {
 export {
   RELEVANT_TOOLS, WRITE_PATTERNS, detectWrite, evaluateHook, hookOutput,
 } from './hook.mjs';
+
+export {
+  REPO_ROLES, REPO_ROLE_MARKER, detectRepoRole, isFrameworkSourceWithoutWorkItem, describeRepoRole,
+} from './repo-role.mjs';

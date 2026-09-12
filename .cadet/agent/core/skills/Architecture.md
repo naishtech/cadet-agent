@@ -9,7 +9,7 @@ You are executing the Cadet **Architecture** skill. This skill is the primary in
 
 ## Gate Check
 
-Before proceeding, read `.cadet/state.json`. Requirements must be finalized (`currentPhase` is `requirementsComplete` or later). If requirements are not approved, stop and invoke the Requirements skill first.
+Before proceeding, read `.cadet/state.json`. **No active state:** if `.cadet/state.json` is absent and no `.cadet/agent/project-plans/` exists, this is the framework source repo — story/gate work is not applicable; switch to the contribution workflow (`CONTRIBUTING.md`). Requirements must be finalized (`currentPhase` is `requirementsComplete` or later). If requirements are not approved, stop and invoke the Requirements skill first.
 
 Read `.cadet/agent/core/Harness.md`. Record the context assumptions, expected verification methods, tool selection, and relevant budget constraints the design implies.
 </instructions>

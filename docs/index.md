@@ -11,6 +11,7 @@ For the condensed agent instruction set, see [cadet-agent.md](https://github.com
 - [Learner Model](core/LearnerModel.md) — How Cadet adapts to different skill levels
 - [Learner Config Persistence](core/LearnerConfigPersistence.md) — How calibration answers are stored
 - [Workflow](core/Workflow.md) — Full workflow routing: large, small, and no-test-required paths
+- [Repository Role](core/RepositoryRole.md) — Framework-source vs consumer-project boundary and how it is detected
 - [Operating Rules](core/OperatingRules.md) — Mandatory constraints for all Cadet behavior
 - [Hard Gates](core/HardGates.md) — Non-skippable checkpoint system enforced via state.json
 - [Policy & Guidance Rules](core/PolicyAndGuidanceRules.md) — How policies and guidance interact
