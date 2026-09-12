@@ -6,6 +6,7 @@ import {
   validateState, migrateStateFile, readState, writeState, evaluateTransition, applyTransition,
   workItemIdOf, loadPolicy, RunLedger, loadRun, listRuns, cleanupRuns, buildReport, formatReport,
   runVerificationLoop, commandForGate, detectCapabilities, runsDir, gitChangedFiles, PolicyError, StateError,
+  detectRepoRole, describeRepoRole,
 } from './harness/index.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -114,13 +115,24 @@ async function cmdState(opts) {
   if (sub === 'validate') {
     const { exists, state } = readState(opts.targetDir);
     if (!exists) {
-      emit(opts, 'No .cadet/state.json found (nothing to validate).', { ok: true, valid: true, exists: false });
+      // Report the detected repo role instead of a bare ok. In the framework
+      // source repository a missing state file is expected, not a silent pass —
+      // saying so prevents story/gate reasoning against a repo that has no story.
+      const role = detectRepoRole(opts.targetDir);
+      const repoRoleDetail = describeRepoRole(role);
+      emit(
+        opts,
+        `No .cadet/state.json found (nothing to validate).\n   Repo role: ${role.role} (${role.source}, ${role.confidence} confidence) — ${repoRoleDetail}`,
+        { ok: true, valid: true, exists: false, repoRole: role.role, repoRoleDetail, repoRoleSource: role.source },
+      );
       return;
     }
     // Pass rootDir so stale/foreign evidence is caught at validation time.
     const result = validateState(state, { rootDir: opts.targetDir });
+    const role = detectRepoRole(opts.targetDir);
+    const repoRoleDetail = describeRepoRole(role);
     if (opts.format === 'json') {
-      emit(opts, '', { ok: result.valid, valid: result.valid, errors: result.errors, warnings: result.warnings });
+      emit(opts, '', { ok: result.valid, valid: result.valid, errors: result.errors, warnings: result.warnings, repoRole: role.role, repoRoleDetail });
     } else {
       if (result.valid) console.log(`✅ state.json is valid (v${state.version}).`);
       else {
@@ -128,6 +140,7 @@ async function cmdState(opts) {
         for (const e of result.errors) console.error(`   ${e.path}: ${e.message}`);
       }
       for (const w of result.warnings) console.log(`   ⚠️  ${w.path}: ${w.message}`);
+      console.log(`   Repo role: ${role.role} — ${repoRoleDetail}`);
     }
     if (!result.valid) process.exit(1);
     return;
@@ -349,7 +362,7 @@ async function cmdHarness(opts) {
     }
 
     if (opts.format === 'json') {
-      emit(opts, '', { ok: result.ok, status: result.status, gate, attempts: result.attempts.length, stopReason: result.stopReason, runId: ledger.runId, path, stateUpdated });
+      emit(opts, '', { ok: result.ok, status: result.status, gate, attempts: result.attempts.length, stopReason: result.stopReason, runId: ledger.runId, path, stateUpdated, repoRole: detectRepoRole(opts.targetDir).role });
     } else if (result.ok) {
       console.log(`✅ Gate "${gate}" verified (${result.attempts.length} attempt(s)). Ledger: ${path}`);
     } else {

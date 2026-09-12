@@ -9,7 +9,7 @@ You are executing the Cadet **Resume** skill. Your sole purpose is to inspect th
 
 ## Gate Check
 
-Before proceeding, read `.cadet/state.json`. No specific phase gate — this skill can be invoked at any time to inspect and resume the current workflow.
+Before proceeding, read `.cadet/state.json`. **No active state:** if `.cadet/state.json` is absent and no `.cadet/agent/project-plans/` exists, this is the framework source repo — report the detected role instead of resuming a workflow that does not exist here, and switch to the contribution workflow (`CONTRIBUTING.md`). No specific phase gate — this skill can be invoked at any time to inspect and resume the current workflow.
 
 Read `.cadet/agent/core/Harness.md`. Resume must load and validate the active run, stale evidence, remaining budgets, pending escalations, and the next legal transition before recommending an action.
 </instructions>

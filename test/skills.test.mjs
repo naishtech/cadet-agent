@@ -61,6 +61,32 @@ describe('Skill files', () => {
   }
 });
 
+describe('Repository-role boundary in skills', () => {
+  // Every phase skill must tell the agent what to do when there is no active
+  // state, so it cannot reason about stories/gates in the framework source repo.
+  const allSkills = [...expectedSkills, 'AgentReviewer.md', 'PlanningReview.md'];
+
+  for (const skill of allSkills) {
+    it(`${skill} documents the no-active-state branch`, () => {
+      const content = readFileSync(join(skillsDir, skill), 'utf-8');
+      assert.ok(
+        content.includes('.cadet/agent/project-plans/'),
+        `${skill} must name .cadet/agent/project-plans/ in its no-active-state branch`,
+      );
+      assert.ok(
+        content.includes('CONTRIBUTING.md'),
+        `${skill} must point framework-source users at CONTRIBUTING.md`,
+      );
+    });
+  }
+
+  it('KickoffFlow detects the repository role before the consumer flow', () => {
+    const content = readFileSync(join(coreDir, 'KickoffFlow.md'), 'utf-8');
+    assert.ok(content.includes('.cadet/agent/project-plans/'), 'KickoffFlow must check for project-plans');
+    assert.ok(content.includes('CONTRIBUTING.md'), 'KickoffFlow must point framework-source users at CONTRIBUTING.md');
+  });
+});
+
 describe('Copilot prompt adapters', () => {
   it('has a .github/prompts directory', () => {
     assert.equal(existsSync(promptsDir), true);

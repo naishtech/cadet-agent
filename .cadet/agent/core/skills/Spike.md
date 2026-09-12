@@ -9,7 +9,7 @@ You are executing the Cadet **Spike** skill. This skill is the primary instructi
 
 ## Gate Check
 
-Before proceeding, read `.cadet/state.json`. A spike is triggered by an unverified assumption in requirements or architecture. Identify the source assumption and the exact question to answer.
+Before proceeding, read `.cadet/state.json`. **No active state:** if `.cadet/state.json` is absent and no `.cadet/agent/project-plans/` exists, this is the framework source repo — story/gate work is not applicable; switch to the contribution workflow (`CONTRIBUTING.md`). A spike is triggered by an unverified assumption in requirements or architecture. Identify the source assumption and the exact question to answer.
 
 Read `.cadet/agent/core/Harness.md`. A spike runs under a bounded budget with an explicit stop condition and produces an evidence artifact.
 </instructions>

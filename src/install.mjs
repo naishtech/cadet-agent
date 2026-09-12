@@ -1,11 +1,12 @@
-import { readFileSync, unlinkSync, existsSync, readdirSync, statSync, writeFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { readFileSync, unlinkSync, existsSync, readdirSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join, relative, dirname } from 'node:path';
 import { createInterface } from 'node:readline';
 import { runUpgrades } from './upgrades.mjs';
 import {
   extractArchive, readArchiveEntry, findEocd,
   DEFAULT_ARCHIVE_LIMITS, ArchiveError,
 } from './harness/archive.mjs';
+import { REPO_ROLES, REPO_ROLE_MARKER } from './harness/repo-role.mjs';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -247,6 +248,44 @@ async function downloadZip(url) {
   return Buffer.concat(chunks);
 }
 
+// ── Repo-role marker ─────────────────────────────────────────────────────────
+//
+// Cadet is consumed either as a framework source checkout (this repository and
+// its forks) or as a consumer project that installs the framework. The two need
+// different behaviour — story/gate work does not apply to the framework source.
+// Writing a tiny `.cadet/.repo-role` marker makes that boundary machine-checkable
+// instead of relying on prose, and it is neither a managed nor a preserved path,
+// so sync can never delete or overwrite it by accident.
+
+const VALID_ROLES = [REPO_ROLES.CONSUMER, REPO_ROLES.FRAMEWORK];
+
+/** Read the `.cadet/.repo-role` marker. Returns the role string, or null. */
+export function readRepoRoleMarker(targetDir) {
+  const path = join(targetDir, REPO_ROLE_MARKER);
+  if (!existsSync(path)) return null;
+  try {
+    const value = readFileSync(path, 'utf-8').trim();
+    return value || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Write the `.cadet/.repo-role` marker, creating `.cadet/` if necessary.
+ * Defaults to `consumer-project` — the role of anything that runs `init`/`sync`.
+ * Throws on an unrecognized role so a typo fails loudly rather than writing junk.
+ */
+export function writeRepoRoleMarker(targetDir, role = REPO_ROLES.CONSUMER) {
+  if (!VALID_ROLES.includes(role)) {
+    throw new Error(`unknown repo role "${role}" (expected: ${VALID_ROLES.join('|')})`);
+  }
+  const path = join(targetDir, REPO_ROLE_MARKER);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${role}\n`, 'utf-8');
+  return path;
+}
+
 // ── Public install entry ────────────────────────────────────────────────────
 
 export async function install(targetDir, opts = {}) {
@@ -274,6 +313,11 @@ export async function install(targetDir, opts = {}) {
     interactive: canPrompt(opts),
   });
   reportCreateOnlySkips(createOnly, targetDir, releaseVersion, opts);
+
+  // 4b. Record the repository role. This install targets a consumer project, and
+  // the marker lets later CLI/skill invocations say so instead of guessing.
+  const roleMarker = writeRepoRoleMarker(targetDir, REPO_ROLES.CONSUMER);
+  console.log(`   Repo role: consumer-project (${roleMarker})`);
 
   // 5. Report
   console.log(`\n✅ Cadet-Agent v${releaseVersion} installed! Extracted ${extracted.length} files.\n`);
@@ -595,6 +639,12 @@ export async function sync(targetDir, opts = {}) {
   const newVersion = normalizeVersion(release.tag_name);
   const oldVersionNorm = normalizeVersion(oldVersion);
   console.log(`   Latest: v${newVersion} (published ${release.published_at})\n`);
+
+  // 2b. Ensure the repo-role marker exists even when no files change, so an
+  // existing install synced by an older CLI still gets the boundary recorded.
+  if (!readRepoRoleMarker(targetDir)) {
+    writeRepoRoleMarker(targetDir, REPO_ROLES.CONSUMER);
+  }
 
   if (oldVersionNorm === newVersion) {
     console.log(`✅ Already up to date (v${oldVersionNorm}). Nothing to sync.\n`);

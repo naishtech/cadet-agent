@@ -13,6 +13,21 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.28.0] — 2026-09-12
+
+### Added
+
+- **Repository-role boundary.** Cadet now distinguishes a **framework source** checkout (this repository and its forks) from a **consumer project**, so an agent cannot reason about stories, epics, or gates in a repo that has none.
+  - New `src/harness/repo-role.mjs` — `detectRepoRole()` resolves the role from an explicit `.cadet/.repo-role` marker (high confidence) or structural signals: a `.cadet/state.json` or `.cadet/agent/project-plans/` means `consumer-project`, a `FrameworkManifest.json` with neither means `framework-source`.
+  - `cadet-agent state validate` now reports the detected role and, when `state.json` is missing, names the repo role and points at `CONTRIBUTING.md` instead of returning a bare `ok: true`. `cadet-agent harness verify` includes `repoRole` in its JSON result.
+  - `init`/`sync` write a `.cadet/.repo-role` marker (`consumer-project`). The marker is neither a managed nor a preserved path, so sync can never delete or overwrite it.
+- **Documentation.** New `docs/core/RepositoryRole.md` (linked from `docs/index.md`) explains the boundary, detection order, the marker, and the gate-claim citation rule. `docs/core/HarnessContract.md` gains compatibility invariant **C9** — the marker is never managed or preserved, and `detectRepoRole` resolves `framework-source` structurally — enforced by `repo-role-marker.test.mjs`.
+
+### Changed
+
+- **Every phase skill and `KickoffFlow.md` now handle the no-active-state case.** A new branch — "if `.cadet/state.json` is absent and no `.cadet/agent/project-plans/` exists, this is the framework source repo — story/gate work is not applicable; switch to the contribution workflow (`CONTRIBUTING.md`)" — was added to the Gate Check of all ten phase skills plus the Agent Reviewer, and to step 1 of `KickoffFlow.md` (later steps renumbered).
+- **Gate-related fix claims must cite their work item.** `CodeReview` and `AgentReviewer` now require every gate-related fix claim to name its `workItemId`, `relevantFiles`, and commit — the same fields `Harness.md` §1 mandates for evidence. A claim missing any of the three is filed as an explicit `unverifiable` finding.
+
 ## [0.27.0] — 2026-09-11
 
 ### Added
