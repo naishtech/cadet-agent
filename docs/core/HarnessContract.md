@@ -39,6 +39,7 @@ These are frozen as requirements. Later phases may add fields but must not chang
 | C10 | The story artifact records, for each acceptance criterion, a stable AC id and the declared test identifier(s) that prove it. The story is the single source of truth for the coverage claim; the epic coverage view is derived from it. | `harness-verify-acs.test.mjs`, `skills.test.mjs` |
 | C11 | Under `strictClosure.enabled`, `acceptanceCriteriaValidated` cannot be satisfied while any declared test is absent from the test inventory of the run that satisfied `testsPassed`, or while an AC declares no test. An unknown/empty inventory satisfies nothing. | `harness-verify-acs.test.mjs` |
 | C12 | `criteriaHash` for AC coverage is computed over the AC ids **and their declared test identifiers**, so renaming a declared test invalidates evidence bound to the old name. | `harness-verify-acs.test.mjs` |
+| C13 | **A command documented as a check performs no writes.** `cadet-agent state transition --to <phase> --dry-run` reports the identical verdict to a real transition and leaves `state.json` byte-identical. Only the gated transitions in `TRANSITIONS` plus the declared ungated forward edges are legal; `closed` is terminal, so a transition out of it is rejected rather than silently allowed. | `harness-transition-dryrun.test.mjs` |
 
 ## 2. Identifiers, hashes, freshness
 
@@ -182,6 +183,7 @@ Redaction runs before ledger persistence and before report display.
 | Accounting | exact + estimated usage | unknown usage never satisfies budget | `harness-ledger.test.mjs` |
 | Repository role | marker/structural detection resolves the role | malformed marker falls through; marker is not managed/preserved | `harness-repo-role.test.mjs`, `repo-role-marker.test.mjs` |
 | AC↔test coverage | declared tests found in the inventory ⇒ gate set | missing/undeclared test, or unknown inventory, ⇒ gate not set; strict-off writes nothing | `harness-verify-acs.test.mjs` |
+| Dry-run transition (C13) | `--dry-run` reports allowed and leaves `state.json` byte-identical | `--dry-run` rejection writes nothing; `closed → implementation` rejected; bootstrap edges still allowed | `harness-transition-dryrun.test.mjs` |
 | Strict closure off (v3) | v2 behaviour byte-identical with the flag absent | stale implementation gate does NOT block closure when off | `harness-strict-closure.test.mjs`, `harness-state.test.mjs` |
 | Closure revalidation (v3) | fresh revalidation satisfies `validation→closed` | gate valid at `implementation` but stale at closure is rejected | `harness-strict-closure.test.mjs` |
 | Revalidation recency (v3) | record newer than the last transition accepted | unexpired but older record rejected | `harness-strict-closure.test.mjs` |

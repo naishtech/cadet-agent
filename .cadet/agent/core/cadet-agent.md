@@ -183,7 +183,7 @@ These files define specific operational workflows. Read them on session start or
 2. Check required gates for the target transition; if any is `false`, block transition and report the failing gate(s).
 3. **Evidence is required.** A gate may only be `true` when backed by a fresh, non-superseded record in `state.json → gateEvidence` (see `.cadet/agent/core/Harness.md`). Evidence from a different work item, a changed input tree, changed acceptance criteria, an expired record, or a superseded record does not satisfy a gate.
    - Build evidence with `cadet-agent harness verify --gate <gate>` for automated checks, or record a user `manual-confirmation` when automation is unavailable.
-   - `cadet-agent state transition --to <phase>` enforces this mechanically and lists every missing or stale gate.
+   - `cadet-agent state transition --to <phase> --dry-run` enforces this mechanically and lists every missing or stale gate. **Always pass `--dry-run` to check** — without it the transition is applied and `state.json` is written.
 4. **For `compileCheckConfirmed` and `unityAnalyzerClean`:** prefer the Unity CLI commands in `.cadet/agent/core/UnityCli.md` (`cadet-agent harness verify` runs them). If Unity CLI is unavailable, record the user's manual confirmation with project path, editor version, timestamp, and scope. The `get_errors` tool may be used as supporting context, but a `manual-confirmation` record is required for the gate.
 5. Apply reset semantics exactly as current rules define (gates reset to `false` on new story/epic), then re-check before transition.
 

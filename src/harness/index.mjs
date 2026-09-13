@@ -25,7 +25,7 @@ export {
 export {
   STATE_VERSION, READABLE_STATE_VERSIONS, validateState, migrateStateV1toV2, migrateStateFile,
   createEvidence, computeInputTreeHash, workItemIdOf, evidenceFreshness,
-  latestEvidenceForGate, activeExceptions, requiredGates, evaluateTransition, resolveStrict,
+  latestEvidenceForGate, activeExceptions, requiredGates, isUngatedForwardEdge, evaluateTransition, resolveStrict,
   applyTransition, resetGatesForNewWorkItem, statePathFor, readState, writeState, writeJsonAtomic, StateError,
 } from './state.mjs';
 

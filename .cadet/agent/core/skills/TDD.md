@@ -79,5 +79,5 @@ For bug fixes:
 After tests pass:
 - Set `gates.testsPassed` to `true` **only** when backed by the fresh green evidence record. Do not hand-edit the gate.
 - Update the story markdown file if using markdown tracking.
-- Do NOT transition to `review` until all implementation → review gates are satisfied and each is evidence-backed. Confirm with `cadet-agent state transition --to review` (dry-run style) or by reading `gateEvidence`.
+- Do NOT transition to `review` until all implementation → review gates are satisfied and each is evidence-backed. Confirm with `cadet-agent state transition --to review --dry-run` (writes nothing) or by reading `gateEvidence`. Running the command **without** `--dry-run` applies the transition.
 </completion>

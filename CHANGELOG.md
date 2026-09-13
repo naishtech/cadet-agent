@@ -13,6 +13,18 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.33.0] — 2026-09-13
+
+### Added
+
+- **`cadet-agent state transition --dry-run` — a real dry check.** The command now reports the identical verdict to a real transition and **writes nothing** (`applied: false`, `dryRun: true` in JSON). Previously the only way to ask "would this transition be allowed?" was to run the command, which **applied the transition and wrote `state.json`**.
+
+### Fixed
+
+- **The Resume and TDD skills instructed a mutating command as a check.** `Resume.md` said to use `state transition --to <phase>` "as a dry check", and `TDD.md` said `state transition --to review` "(dry-run style)". Neither was true: the command always applied the transition. An agent following Resume during session resume could move a finalised `closed` project back to `implementation` and append a `changeHistory` entry, corrupting state that had already been validated. Both skills now pass `--dry-run` explicitly and state that omitting it applies the transition.
+- **`closed` is now terminal.** `evaluateTransition` treated any target that is not the target of a gated transition as "ungated, therefore legal" — so a transition into `implementation`, `requirements`, `architecture`, etc. was accepted **from anywhere**, including out of `closed`. The legal set is now the gated transitions plus an explicit list of ungated forward edges (bootstrap and planning progression: `context-resolution → requirements|architecture|implementation`, `requirements → architecture|requirementsComplete|spikes`, `architecture → architectureComplete|spikes`, `architectureComplete → story-breakdown|spikes`, `spikes → architecture|architectureComplete|story-breakdown`, `story-breakdown → implementation`). Anything else is rejected with a named reason.
+- `src/harness/state.mjs` exports `isUngatedForwardEdge`; contract invariant **C13** ("a command documented as a check performs no writes") is enforced by `harness-transition-dryrun.test.mjs`.
+
 ## [0.32.1] — 2026-09-13
 
 ### Fixed

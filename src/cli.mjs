@@ -39,6 +39,7 @@ function showHelp() {
     cadet-agent state validate      Validate .cadet/state.json against the v2 schema
     cadet-agent state migrate       Atomically migrate v1 state to v2 (backup on write)
     cadet-agent state transition --to <phase>   Enforce the transition matrix + evidence
+    cadet-agent state transition --to <phase> --dry-run   Check only; writes nothing
 
     cadet-agent harness record      Append a sanitized span/evidence/decision event
     cadet-agent harness confirm     Record manual-confirmation evidence (writes ledger + state)
@@ -93,6 +94,7 @@ function parseArgs(argv) {
       case '--story': opts.story = argv[++i]; break;
       case '--report': opts.report = argv[++i]; break;
       case '--write-coverage': opts.writeCoverage = true; break;
+      case '--dry-run': opts.dryRun = true; break;
       case '--older-than-ms': opts.olderThanMs = Number(argv[++i]); break;
       case '--agents-md': opts.agentsMd = argv[++i]; break;
       case '--yes': case '-y': opts.yes = true; break;
@@ -204,16 +206,23 @@ async function cmdState(opts) {
     if (!exists) fail(opts, 'No .cadet/state.json found. Initialise state before transitioning.', () => 2);
     // Freshness is enforced against the current working tree: evaluateTransition
     // recomputes each gate's input-tree hash from the evidence's relevant files.
+    //
+    // `--dry-run` reports the SAME verdict and stops. It is the only safe way to
+    // ask "would this transition be allowed?" — running the command without the
+    // flag applies the transition. A check that is documented as a dry run must
+    // not have side effects, so the write below is gated on `!opts.dryRun`.
     const evaluation = evaluateTransition(state, opts.to, { rootDir: opts.targetDir });
     if (!evaluation.allowed) {
       const detail = {
         ok: false,
         allowed: false,
+        dryRun: opts.dryRun === true,
+        applied: false,
         missingGates: evaluation.missingGates,
         staleEvidence: evaluation.staleEvidence,
         errors: evaluation.errors,
       };
-      const lines = ['❌ Transition rejected:'];
+      const lines = [`❌ Transition rejected${opts.dryRun ? ' (dry run — nothing was written)' : ''}:`];
       for (const e of evaluation.errors) lines.push(`   ${e}`);
       if (evaluation.missingGates.length) lines.push(`   missing gates/evidence: ${evaluation.missingGates.join(', ')}`);
       for (const s of evaluation.staleEvidence) lines.push(`   stale: ${s.gate} — ${s.reason || (s.reasons || []).join('; ')}`);
@@ -221,9 +230,17 @@ async function cmdState(opts) {
       else console.error(lines.join('\n'));
       process.exit(1);
     }
+    if (opts.dryRun) {
+      emit(
+        opts,
+        `✅ Transition ${state.session?.currentPhase} → ${opts.to} would be allowed (dry run — nothing was written).`,
+        { ok: true, allowed: true, dryRun: true, applied: false, to: opts.to, from: state.session?.currentPhase },
+      );
+      return;
+    }
     const next = applyTransition(state, opts.to, { rootDir: opts.targetDir });
     writeState(opts.targetDir, next);
-    emit(opts, `✅ Transitioned to ${opts.to}.`, { ok: true, allowed: true, to: opts.to });
+    emit(opts, `✅ Transitioned to ${opts.to}.`, { ok: true, allowed: true, dryRun: false, applied: true, to: opts.to });
     return;
   }
 
