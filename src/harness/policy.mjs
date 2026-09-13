@@ -39,11 +39,39 @@ export const GATES = Object.freeze([
   'designArtifactSyncConfirmed',
 ]);
 
-/** Legal phase transitions (compatibility invariant C4). */
+/**
+ * Legal phase transitions (compatibility invariant C4, revised in contract v3).
+ *
+ * `gates` is unchanged: the v2 frozen list each transition must satisfy.
+ * `revalidate` is new in v3 — gates that must be satisfied *again* as a
+ * precondition of this transition. It is applied only when
+ * `strictClosure.enabled` is true, so with the flag off this table behaves
+ * exactly as it did in v2.
+ *
+ * Why revalidation exists: v2 closure required only
+ * `designArtifactSyncConfirmed`, so a gate satisfied early in `implementation`
+ * could go stale during a long `review`/`validation` and closure would still
+ * succeed. The sets below pin the gates at the point they are cheapest to fix.
+ */
 export const TRANSITIONS = Object.freeze({
-  implementation: { to: 'review', gates: ['testsPassed', 'compileCheckConfirmed', 'unityAnalyzerClean', 'storyTrackingUpdated'] },
-  review: { to: 'validation', gates: ['codeReviewCompleted', 'securityReviewPassed', 'acceptanceCriteriaValidated'] },
-  validation: { to: 'closed', gates: ['designArtifactSyncConfirmed'] },
+  implementation: {
+    to: 'review',
+    gates: ['testsPassed', 'compileCheckConfirmed', 'unityAnalyzerClean', 'storyTrackingUpdated'],
+    revalidate: [],
+  },
+  review: {
+    to: 'validation',
+    gates: ['codeReviewCompleted', 'securityReviewPassed', 'acceptanceCriteriaValidated'],
+    revalidate: ['testsPassed', 'compileCheckConfirmed', 'unityAnalyzerClean', 'storyTrackingUpdated'],
+  },
+  validation: {
+    to: 'closed',
+    gates: ['designArtifactSyncConfirmed'],
+    revalidate: [
+      'codeReviewCompleted', 'securityReviewPassed', 'acceptanceCriteriaValidated',
+      'testsPassed', 'compileCheckConfirmed', 'unityAnalyzerClean', 'storyTrackingUpdated',
+    ],
+  },
 });
 
 /** Evidence statuses. */
@@ -119,6 +147,79 @@ export const DEFAULT_HOOK_POLICY = Object.freeze({
   mode: 'ask-on-recognized-write', // or 'fail-open' (opt-in, visible)
 });
 
+/**
+ * Gate-exception taxonomy (contract v3 §4).
+ *
+ * Two situations that v2 could not distinguish — "this gate cannot be automated
+ * here" versus "this work item is a documentation-only change" — need different
+ * expiry policies and different levels of review. A category makes that explicit
+ * and lets a typo fail loudly instead of classifying as an untyped exception.
+ */
+export const EXCEPTION_CATEGORIES = Object.freeze([
+  'manual-compile',
+  'budget-override',
+  'analyzer-fallback',
+  'unscoped-freshness',
+  'documentation-only',
+  'tooling-gap',
+]);
+
+/** Default expiry (in days) per category. `null` means "no default bound". */
+export const EXCEPTION_EXPIRY_DAYS = Object.freeze({
+  'manual-compile': 7,
+  'budget-override': null,      // scoped to the run that overrode it
+  'analyzer-fallback': 30,
+  'unscoped-freshness': 1,
+  'documentation-only': null,   // scoped to the work item
+  'tooling-gap': 14,
+});
+
+/** Categories whose exception must carry a closure review note. */
+export const EXCEPTION_REQUIRES_REVIEW_NOTE = Object.freeze([
+  'manual-compile',
+  'budget-override',
+  'analyzer-fallback',
+  'unscoped-freshness',
+  'tooling-gap',
+]);
+
+/**
+ * Gates that are agent-owned and can never be satisfied by a human assertion,
+ * so listing them in `disallowManualFor` would be meaningless. Rejecting them
+ * keeps the flag's intent legible (contract v3 §2).
+ */
+export const AGENT_OWNED_GATES = Object.freeze(['codeReviewCompleted']);
+
+/**
+ * Strict-closure policy (contract v3 §2). Absent or `enabled: false` means
+ * byte-identical v2 behaviour — the property that makes this opt-in.
+ */
+export const DEFAULT_STRICT_CLOSURE = Object.freeze({
+  enabled: false,
+  revalidateOnClosure: true,
+  requireFreshRevalidation: true,
+  manualConfirmation: Object.freeze({
+    requireReason: true,
+    requireExpiresAt: true,
+    requireEnvironment: true,
+    requireScope: true,
+    maxValidityMs: 24 * 60 * 60 * 1000,
+    // Tolerance for clock skew between the writer and the validator. Without a
+    // tolerance, a record created on a machine a few seconds fast would be
+    // rejected as future-dated.
+    clockSkewToleranceMs: 60 * 1000,
+  }),
+  disallowManualFor: Object.freeze(['testsPassed']),
+});
+
+const STRICT_CLOSURE_KEYS = new Set([
+  'enabled', 'revalidateOnClosure', 'requireFreshRevalidation', 'manualConfirmation', 'disallowManualFor',
+]);
+const MANUAL_CONFIRMATION_KEYS = new Set([
+  'requireReason', 'requireExpiresAt', 'requireEnvironment', 'requireScope', 'maxValidityMs',
+  'clockSkewToleranceMs',
+]);
+
 const BUDGET_KEYS = Object.keys(DEFAULT_BUDGETS);
 
 class PolicyError extends Error {
@@ -193,6 +294,104 @@ function enforceCeilings(resolved, { allowCeilingOverride = false } = {}) {
 }
 
 /**
+ * Resolve and validate the `strictClosure` policy block (contract v3 §2).
+ *
+ * Every rejection here is deliberate: a strictness knob that is accepted but
+ * never applied is worse than one that is absent, because it lets a reader
+ * believe a guarantee exists. `revalidateOnClosure: true` with `enabled: false`
+ * is rejected for exactly that reason.
+ */
+function resolveStrictClosure(raw) {
+  if (raw === undefined) return { ...DEFAULT_STRICT_CLOSURE, manualConfirmation: { ...DEFAULT_STRICT_CLOSURE.manualConfirmation }, disallowManualFor: [...DEFAULT_STRICT_CLOSURE.disallowManualFor] };
+  if (!isPlainObject(raw)) throw new PolicyError('"strictClosure" must be an object.');
+
+  for (const key of Object.keys(raw)) {
+    if (!STRICT_CLOSURE_KEYS.has(key)) {
+      throw new PolicyError(`Unknown "strictClosure" key "${key}".`);
+    }
+  }
+
+  const out = {
+    enabled: raw.enabled === true,
+    revalidateOnClosure: raw.revalidateOnClosure === undefined ? DEFAULT_STRICT_CLOSURE.revalidateOnClosure : raw.revalidateOnClosure === true,
+    requireFreshRevalidation: raw.requireFreshRevalidation === undefined ? DEFAULT_STRICT_CLOSURE.requireFreshRevalidation : raw.requireFreshRevalidation === true,
+    manualConfirmation: { ...DEFAULT_STRICT_CLOSURE.manualConfirmation },
+    disallowManualFor: raw.disallowManualFor === undefined
+      ? [...DEFAULT_STRICT_CLOSURE.disallowManualFor]
+      : raw.disallowManualFor,
+  };
+
+  for (const key of ['revalidateOnClosure', 'requireFreshRevalidation']) {
+    if (raw[key] !== undefined && typeof raw[key] !== 'boolean') {
+      throw new PolicyError(`"strictClosure.${key}" must be a boolean.`);
+    }
+  }
+
+  // Contradiction guard: these only take effect when the master switch is on.
+  if (out.enabled !== true) {
+    for (const key of ['revalidateOnClosure', 'requireFreshRevalidation']) {
+      if (raw[key] === true) {
+        throw new PolicyError(`"strictClosure.${key}" is true but "strictClosure.enabled" is false; the setting would be inert. Enable strictClosure or remove the override.`);
+      }
+    }
+    if (raw.disallowManualFor !== undefined && raw.disallowManualFor.length > 0) {
+      throw new PolicyError('"strictClosure.disallowManualFor" is set but "strictClosure.enabled" is false; the setting would be inert.');
+    }
+    if (raw.manualConfirmation !== undefined) {
+      throw new PolicyError('"strictClosure.manualConfirmation" is set but "strictClosure.enabled" is false; the setting would be inert.');
+    }
+  }
+
+  if (raw.manualConfirmation !== undefined) {
+    if (!isPlainObject(raw.manualConfirmation)) {
+      throw new PolicyError('"strictClosure.manualConfirmation" must be an object.');
+    }
+    for (const key of Object.keys(raw.manualConfirmation)) {
+      if (!MANUAL_CONFIRMATION_KEYS.has(key)) {
+        throw new PolicyError(`Unknown "strictClosure.manualConfirmation" key "${key}".`);
+      }
+    }
+    for (const key of ['requireReason', 'requireExpiresAt', 'requireEnvironment', 'requireScope']) {
+      const v = raw.manualConfirmation[key];
+      if (v === undefined) continue;
+      if (typeof v !== 'boolean') throw new PolicyError(`"strictClosure.manualConfirmation.${key}" must be a boolean.`);
+      out.manualConfirmation[key] = v;
+    }
+    const mv = raw.manualConfirmation.maxValidityMs;
+    if (mv !== undefined) {
+      if (mv !== null && (!Number.isInteger(mv) || mv <= 0)) {
+        throw new PolicyError('"strictClosure.manualConfirmation.maxValidityMs" must be a positive integer or null.');
+      }
+      out.manualConfirmation.maxValidityMs = mv;
+    }
+    const skew = raw.manualConfirmation.clockSkewToleranceMs;
+    if (skew !== undefined) {
+      if (!Number.isInteger(skew) || skew < 0) {
+        throw new PolicyError('"strictClosure.manualConfirmation.clockSkewToleranceMs" must be a non-negative integer.');
+      }
+      out.manualConfirmation.clockSkewToleranceMs = skew;
+    }
+  }
+
+  if (!Array.isArray(out.disallowManualFor)) {
+    throw new PolicyError('"strictClosure.disallowManualFor" must be an array of gate names.');
+  }
+  for (const gate of out.disallowManualFor) {
+    if (!GATES.includes(gate)) {
+      throw new PolicyError(`"strictClosure.disallowManualFor" contains unknown gate "${gate}".`);
+    }
+    // A gate that is agent-owned can never be manual, so listing it is a no-op
+    // that would mislead a reader into thinking a restriction was added.
+    if (AGENT_OWNED_GATES.includes(gate)) {
+      throw new PolicyError(`"strictClosure.disallowManualFor" cannot contain agent-owned gate "${gate}"; it is never satisfied by manual confirmation.`);
+    }
+  }
+  out.disallowManualFor = [...out.disallowManualFor];
+
+  return out;
+}
+
+/**
  * Parse and validate a repository harness policy document.
  * Unknown top-level keys are rejected so misconfiguration fails loudly.
  */
@@ -204,7 +403,7 @@ export function validatePolicy(raw, defaults = DEFAULT_BUDGETS) {
     '$schema',
     'budgets', 'archive', 'output', 'retention', 'estimation', 'hook',
     'allowBudgetCeilingOverride', 'scopes', 'model', 'analyzerCommand',
-    'compileCommand', 'testCommand', 'allowEmptyFreshness',
+    'compileCommand', 'testCommand', 'allowEmptyFreshness', 'strictClosure',
   ]);
   for (const key of Object.keys(raw)) {
     if (!allowed.has(key)) {
@@ -270,6 +469,7 @@ export function validatePolicy(raw, defaults = DEFAULT_BUDGETS) {
   }
 
   const allowCeilingOverride = raw.allowBudgetCeilingOverride === true;
+  const strictClosure = resolveStrictClosure(raw.strictClosure);
 
   const resolved = {
     budgets,
@@ -280,6 +480,7 @@ export function validatePolicy(raw, defaults = DEFAULT_BUDGETS) {
     hook,
     allowBudgetCeilingOverride: allowCeilingOverride,
     allowEmptyFreshness: raw.allowEmptyFreshness === true,
+    strictClosure,
     scopes: raw.scopes || { perRun: {}, perStory: {} },
     model: raw.model || null,
     analyzerCommand: raw.analyzerCommand || null,

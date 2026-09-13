@@ -8,13 +8,13 @@
   "properties": {
     "version": {
       "type": "integer",
-      "enum": [1, 2],
-      "description": "Schema version. v1 is gate-only; v2 adds gateEvidence, activeRunId, activeWorkItem, and lastTransition."
+      "enum": [1, 2, 3],
+      "description": "Schema version. v1 is gate-only; v2 adds gateEvidence, activeRunId, activeWorkItem, and lastTransition. v3 adds strict closure (revalidation of earlier gates at each transition), manual-confirmation quality fields, and a gate-exception taxonomy — all opt-in via `strictClosure.enabled`, so a v2 document remains valid and is not retroactively invalidated."
     },
     "stateVersion": {
       "type": "integer",
-      "const": 2,
-      "description": "Present on v2 documents. Redundant with version for tooling that reads stateVersion first."
+      "enum": [2, 3],
+      "description": "Present on v2/v3 documents. Redundant with version for tooling that reads stateVersion first."
     },
     "session": {
       "type": "object",
@@ -192,7 +192,21 @@
           "gate": { "type": "string" },
           "scope": { "type": "string" },
           "rationale": { "type": "string" },
-          "expiresAt": { "type": "string", "format": "date-time" }
+          "expiresAt": { "type": "string", "format": "date-time" },
+          "category": {
+            "type": "string",
+            "enum": ["manual-compile", "budget-override", "analyzer-fallback", "unscoped-freshness", "documentation-only", "tooling-gap"],
+            "description": "v3: required on a gate-exception under strictClosure. Determines the default expiry window and whether closureReviewNote is required. Strict closure only."
+          },
+          "reason": { "type": "string", "description": "v3: why the exception was needed. Strict closure only." },
+          "closureReviewNote": {
+            "type": "string",
+            "description": "v3: who accepted this exception and what would change that judgement. Required for categories that are not documentation-only. Strict closure only."
+          },
+          "expiryExtendedReason": {
+            "type": "string",
+            "description": "v3: required when the exception expires beyond its category default."
+          }
         }
       }
     }

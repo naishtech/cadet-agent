@@ -461,25 +461,58 @@ function finalize({ status, attempts, tracker, inputTreeHash, criteriaHash, stop
 export function manualConfirmation({
   gate, workItemId, phase, projectPath, editorVersion, scope, acceptanceCriterionId = null,
   relevantFiles = [], criteria = [], rootDir = process.cwd(), approvedBy = 'user', at = new Date(),
+  reason = null, expiresAt = null, environment = null, expiresInMs = null,
 } = {}) {
   const inputTreeHash = computeInputTreeHash(rootDir, relevantFiles);
-  const evidence = createEvidence({
-    evidenceId: newId(),
-    workItemId,
-    acceptanceCriterionId,
-    phase,
-    gate,
-    status: 'manual-confirmation',
-    command: null,
-    result: `manual confirmation: project=${projectPath} editor=${editorVersion} scope=${scope}`,
-    exitCode: null,
-    inputTreeHash,
-    criteriaHash: hashCriteria(criteria),
-    relevantFiles,
-    createdAt: at,
-    source: 'manual-confirmation',
-  });
-  return { evidence, approvedBy, projectPath, editorVersion, scope, recordedAt: timestamp(at) };
+  // v3 quality fields. `scope` is declared both as the free-text `result` line
+  // (v2 shape, kept for audit) and as a machine-checkable array when supplied.
+  //
+  // SECURITY: `reason`, `result`, `scope` and the environment values are free
+  // human prose and are persisted into state.json, which is committed. The run
+  // ledger is redacted; state must be too, or a pasted token ends up in git.
+  // Redaction has no bypass (contract §8).
+  const scopeList = (Array.isArray(scope) ? scope : (scope ? [scope] : [])).map(redactString);
+  const safeReason = reason === null || reason === undefined ? null : redactString(String(reason));
+  const env = Object.fromEntries(
+    Object.entries(environment || (projectPath || editorVersion
+      ? { projectPath: projectPath || null, editorVersion: editorVersion || null }
+      : {})).map(([k, v]) => [k, typeof v === 'string' ? redactString(v) : v]),
+  );
+  const hasEnv = Object.keys(env).length > 0;
+  const expiry = expiresAt || (expiresInMs ? new Date(at.getTime() + expiresInMs) : null);
+  const resultText = [
+    'manual confirmation:',
+    projectPath ? `project=${redactString(String(projectPath))}` : null,
+    editorVersion ? `editor=${redactString(String(editorVersion))}` : null,
+    scopeList.length ? `scope=${scopeList.join('; ')}` : null,
+    safeReason ? `reason=${safeReason}` : null,
+  ].filter(Boolean).join(' ');
+
+  const evidence = {
+    ...createEvidence({
+      evidenceId: newId(),
+      workItemId,
+      acceptanceCriterionId,
+      phase,
+      gate,
+      status: 'manual-confirmation',
+      command: null,
+      result: resultText,
+      exitCode: null,
+      inputTreeHash,
+      criteriaHash: hashCriteria(criteria),
+      relevantFiles,
+      createdAt: at,
+      expiresAt: expiry,
+      source: 'manual-confirmation',
+    }),
+    // Present only when supplied, so a v2-shaped record is unchanged when the
+    // caller does not ask for the v3 fields. Values are already redacted above.
+    ...(safeReason !== null ? { reason: safeReason } : {}),
+    ...(hasEnv ? { environment: env } : {}),
+    ...(scopeList.length ? { scope: scopeList } : {}),
+  };
+  return { evidence, approvedBy, projectPath, editorVersion, scope: scopeList, reason: safeReason, environment: env, recordedAt: timestamp(at) };
 }
 
 /** Convenience: is the verification result an exhaustion that must not read as success? */

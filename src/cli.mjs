@@ -6,7 +6,7 @@ import {
   validateState, migrateStateFile, readState, writeState, evaluateTransition, applyTransition,
   workItemIdOf, loadPolicy, RunLedger, loadRun, listRuns, cleanupRuns, buildReport, formatReport,
   runVerificationLoop, commandForGate, detectCapabilities, runsDir, gitChangedFiles, PolicyError, StateError,
-  detectRepoRole, describeRepoRole,
+  detectRepoRole, describeRepoRole, GATES, manualConfirmation,
 } from './harness/index.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -39,6 +39,7 @@ function showHelp() {
     cadet-agent state transition --to <phase>   Enforce the transition matrix + evidence
 
     cadet-agent harness record      Append a sanitized span/evidence/decision event
+    cadet-agent harness confirm     Record manual-confirmation evidence (writes ledger + state)
     cadet-agent harness verify      Run a bounded, classified verification loop
     cadet-agent harness report      Summarize budget consumption and failures
     cadet-agent harness cleanup     Apply the retention policy to .cadet/runs/
@@ -49,9 +50,13 @@ function showHelp() {
     --source       Release API URL override (for forked deployments)
     --format       human|json (default: human)
     --to           Target phase (state transition)
-    --gate         Gate name (harness verify)
+    --gate         Gate name (harness verify|confirm)
     --command      Command override (harness verify)
-    --files        Comma-separated relevant files to bind evidence to (harness verify)
+    --files        Comma-separated relevant files to bind evidence to (harness verify|confirm)
+    --reason       Why automation was unavailable (harness confirm)
+    --expires-at   ISO-8601 expiry bounding the confirmation (harness confirm)
+    --environment  key=value,... describing what was verified (harness confirm)
+    --scope        Comma-separated scope of the confirmation (harness confirm)
     --agents-md    keep|overwrite|merge for an existing AGENTS.md (init/sync)
     --yes, -y      Never prompt; keep existing files (non-interactive installs)
     --help, -h    Show this help
@@ -77,6 +82,9 @@ function parseArgs(argv) {
       case '--run': opts.runId = argv[++i]; break;
       case '--type': opts.type = argv[++i]; break;
       case '--reason': opts.reason = argv[++i]; break;
+      case '--expires-at': opts.expiresAt = argv[++i]; break;
+      case '--environment': opts.environment = argv[++i]; break;
+      case '--scope': opts.scope = (argv[++i] || '').split(',').map((s) => s.trim()).filter(Boolean); break;
       case '--evidence-status': opts.evidenceStatus = argv[++i]; break;
       case '--files': opts.files = (argv[++i] || '').split(',').map((s) => s.trim()).filter(Boolean); break;
       case '--older-than-ms': opts.olderThanMs = Number(argv[++i]); break;
@@ -94,6 +102,28 @@ function emit(opts, human, json) {
   } else {
     console.log(human);
   }
+}
+
+/**
+ * Parse `--environment "projectPath=...,editorVersion=...,tool=...,host=..."`
+ * into an object. Unknown keys are preserved: an unusual environment is still
+ * evidence, and silently dropping a field would misrepresent what was verified.
+ */
+function parseEnvironment(raw) {
+  const env = {};
+  if (!raw) return env;
+  for (const part of String(raw).split(',')) {
+    const eq = part.indexOf('=');
+    if (eq === -1) {
+      const key = part.trim();
+      if (key) env[key] = true;
+      continue;
+    }
+    const key = part.slice(0, eq).trim();
+    const value = part.slice(eq + 1).trim();
+    if (key) env[key] = value;
+  }
+  return env;
 }
 
 function fail(opts, message, code = json => json.exitCode || 1, json = {}) {
@@ -127,8 +157,12 @@ async function cmdState(opts) {
       );
       return;
     }
-    // Pass rootDir so stale/foreign evidence is caught at validation time.
-    const result = validateState(state, { rootDir: opts.targetDir });
+    // Pass rootDir so stale/foreign evidence is caught at validation time, and
+    // the resolved policy so strict-closure rules are actually enforced. Without
+    // the policy, `strictClosure` was invisible here and every strict rule was
+    // silently skipped — the feature would "install cleanly and do nothing".
+    const policy = loadPolicy(opts.targetDir);
+    const result = validateState(state, { rootDir: opts.targetDir, strictClosure: policy.strictClosure });
     const role = detectRepoRole(opts.targetDir);
     const repoRoleDetail = describeRepoRole(role);
     if (opts.format === 'json') {
@@ -209,6 +243,137 @@ async function cmdHarness(opts) {
       console.log(`  Cost telemetry: ${caps.costTelemetry.available ? 'available' : `unavailable (${caps.costTelemetry.reason})`}`);
       console.log(`  Note: ${caps.hook.note}`);
     }
+    return;
+  }
+
+  if (sub === 'confirm') {
+    const gate = opts.gate;
+    if (!gate) fail(opts, 'harness confirm requires --gate <gate>');
+    if (!GATES.includes(gate)) fail(opts, `unknown gate "${gate}". Valid gates: ${GATES.join(', ')}`);
+
+    const { exists, state } = readState(opts.targetDir);
+    if (!exists) fail(opts, 'No .cadet/state.json found. Initialise state before recording confirmation.', () => 2);
+
+    const strict = policy.strictClosure?.enabled === true ? policy.strictClosure : null;
+    const mc = strict?.manualConfirmation || null;
+    // One reference instant for the whole command, captured before any work.
+    // Reading Date.now() at the check instead made the validity boundary
+    // non-deterministic: process latency absorbed a small overage, so the same
+    // input could pass or fail run to run.
+    const requestedAt = new Date();
+
+    // Collect EVERY missing field so the caller fixes the record in one pass,
+    // rather than discovering one omission per invocation.
+    const missing = [];
+    if (mc?.requireReason !== false && strict && (!opts.reason || String(opts.reason).trim() === '')) missing.push('--reason');
+    if (mc?.requireExpiresAt !== false && strict) {
+      if (!opts.expiresAt) missing.push('--expires-at');
+      else if (Number.isNaN(Date.parse(opts.expiresAt))) missing.push('--expires-at (not an ISO-8601 date-time)');
+    }
+    if (mc?.requireEnvironment !== false && strict && (!opts.environment || String(opts.environment).trim() === '')) missing.push('--environment');
+    if (mc?.requireScope !== false && strict && (!opts.scope || opts.scope.length === 0)) missing.push('--scope');
+    if (missing.length) {
+      fail(opts, `strictClosure requires manual-confirmation metadata. Missing: ${missing.join(', ')}.`, () => 1, { ok: false, gate, code: 'strict-metadata-missing', missing });
+    }
+
+    // A gate listed in disallowManualFor may never be satisfied by a human
+    // assertion; point at the automated path instead of accepting the record.
+    if (strict && Array.isArray(strict.disallowManualFor) && strict.disallowManualFor.includes(gate)) {
+      fail(opts, `manual-confirmation is not permitted for gate "${gate}" under strictClosure.disallowManualFor; run "cadet-agent harness verify --gate ${gate}" instead.`, () => 1, { ok: false, gate, code: 'manual-disallowed' });
+    }
+
+    // Bound the validity window: an expiry far in the future is how a manual
+    // assertion silently becomes permanent. Measured against `requestedAt`, the
+    // single instant captured at command start, so the boundary is deterministic
+    // and agrees with `validateState` (which anchors to the present too).
+    if (mc?.maxValidityMs !== null && mc?.maxValidityMs !== undefined && opts.expiresAt) {
+      const window = Date.parse(opts.expiresAt) - requestedAt.getTime();
+      if (Number.isFinite(window) && window > mc.maxValidityMs) {
+        fail(opts, `requested validity ${window}ms exceeds strictClosure.manualConfirmation.maxValidityMs (${mc.maxValidityMs}ms).`, () => 1, { ok: false, gate, code: 'validity-exceeded', requestedMs: window, maxValidityMs: mc.maxValidityMs });
+      }
+    }
+
+    // Freshness binding mirrors `harness verify`: never record a gate against an
+    // unknown input tree unless the repository explicitly opted out.
+    const allowEmpty = policy?.allowEmptyFreshness === true;
+    let relevantFiles;
+    if (opts.files && opts.files.length) {
+      relevantFiles = opts.files.map((f) => f.replace(/\\/g, '/'));
+    } else {
+      const changed = gitChangedFiles(opts.targetDir);
+      if (!changed.available) {
+        if (!allowEmpty) {
+          fail(opts, `cannot establish freshness coverage: ${changed.reason}. Pass --files <paths>, or enable allowEmptyFreshness in .cadet/harness.json.`, () => 1, { ok: false, gate, code: 'freshness-unavailable' });
+        }
+        relevantFiles = [];
+      } else {
+        relevantFiles = changed.files;
+      }
+    }
+
+    const workItemId = state ? workItemIdOf(state) : 'unscoped';
+    const phase = state?.session?.currentPhase || 'implementation';
+    // Reuse the command-start instant so the recorded createdAt and the validity
+    // check describe the same moment.
+    const at = requestedAt;
+    const environment = parseEnvironment(opts.environment);
+
+    const { evidence } = manualConfirmation({
+      gate,
+      workItemId,
+      phase,
+      projectPath: environment.projectPath || null,
+      editorVersion: environment.editorVersion || null,
+      scope: opts.scope || [],
+      reason: opts.reason || null,
+      expiresAt: opts.expiresAt || null,
+      environment,
+      relevantFiles,
+      rootDir: opts.targetDir,
+      approvedBy: opts.approvedBy || 'user',
+      at,
+    });
+
+    // Ledger first, then state. The ledger is append-only and merely references
+    // the evidence id; state.json carries the gate claim. Writing state first
+    // would let an interruption leave a gate claimed true with no ledger entry.
+    // This order fails toward "less proven", never "claimed but unbacked".
+    const ledger = new RunLedger({
+      targetDir: opts.targetDir,
+      policy,
+      runId: state?.activeRunId || null,
+      workItemId,
+      phase,
+    });
+    ledger.addEvidence(evidence);
+    ledger.addDecision({
+      kind: 'manual-confirmation',
+      reason: opts.reason || 'manual confirmation recorded',
+      gate,
+      evidenceId: evidence.evidenceId,
+      approvedBy: evidence.approvedBy || 'user',
+    });
+    ledger.finalize({ status: 'ok' });
+    const ledgerPath = ledger.persist();
+
+    const next = { ...state };
+    const prior = Array.isArray(state.gateEvidence) ? state.gateEvidence : [];
+    next.gateEvidence = [
+      // Immutability: supersede prior passing evidence, never delete it.
+      ...prior.map((e) => (e.gate === gate && (e.status === 'passed' || e.status === 'manual-confirmation')
+        ? { ...e, status: 'superseded', supersededBy: evidence.evidenceId }
+        : e)),
+      evidence,
+    ];
+    next.gates = { ...(state.gates || {}), [gate]: true };
+    writeState(opts.targetDir, next);
+
+    const superseded = prior.filter((e) => e.gate === gate && (e.status === 'passed' || e.status === 'manual-confirmation')).length;
+    emit(
+      opts,
+      `✅ Recorded manual confirmation for gate "${gate}". Evidence: ${evidence.evidenceId}\n   Ledger: ${ledgerPath}`,
+      { ok: true, gate, evidenceId: evidence.evidenceId, runId: ledger.runId, path: ledgerPath, stateUpdated: true, superseded },
+    );
     return;
   }
 
@@ -391,7 +556,7 @@ async function cmdHarness(opts) {
     return;
   }
 
-  fail(opts, `Unknown harness subcommand: ${sub || '(none)'}. Use record|verify|report|cleanup|capabilities.`);
+  fail(opts, `Unknown harness subcommand: ${sub || '(none)'}. Use record|confirm|verify|report|cleanup|capabilities.`);
 }
 
 export async function run(argv) {

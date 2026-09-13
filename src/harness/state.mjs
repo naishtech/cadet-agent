@@ -11,13 +11,18 @@ import { readFileSync, writeFileSync, renameSync, copyFileSync, existsSync, mkdt
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
-  PHASES, GATES, TRANSITIONS, EVIDENCE_STATUSES,
+  PHASES, GATES, TRANSITIONS, EVIDENCE_STATUSES, DEFAULT_STRICT_CLOSURE,
+  EXCEPTION_CATEGORIES, EXCEPTION_EXPIRY_DAYS, EXCEPTION_REQUIRES_REVIEW_NOTE,
 } from './policy.mjs';
 import { hashTree, hashFile, hashCriteria, timestamp, isUuid } from './util.mjs';
 
 export { PHASES, GATES, TRANSITIONS, EVIDENCE_STATUSES };
+export { EXCEPTION_CATEGORIES, EXCEPTION_EXPIRY_DAYS };
 
-export const STATE_VERSION = 2;
+export const STATE_VERSION = 3;
+
+/** Highest state version this module can read. v1/v2 remain readable. */
+export const READABLE_STATE_VERSIONS = Object.freeze([1, 2, 3]);
 
 class StateError extends Error {
   constructor(message, detail = {}) {
@@ -49,6 +54,7 @@ export function validateState(state, context = {}) {
   const errors = [];
   const warnings = [];
   const rootDir = context.rootDir || null;
+  const strict = resolveStrict(context);
   const hasTrueGate = isPlainObject(state) && isPlainObject(state.gates)
     && Object.values(state.gates).some((v) => v === true);
   if (!rootDir && hasTrueGate && context.structuralOnly !== true) {
@@ -64,8 +70,8 @@ export function validateState(state, context = {}) {
   }
 
   const version = state.version ?? state.stateVersion;
-  if (version !== 1 && version !== 2) {
-    errors.push({ path: 'version', message: `unsupported state version ${JSON.stringify(version)} (expected 1 or 2)` });
+  if (!READABLE_STATE_VERSIONS.includes(version)) {
+    errors.push({ path: 'version', message: `unsupported state version ${JSON.stringify(version)} (expected 1, 2 or 3)` });
   }
 
   if (!isPlainObject(state.session)) {
@@ -110,13 +116,22 @@ export function validateState(state, context = {}) {
     }
   }
 
-  if (version === 2) {
+  if (version === 2 || version === 3) {
     if (state.gateEvidence !== undefined && !Array.isArray(state.gateEvidence)) {
       errors.push({ path: 'gateEvidence', message: 'gateEvidence must be an array' });
     }
     if (Array.isArray(state.gateEvidence)) {
       state.gateEvidence.forEach((ev, i) => {
-        for (const e of validateEvidenceShape(ev)) errors.push({ path: `gateEvidence[${i}].${e.path}`, message: e.message });
+        for (const e of validateEvidenceShape(ev, strict)) errors.push({ path: `gateEvidence[${i}].${e.path}`, message: e.message });
+      });
+    }
+    // Gate exceptions are categorised under strict closure (contract v3 §4).
+    if (strict && Array.isArray(state.changeHistory)) {
+      state.changeHistory.forEach((entry, i) => {
+        if (entry?.type !== 'gate-exception') return;
+        for (const e of validateGateException(entry, strict)) {
+          errors.push({ path: `changeHistory[${i}].${e.path}`, message: e.message });
+        }
       });
     }
     // A claimed-true gate must be backed by evidence. This is rejected at
@@ -204,7 +219,16 @@ export function validateState(state, context = {}) {
   return { valid: errors.length === 0, errors, warnings };
 }
 
-function validateEvidenceShape(ev) {
+/**
+ * Validate the shape of one evidence record.
+ *
+ * `strict` (contract v3 §3) is the resolved `strictClosure` policy, or null when
+ * strict closure is off. When provided, a `manual-confirmation` record must carry
+ * machine-checkable `reason`, `environment`, `scope`, and a real `expiresAt` —
+ * because in v2 "declared the key" was accepted as "declared a bound", which let
+ * an unbounded record satisfy a gate.
+ */
+function validateEvidenceShape(ev, strict = null) {
   const errors = [];
   if (!isPlainObject(ev)) return [{ path: '', message: 'evidence must be an object' }];
   // Required, non-null fields (contract §2).
@@ -219,8 +243,20 @@ function validateEvidenceShape(ev) {
     if (!(field in ev)) errors.push({ path: field, message: `${field} is required (may be null)` });
   }
   // A freshness bound is mandatory: either an expiry or an explicit policy.
+  // v3 (strict only, manual-confirmation only): a *non-null* bound.
+  // An automated `passed` record is bound to files by `inputTreeHash`, so a
+  // null expiry does not mean "never stale" for it. A manual-confirmation has
+  // no such binding — its only freshness control is the expiry — so there,
+  // `expiresAt: null` + `freshnessPolicy: null` is a real hole.
+  const hasExpiry = ev.expiresAt !== undefined && ev.expiresAt !== null;
+  const hasPolicy = ev.freshnessPolicy !== undefined && ev.freshnessPolicy !== null;
   if (ev.expiresAt === undefined && ev.freshnessPolicy === undefined) {
     errors.push({ path: 'expiresAt', message: 'evidence must declare expiresAt or freshnessPolicy' });
+  } else if (strict && ev.status === 'manual-confirmation' && !hasExpiry && !hasPolicy) {
+    errors.push({
+      path: 'expiresAt',
+      message: 'strictClosure requires a usable freshness bound: expiresAt and freshnessPolicy are both null, so the record never expires',
+    });
   }
   if (ev.evidenceId !== undefined && !isUuid(ev.evidenceId)) errors.push({ path: 'evidenceId', message: 'evidenceId must be a UUIDv4' });
   if (ev.phase !== undefined && !PHASES.includes(ev.phase)) errors.push({ path: 'phase', message: `unknown phase "${ev.phase}"` });
@@ -252,6 +288,168 @@ function validateEvidenceShape(ev) {
       errors.push({ path: 'freshnessPolicy.scope', message: 'freshnessPolicy.scope must be story|phase|run|manual' });
     }
   }
+
+  if (strict && ev.status === 'manual-confirmation') {
+    errors.push(...validateManualConfirmation(ev, strict));
+  }
+
+  return errors;
+}
+
+/**
+ * Strict-closure constraints on a manual-confirmation record (contract v3 §3).
+ * Reports *every* problem at once so a caller fixes the record in one pass.
+ */
+function validateManualConfirmation(ev, strict) {
+  const errors = [];
+  const mc = strict.manualConfirmation || DEFAULT_STRICT_CLOSURE.manualConfirmation;
+
+  if (mc.requireReason !== false && (typeof ev.reason !== 'string' || ev.reason.trim() === '')) {
+    errors.push({ path: 'reason', message: 'strictClosure requires a non-empty "reason" explaining why automation was unavailable' });
+  }
+
+  if (mc.requireExpiresAt !== false) {
+    if (typeof ev.expiresAt !== 'string' || Number.isNaN(Date.parse(ev.expiresAt))) {
+      errors.push({ path: 'expiresAt', message: 'strictClosure requires a concrete "expiresAt" (a null validity bound is not accepted)' });
+    } else if (mc.maxValidityMs !== null && mc.maxValidityMs !== undefined && ev.createdAt) {
+      // A record whose createdAt lies in the future can shift both timestamps
+      // forward and stay "valid" indefinitely: the window would look legal while
+      // the assertion never expires. Reject future-dated records outright, with a
+      // small tolerance for clock skew between the writer and the validator.
+      const createdMs = Date.parse(ev.createdAt);
+      if (Number.isFinite(createdMs)) {
+        const skew = mc.clockSkewToleranceMs ?? DEFAULT_STRICT_CLOSURE.manualConfirmation.clockSkewToleranceMs;
+        if (createdMs > Date.now() + skew) {
+          errors.push({
+            path: 'createdAt',
+            message: `strictClosure rejects a future-dated "createdAt" (${ev.createdAt}); a record cannot be created in the future`,
+          });
+        }
+      }
+      const window = Date.parse(ev.expiresAt) - Date.parse(ev.createdAt);
+      if (Number.isFinite(window) && window > mc.maxValidityMs) {
+        errors.push({
+          path: 'expiresAt',
+          message: `strictClosure manual-confirmation validity (${window}ms) exceeds maxValidityMs (${mc.maxValidityMs}ms)`,
+        });
+      }
+      // The window must also be measured against the present, so that a record
+      // cannot be given an arbitrarily distant expiry by post-dating createdAt.
+      const remaining = Date.parse(ev.expiresAt) - Date.now();
+      if (Number.isFinite(remaining) && remaining > mc.maxValidityMs) {
+        errors.push({
+          path: 'expiresAt',
+          message: `strictClosure manual-confirmation expiry is ${remaining}ms from now, beyond maxValidityMs (${mc.maxValidityMs}ms)`,
+        });
+      }
+    }
+  }
+
+  if (mc.requireEnvironment !== false) {
+    const env = ev.environment;
+    if (!isPlainObject(env)) {
+      errors.push({ path: 'environment', message: 'strictClosure requires an "environment" object describing what was verified' });
+    } else if (!env.projectPath && !env.tool) {
+      errors.push({ path: 'environment', message: 'strictClosure requires "environment.projectPath" or "environment.tool"' });
+    }
+  }
+
+  if (mc.requireScope !== false) {
+    const scope = ev.scope;
+    if (!Array.isArray(scope) || scope.length === 0) {
+      errors.push({ path: 'scope', message: 'strictClosure requires a non-empty "scope" array naming what the confirmation covers' });
+    } else if (!scope.every((s) => typeof s === 'string' && s.trim() !== '')) {
+      // The schema declares items as strings; code and schema must agree, or a
+      // record validates here and then fails schema validation downstream.
+      errors.push({ path: 'scope', message: 'strictClosure requires every "scope" entry to be a non-empty string' });
+    }
+  }
+
+  if (Array.isArray(strict.disallowManualFor) && strict.disallowManualFor.includes(ev.gate)) {
+    errors.push({
+      path: 'status',
+      message: `manual-confirmation is not permitted for gate "${ev.gate}" under strictClosure.disallowManualFor; record automated evidence instead`,
+    });
+  }
+
+  return errors;
+}
+
+/**
+ * Resume the resolved strict-closure policy from whatever the caller supplied.
+ * Accepts a full resolved policy, a bare `strictClosure` block, or null.
+ * Returns null when strict closure is not active, so callers can branch cheaply
+ * and cannot accidentally apply half-strict behaviour.
+ */
+export function resolveStrict(context) {
+  if (!context) return null;
+  // Accept the shapes a caller may reasonably pass, so a resolved policy and a
+  // bare strictClosure block are interchangeable:
+  //   { strictClosure: { enabled, ... } }          — a resolved policy
+  //   { enabled, manualConfirmation, ... }         — a bare strictClosure block
+  //   { strictClosure: { strictClosure: {...} } }  — a resolved policy nested as a block
+  const nested = context.strictClosure;
+  const block = (nested && nested.strictClosure && nested.strictClosure.enabled !== undefined)
+    ? nested.strictClosure
+    : nested;
+  if (!block || block.enabled !== true) return null;
+  return {
+    ...DEFAULT_STRICT_CLOSURE,
+    ...block,
+    manualConfirmation: { ...DEFAULT_STRICT_CLOSURE.manualConfirmation, ...(block.manualConfirmation || {}) },
+    disallowManualFor: block.disallowManualFor || [...DEFAULT_STRICT_CLOSURE.disallowManualFor],
+  };
+}
+
+/**
+ * Strict-closure constraints on a `gate-exception` entry (contract v3 §4).
+ *
+ * The category is what makes an exception's expiry policy and review burden
+ * derivable instead of arbitrary. An unknown category is rejected with the valid
+ * set named, mirroring how unknown budget keys are handled: a typo must not
+ * produce an exception that silently escapes its rules.
+ */
+function validateGateException(entry, strict) {
+  const errors = [];
+  if (!entry.gate || !GATES.includes(entry.gate)) {
+    errors.push({ path: 'gate', message: `gate-exception has unknown gate "${entry.gate}"` });
+  }
+  const category = entry.category;
+  if (!category) {
+    errors.push({ path: 'category', message: `strictClosure requires a "category" on gate-exception. Valid categories: ${EXCEPTION_CATEGORIES.join(', ')}` });
+    return errors;
+  }
+  if (!EXCEPTION_CATEGORIES.includes(category)) {
+    errors.push({ path: 'category', message: `unknown exception category "${category}". Valid categories: ${EXCEPTION_CATEGORIES.join(', ')}` });
+    return errors;
+  }
+
+  if (EXCEPTION_REQUIRES_REVIEW_NOTE.includes(category)) {
+    if (typeof entry.closureReviewNote !== 'string' || entry.closureReviewNote.trim() === '') {
+      errors.push({ path: 'closureReviewNote', message: `exception category "${category}" requires a "closureReviewNote" recording who accepted it and what would change that judgement` });
+    }
+  }
+
+  // Category-derived expiry: a category default can be shortened freely, but
+  // extending it is a deliberate act that must be explained.
+  const defaultDays = EXCEPTION_EXPIRY_DAYS[category];
+  if (defaultDays !== null && defaultDays !== undefined) {
+    if (entry.expiresAt === undefined || entry.expiresAt === null) {
+      errors.push({ path: 'expiresAt', message: `exception category "${category}" requires an "expiresAt" (default window is ${defaultDays} day(s))` });
+    } else {
+      const maxMs = defaultDays * 24 * 60 * 60 * 1000;
+      const created = entry.createdAt ? Date.parse(entry.createdAt) : Date.now();
+      const expiry = Date.parse(entry.expiresAt);
+      if (Number.isFinite(expiry) && Number.isFinite(created) && expiry - created > maxMs) {
+        if (typeof entry.expiryExtendedReason !== 'string' || entry.expiryExtendedReason.trim() === '') {
+          errors.push({
+            path: 'expiryExtendedReason',
+            message: `exception category "${category}" expires beyond its ${defaultDays}-day default; state an "expiryExtendedReason" to extend it`,
+          });
+        }
+      }
+    }
+  }
   return errors;
 }
 
@@ -266,6 +464,9 @@ export function migrateStateV1toV2(v1) {
   if (v1.version === 2 || v1.stateVersion === 2) {
     return { state: { ...v1, version: 2, stateVersion: 2, gateEvidence: v1.gateEvidence || [] }, changed: false };
   }
+  if (v1.version === 3 || v1.stateVersion === 3) {
+    return { state: { ...v1, version: 3, stateVersion: 3, gateEvidence: v1.gateEvidence || [] }, changed: false };
+  }
   const gates = isPlainObject(v1.gates) ? { ...v1.gates } : {};
   for (const gate of GATES) {
     if (typeof gates[gate] !== 'boolean') gates[gate] = false;
@@ -277,10 +478,13 @@ export function migrateStateV1toV2(v1) {
       preserved[key] = value;
     }
   }
-  const v2 = {
+  // v1 migrates straight to the current version (v3). The intermediate v2
+  // shape is identical for these fields; only the version stamp differs, so a
+  // single-step migration avoids a transient on-disk v2 document.
+  const migrated = {
     ...preserved,
-    version: 2,
-    stateVersion: 2,
+    version: STATE_VERSION,
+    stateVersion: STATE_VERSION,
     session: { ...v1.session },
     epics: v1.epics || {},
     gates,
@@ -291,7 +495,7 @@ export function migrateStateV1toV2(v1) {
     spikes: v1.spikes || {},
     changeHistory: Array.isArray(v1.changeHistory) ? [...v1.changeHistory] : [],
   };
-  return { state: v2, changed: true };
+  return { state: migrated, changed: true };
 }
 
 function activeWorkItemFromState(state) {
@@ -476,14 +680,76 @@ export function activeExceptions(state, { workItemId, now = new Date() } = {}) {
 /** Required gates for a transition target, or null when the target is not gated. */
 export function requiredGates(toPhase) {
   for (const [from, spec] of Object.entries(TRANSITIONS)) {
-    if (spec.to === toPhase) return { from, gates: spec.gates };
+    if (spec.to === toPhase) return { from, gates: spec.gates, revalidate: spec.revalidate || [] };
   }
   return null;
 }
 
 /**
+ * Check one gate for a transition. Shared by the primary `gates` set and the
+ * strict-closure `revalidate` set so the two can never drift apart.
+ *
+ * `recencyFloor` implements `requireFreshRevalidation`: when supplied, evidence
+ * must have been created at or after that instant. Without it, "fresh" would mean
+ * only "not yet expired", which lets a long phase carry evidence that predates
+ * the work it is meant to attest.
+ */
+function checkGate({ gate, state, gates, exceptions, now, workItemId, fromPhase, rootDir, computeTreeHash, inputTreeHash, critHash, recencyFloor = null }) {
+  const missingGates = [];
+  const staleEvidence = [];
+
+  if (gates[gate] !== true) {
+    if (exceptions[gate]) return { missingGates, staleEvidence };
+    missingGates.push(gate);
+    return { missingGates, staleEvidence };
+  }
+
+  const evidence = latestEvidenceForGate(state, gate);
+  if (!evidence) {
+    if (exceptions[gate]) return { missingGates, staleEvidence };
+    missingGates.push(gate);
+    staleEvidence.push({ gate, reason: 'no evidence record for a claimed-true gate' });
+    return { missingGates, staleEvidence };
+  }
+
+  let currentTreeHash = inputTreeHash;
+  if (computeTreeHash) {
+    const relevant = Array.isArray(evidence.relevantFiles) ? evidence.relevantFiles : [];
+    currentTreeHash = computeInputTreeHash(rootDir, relevant);
+  }
+  const { fresh, reasons } = evidenceFreshness(evidence, {
+    now,
+    workItemId,
+    phase: fromPhase,
+    inputTreeHash: currentTreeHash,
+    criteriaHash: critHash,
+  });
+
+  const allReasons = [...reasons];
+  let stillFresh = fresh;
+  if (recencyFloor && evidence.createdAt) {
+    const created = Date.parse(evidence.createdAt);
+    if (Number.isFinite(created) && created < recencyFloor.getTime()) {
+      stillFresh = false;
+      allReasons.push('evidence predates the last transition, so it does not confirm the gate is still true now');
+    }
+  }
+
+  if (!stillFresh && !exceptions[gate]) {
+    missingGates.push(gate);
+    staleEvidence.push({ gate, evidenceId: evidence.evidenceId, reasons: allReasons });
+  }
+  return { missingGates, staleEvidence };
+}
+
+/**
  * Evaluate whether a transition is legal and evidence-backed.
- * Returns a machine-readable result: `{ allowed, toPhase, missingGates, staleEvidence, errors }`.
+ * Returns a machine-readable result:
+ * `{ allowed, toPhase, missingGates, staleEvidence, errors, revalidated }`.
+ *
+ * Strict closure (contract v3 §1) additionally re-checks the `revalidate` set for
+ * the target transition when `context.strictClosure.enabled` is true. With the
+ * flag off, only `gates` is checked and behaviour matches v2 exactly.
  */
 export function evaluateTransition(state, toPhase, context = {}) {
   const errors = [];
@@ -495,21 +761,21 @@ export function evaluateTransition(state, toPhase, context = {}) {
 
   if (!PHASES.includes(toPhase)) {
     errors.push(`unknown target phase "${toPhase}"`);
-    return { allowed: false, fromPhase, toPhase, missingGates, staleEvidence, errors };
+    return { allowed: false, fromPhase, toPhase, missingGates, staleEvidence, errors, revalidated: [] };
   }
   if (toPhase === fromPhase) {
     errors.push(`already in phase "${toPhase}"`);
-    return { allowed: false, fromPhase, toPhase, missingGates, staleEvidence, errors };
+    return { allowed: false, fromPhase, toPhase, missingGates, staleEvidence, errors, revalidated: [] };
   }
 
   const spec = requiredGates(toPhase);
   if (!spec) {
     // Ungated transitions (e.g. context-resolution → requirements) are legal.
-    return { allowed: true, fromPhase, toPhase, missingGates, staleEvidence, errors };
+    return { allowed: true, fromPhase, toPhase, missingGates, staleEvidence, errors, revalidated: [] };
   }
   if (spec.from !== fromPhase) {
     errors.push(`illegal transition "${fromPhase}" → "${toPhase}" (expected from "${spec.from}")`);
-    return { allowed: false, fromPhase, toPhase, missingGates: [...spec.gates], staleEvidence, errors };
+    return { allowed: false, fromPhase, toPhase, missingGates: [...spec.gates], staleEvidence, errors, revalidated: [] };
   }
 
   const exceptions = activeExceptions(state, { workItemId, now });
@@ -519,40 +785,30 @@ export function evaluateTransition(state, toPhase, context = {}) {
   // relevant files. This prevents a caller from silently accepting stale evidence.
   const rootDir = context.rootDir || process.cwd();
   const computeTreeHash = context.inputTreeHash === undefined && context.computeFreshness !== false;
+  const inputTreeHash = context.inputTreeHash !== undefined ? context.inputTreeHash : null;
+  const critHash = context.criteriaHash !== undefined ? context.criteriaHash : null;
+
+  const shared = { state, gates, exceptions, now, workItemId, fromPhase, rootDir, computeTreeHash, inputTreeHash, critHash };
 
   for (const gate of spec.gates) {
-    if (gates[gate] !== true) {
-      // A gate exception may substitute for a gate that is not claimed true.
-      if (exceptions[gate]) continue;
-      missingGates.push(gate);
-      continue;
-    }
-    // Gate is claimed true — require fresh, non-superseded evidence.
-    const evidence = latestEvidenceForGate(state, gate);
-    if (!evidence) {
-      if (exceptions[gate]) continue;
-      missingGates.push(gate);
-      staleEvidence.push({ gate, reason: 'no evidence record for a claimed-true gate' });
-      continue;
-    }
-    let inputTreeHash = context.inputTreeHash !== undefined ? context.inputTreeHash : null;
-    if (computeTreeHash) {
-      const relevant = Array.isArray(evidence.relevantFiles) ? evidence.relevantFiles : [];
-      // An evidence record with no relevant files cannot prove freshness of any
-      // file; the tree hash still captures "nothing relevant changed".
-      inputTreeHash = computeInputTreeHash(rootDir, relevant);
-    }
-    const critHash = context.criteriaHash !== undefined ? context.criteriaHash : null;
-    const { fresh, reasons } = evidenceFreshness(evidence, {
-      now,
-      workItemId,
-      phase: fromPhase,
-      inputTreeHash,
-      criteriaHash: critHash,
-    });
-    if (!fresh && !exceptions[gate]) {
-      missingGates.push(gate);
-      staleEvidence.push({ gate, evidenceId: evidence.evidenceId, reasons });
+    const r = checkGate({ ...shared, gate });
+    missingGates.push(...r.missingGates);
+    staleEvidence.push(...r.staleEvidence);
+  }
+
+  // Strict closure: re-derive the earlier gates at this transition.
+  const strict = resolveStrict(context);
+  const revalidated = [];
+  if (strict && strict.revalidateOnClosure !== false) {
+    const recencyFloor = strict.requireFreshRevalidation !== false && state?.lastTransition?.at
+      ? new Date(state.lastTransition.at)
+      : null;
+    for (const gate of spec.revalidate) {
+      if (spec.gates.includes(gate)) continue; // already checked as a primary gate
+      revalidated.push(gate);
+      const r = checkGate({ ...shared, gate, recencyFloor });
+      missingGates.push(...r.missingGates);
+      staleEvidence.push(...r.staleEvidence);
     }
   }
 
@@ -563,6 +819,7 @@ export function evaluateTransition(state, toPhase, context = {}) {
     missingGates,
     staleEvidence,
     errors,
+    revalidated,
     exceptions: Object.keys(exceptions),
   };
 }
@@ -572,11 +829,12 @@ export function evaluateTransition(state, toPhase, context = {}) {
  * Resets the target transition's gates is NOT done here — gates reset when a new
  * work item starts (see `resetGatesForNewWorkItem`).
  */
-export function applyTransition(state, toPhase, { evidenceIds = [], at = new Date(), inputTreeHash = undefined, criteriaHash = undefined, rootDir = undefined } = {}) {
+export function applyTransition(state, toPhase, { evidenceIds = [], at = new Date(), inputTreeHash = undefined, criteriaHash = undefined, rootDir = undefined, strictClosure = undefined } = {}) {
   const context = { now: at };
   if (inputTreeHash !== undefined) context.inputTreeHash = inputTreeHash;
   if (criteriaHash !== undefined) context.criteriaHash = criteriaHash;
   if (rootDir !== undefined) context.rootDir = rootDir;
+  if (strictClosure !== undefined) context.strictClosure = strictClosure;
   const evaluation = evaluateTransition(state, toPhase, context);
   if (!evaluation.allowed) {
     throw new StateError(

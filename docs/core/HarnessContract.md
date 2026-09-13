@@ -1,8 +1,14 @@
-# Harness Contract (v2)
+# Harness Contract (v3)
 
-> Status: **frozen** 2026-09-11 — implementation input for the harness modernization.
+> Status: **frozen** 2026-09-13 (v2 frozen 2026-09-11).
 > Canonical runtime rules live in `.cadet/agent/core/Harness.md`. This document freezes
 > the data contract and the compatibility invariants that later phases are tested against.
+>
+> **v3 revision.** Contract v3 adds strict closure, manual-confirmation quality constraints,
+> and a gate-exception taxonomy. All three are opt-in via `strictClosure.enabled`; with the
+> flag absent or `false`, behaviour is identical to v2 and a v2 document remains valid.
+> The full v3 rationale, the transition `revalidate` sets, the taxonomy table, the CLI
+> contract, and the test matrix are in [HarnessContract-v3.md](HarnessContract-v3.md).
 
 This file is the Phase 0 deliverable: the implementation contract, the compatibility
 invariants, and the contract test matrix. Any change to the items below is a breaking
@@ -17,9 +23,9 @@ These are frozen as requirements. Later phases may add fields but must not chang
 | C1 | Phase names stay exactly: `context-resolution`, `requirements`, `requirementsComplete`, `architecture`, `architectureComplete`, `spikes`, `story-breakdown`, `implementation`, `review`, `validation`, `closed`. | `harness-state.test.mjs` |
 | C2 | Skill dispatch order is unchanged (Requirements → Architecture → Spike → StoryBreakdown → TDD → Debugging → CodeReview → Resume → MCPSetup; AgentReviewer is audit-only). | `skills.test.mjs`, `adapters.test.mjs` |
 | C3 | Gate names stay exactly: `codeReviewCompleted`, `testsPassed`, `storyTrackingUpdated`, `compileCheckConfirmed`, `unityAnalyzerClean`, `acceptanceCriteriaValidated`, `securityReviewPassed`, `designArtifactSyncConfirmed`. | `skills.test.mjs`, `harness-state.test.mjs` |
-| C4 | The transition table is unchanged: `implementation→review`, `review→validation`, `validation→closed`. | `harness-state.test.mjs` |
+| C4 | The transition table targets are unchanged: `implementation→review`, `review→validation`, `validation→closed`, and the per-transition `gates` lists are unchanged. Contract v3 adds a `revalidate` set per transition, applied **only** when `strictClosure.enabled` is true (v3 §1). | `harness-state.test.mjs` |
 | C5 | User approval requirements are unchanged: no automatic commit/push/merge, no automatic approval, live-editor mutation requires explicit confirmation. | `git-guard` tests, `Harness.md` |
-| C6 | Existing v1 `state.json` files either validate unchanged after migration or receive a documented, atomic migration that leaves the original untouched on failure. | `harness-state.test.mjs` |
+| C6 | Existing v1/v2 `state.json` files either validate unchanged after migration or receive a documented, atomic migration that leaves the original untouched on failure. A v2 document stays readable and is **not** retroactively invalidated by the v3 bump; v1 migrates straight to the current version. | `harness-state.test.mjs`, `harness-cli.test.mjs` |
 | C7 | Adapters remain thin pointers; no adapter restates canonical content. | `adapters.test.mjs` |
 | C8 | `sync` preserves `.cadet/harness.json`, `.cadet/runs/`, `.cadet/agent/policies/`, `.cadet/agent/project-plans/`, `.cadet/state.json`. | `sync.test.mjs` |
 | C9 | `.cadet/.repo-role` is neither a managed nor a preserved path, and `init`/`sync` write it as `consumer-project`; `detectRepoRole` reports `framework-source` for a tree with a manifest but no state and no project-plans. | `repo-role-marker.test.mjs`, `harness-repo-role.test.mjs` |
@@ -165,3 +171,14 @@ Redaction runs before ledger persistence and before report display.
 | Adapter/skill pointers | pointers resolve | adapter restates canonical content | `adapters.test.mjs`, `skills.test.mjs` |
 | Accounting | exact + estimated usage | unknown usage never satisfies budget | `harness-ledger.test.mjs` |
 | Repository role | marker/structural detection resolves the role | malformed marker falls through; marker is not managed/preserved | `harness-repo-role.test.mjs`, `repo-role-marker.test.mjs` |
+| Strict closure off (v3) | v2 behaviour byte-identical with the flag absent | stale implementation gate does NOT block closure when off | `harness-strict-closure.test.mjs`, `harness-state.test.mjs` |
+| Closure revalidation (v3) | fresh revalidation satisfies `validation→closed` | gate valid at `implementation` but stale at closure is rejected | `harness-strict-closure.test.mjs` |
+| Revalidation recency (v3) | record newer than the last transition accepted | unexpired but older record rejected | `harness-strict-closure.test.mjs` |
+| Manual-confirmation quality (v3) | full record (reason/expiresAt/environment/scope) accepted | each missing field rejected; all reported together | `harness-strict-closure.test.mjs` |
+| Null freshness bound (v3) | `freshnessPolicy.scope` present accepted | `expiresAt: null` + `freshnessPolicy: null` rejected under strict | `harness-strict-closure.test.mjs` |
+| `disallowManualFor` (v3) | gate not in the list accepts manual evidence | `testsPassed` manual rejected with a pointer to automation | `harness-strict-closure.test.mjs` |
+| Validity window (v3) | expiry within `maxValidityMs` accepted | beyond the bound rejected | `harness-strict-closure.test.mjs` |
+| Exception taxonomy (v3) | each category accepted with expiry + review note | unknown category rejected listing the valid set; missing note rejected | `harness-strict-closure.test.mjs` |
+| Taxonomy expiry (v3) | shortening a category's default accepted | extending it without `expiryExtendedReason` rejected | `harness-strict-closure.test.mjs` |
+| `harness confirm` (v3) | writes ledger + state, flips gate, supersedes prior evidence | disallowed gate / missing metadata / over-long validity each exit 1 and write nothing | `harness-confirm-cli.test.mjs` |
+| Schema/code lockstep (v3) | schemas declare strictClosure and the taxonomy | version enum is `[1,2,3]` and defaults stay opt-in | `skills.test.mjs` |
