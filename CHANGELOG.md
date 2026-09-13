@@ -13,6 +13,13 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.32.1] — 2026-09-13
+
+### Fixed
+
+- **`harness verify-acs` wrote evidence its own validator rejected.** The command set `freshnessPolicy: 'current-story'` — a bare string — while the contract requires an object carrying a `scope` (`harness.schema.json#/$defs/freshnessPolicy` has `required: ["scope"]`; `validateEvidenceShape` enforces the same). It therefore exited 0 and flipped `acceptanceCriteriaValidated`, then `cadet-agent state validate` rejected the record it had just written with `gateEvidence[0].freshnessPolicy: freshnessPolicy must be an object or null`. It now writes `{ scope: 'story' }`.
+  - Added a round-trip regression guard: after `verify-acs`, `state validate` must exit 0. The original test asserted the produced gate value but never validated the record that carried it, which is why CI passed on self-contradicting output.
+
 ## [0.32.0] — 2026-09-13
 
 ### Added
