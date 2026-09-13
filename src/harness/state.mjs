@@ -686,6 +686,48 @@ export function requiredGates(toPhase) {
 }
 
 /**
+ * Ungated forward edges — transitions that carry no gate requirement but are
+ * still legal. These are the bootstrap and planning-progression edges from the
+ * workflow (README mermaid + Workflow.md): classification can drop straight to
+ * implementation, and the planning phases advance without gates.
+ *
+ * This list exists because `requiredGates` returns null for any phase that is
+ * never a *target* of a gated transition (implementation, requirements,
+ * architecture, …). Treating null as "ungated, therefore legal" allowed a
+ * transition into those phases from ANYWHERE — including out of the terminal
+ * `closed` phase. The set below is the closed enumeration of the intended
+ * forward edges; anything not in it (or in TRANSITIONS) is rejected.
+ */
+const UNGATED_FORWARD_EDGES = Object.freeze([
+  // Classification (context-resolution) routes to planning or straight to work.
+  ['context-resolution', 'requirements'],
+  ['context-resolution', 'architecture'],
+  ['context-resolution', 'implementation'],
+  // Planning progression.
+  ['requirements', 'architecture'],
+  ['requirements', 'requirementsComplete'],
+  ['requirementsComplete', 'architecture'],
+  ['requirementsComplete', 'architectureComplete'],
+  ['architecture', 'architectureComplete'],
+  ['architecture', 'spikes'],
+  ['requirements', 'spikes'],
+  ['requirementsComplete', 'spikes'],
+  ['architectureComplete', 'spikes'],
+  ['spikes', 'architecture'],
+  ['spikes', 'architectureComplete'],
+  ['architectureComplete', 'story-breakdown'],
+  ['spikes', 'story-breakdown'],
+  ['story-breakdown', 'implementation'],
+  // Re-entering work for a new story/epic from a review/vallidation outcome.
+  ['story-breakdown', 'story-breakdown'],
+]);
+
+/** Is `from → to` one of the declared ungated forward edges? */
+export function isUngatedForwardEdge(fromPhase, toPhase) {
+  return UNGATED_FORWARD_EDGES.some(([from, to]) => from === fromPhase && to === toPhase);
+}
+
+/**
  * Check one gate for a transition. Shared by the primary `gates` set and the
  * strict-closure `revalidate` set so the two can never drift apart.
  *
@@ -770,8 +812,15 @@ export function evaluateTransition(state, toPhase, context = {}) {
 
   const spec = requiredGates(toPhase);
   if (!spec) {
-    // Ungated transitions (e.g. context-resolution → requirements) are legal.
-    return { allowed: true, fromPhase, toPhase, missingGates, staleEvidence, errors, revalidated: [] };
+    // Ungated transitions are legal ONLY along the declared forward edges
+    // (bootstrap + planning progression). A target that is neither gated nor a
+    // declared forward edge is rejected — most importantly, this makes `closed`
+    // terminal instead of an any-to-any escape hatch.
+    if (isUngatedForwardEdge(fromPhase, toPhase)) {
+      return { allowed: true, fromPhase, toPhase, missingGates, staleEvidence, errors, revalidated: [] };
+    }
+    errors.push(`illegal transition "${fromPhase}" → "${toPhase}" (not a gated transition, and not a declared forward edge)`);
+    return { allowed: false, fromPhase, toPhase, missingGates, staleEvidence, errors, revalidated: [] };
   }
   if (spec.from !== fromPhase) {
     errors.push(`illegal transition "${fromPhase}" → "${toPhase}" (expected from "${spec.from}")`);

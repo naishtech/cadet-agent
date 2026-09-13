@@ -162,7 +162,7 @@ Before recommending the next action, validate the harness state:
 4. Check gate evidence freshness for the current work item:
    - For each claimed `true` gate, confirm a matching, non-expired, non-superseded evidence record.
    - Flag any gate whose evidence has a stale input tree hash, a different work item, or changed acceptance criteria.
-5. Determine the **next legal transition** and whether its required gates are evidence-backed. Use `cadet-agent state transition --to <phase>` as a dry check; a rejection lists the exact missing or stale gates.
+5. Determine the **next legal transition** and whether its required gates are evidence-backed. Use `cadet-agent state transition --to <phase> --dry-run`, which reports the same verdict as a real transition without writing anything — a rejection lists the exact missing or stale gates. **Always pass `--dry-run` here:** without it the command applies the transition and writes `state.json`, which mutates finalised state during what is only meant to be an inspection.
 6. Report harness findings as warnings — do not silently reconcile.
 
 ## Phase 3 — Determine Next Action
