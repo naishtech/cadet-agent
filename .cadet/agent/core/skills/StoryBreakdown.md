@@ -41,6 +41,7 @@ Decompose large work into small, independently implementable stories grouped und
 6. If a story still feels large, split it further until each story is small enough for a focused code review.
 7. **Harness contract per story:** each story must declare —
    - the acceptance-criterion ID(s) it satisfies;
+   - for every acceptance criterion, the **exact test identifier(s)** that prove it (the declared tests). A criterion that names no test is not ready: `cadet-agent harness verify-acs` checks this mapping later, and an unnamed test cannot be verified;
    - the verification command(s) and expected evidence output (report path/hash) for `testsPassed` and any Unity gates;
    - the retry policy (per-step and total) and what counts as a deterministic failure;
    - the expected context tier and tool scope (files, tests, and whether live Unity/MCP is needed).

@@ -63,3 +63,9 @@ export {
 export {
   REPO_ROLES, REPO_ROLE_MARKER, detectRepoRole, isFrameworkSourceWithoutWorkItem, describeRepoRole,
 } from './repo-role.mjs';
+
+export {
+  INVENTORY_FORMATS, COVERAGE_STATUSES, DEFAULT_MAX_REPORT_BYTES, DEFAULT_MAX_INVENTORY_ENTRIES,
+  normalizeTestName, parseTestInventory, parseStoryCriteria, parseStoryCriteriaText,
+  compareCoverage, describeCoverageGaps,
+} from './verify-acs.mjs';

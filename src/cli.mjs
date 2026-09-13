@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { install, sync } from './install.mjs';
@@ -7,6 +7,8 @@ import {
   workItemIdOf, loadPolicy, RunLedger, loadRun, listRuns, cleanupRuns, buildReport, formatReport,
   runVerificationLoop, commandForGate, detectCapabilities, runsDir, gitChangedFiles, PolicyError, StateError,
   detectRepoRole, describeRepoRole, GATES, manualConfirmation,
+  parseTestInventory, parseStoryCriteria, compareCoverage, describeCoverageGaps,
+  createEvidence, newId, computeInputTreeHash, hashCriteria,
 } from './harness/index.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -41,6 +43,7 @@ function showHelp() {
     cadet-agent harness record      Append a sanitized span/evidence/decision event
     cadet-agent harness confirm     Record manual-confirmation evidence (writes ledger + state)
     cadet-agent harness verify      Run a bounded, classified verification loop
+    cadet-agent harness verify-acs  Verify declared AC↔test coverage against a test report
     cadet-agent harness report      Summarize budget consumption and failures
     cadet-agent harness cleanup     Apply the retention policy to .cadet/runs/
     cadet-agent harness capabilities  Report available CLI/Unity/MCP/hook/token/cost telemetry
@@ -87,6 +90,9 @@ function parseArgs(argv) {
       case '--scope': opts.scope = (argv[++i] || '').split(',').map((s) => s.trim()).filter(Boolean); break;
       case '--evidence-status': opts.evidenceStatus = argv[++i]; break;
       case '--files': opts.files = (argv[++i] || '').split(',').map((s) => s.trim()).filter(Boolean); break;
+      case '--story': opts.story = argv[++i]; break;
+      case '--report': opts.report = argv[++i]; break;
+      case '--write-coverage': opts.writeCoverage = true; break;
       case '--older-than-ms': opts.olderThanMs = Number(argv[++i]); break;
       case '--agents-md': opts.agentsMd = argv[++i]; break;
       case '--yes': case '-y': opts.yes = true; break;
@@ -537,6 +543,164 @@ async function cmdHarness(opts) {
     return;
   }
 
+  if (sub === 'verify-acs') {
+    // Mechanical AC↔test verification (contract v4). Declared tests must appear
+    // in the inventory of a run that actually executed them; a name that was
+    // never written cannot be asserted into coverage.
+    if (!opts.story) fail(opts, 'harness verify-acs requires --story <path>');
+    const { exists, state } = readState(opts.targetDir);
+    const strict = policy.strictClosure?.enabled === true;
+    const workItemId = state ? workItemIdOf(state) : 'unscoped';
+    const phase = state?.session?.currentPhase || 'implementation';
+
+    let criteria;
+    try {
+      ({ criteria } = parseStoryCriteria(opts.story));
+    } catch (err) {
+      fail(opts, `cannot parse story "${opts.story}": ${err.message}`, () => 1, { ok: false, code: 'story-parse', story: opts.story });
+    }
+    if (criteria.length === 0) {
+      fail(opts, `story "${opts.story}" declares no acceptance criteria (expected a "## Acceptance Criteria" section).`, () => 1, { ok: false, code: 'no-criteria', story: opts.story });
+    }
+
+    // Resolve the inventory: an explicit --report, else the artifact of the most
+    // recent passing testsPassed evidence. Neither resolving is `blocked`, never
+    // a pass — an unproven inventory cannot satisfy coverage.
+    let reportText = null;
+    let reportSource = null;
+    let reportPath = null;
+    if (opts.report) {
+      try {
+        reportText = readFileSync(opts.report, 'utf-8');
+        reportSource = 'explicit';
+        reportPath = opts.report;
+      } catch (err) {
+        fail(opts, `cannot read --report "${opts.report}": ${err.message}`, () => 1, { ok: false, code: 'report-unreadable', report: opts.report });
+      }
+    } else if (exists) {
+      const prior = Array.isArray(state.gateEvidence) ? state.gateEvidence : [];
+      const passing = prior
+        .filter((e) => e.gate === 'testsPassed' && e.status === 'passed' && e.artifactPath)
+        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+      const newest = passing[0];
+      if (newest) {
+        try {
+          reportText = readFileSync(newest.artifactPath, 'utf-8');
+          reportSource = 'testsPassed-evidence';
+          reportPath = newest.artifactPath;
+        } catch { /* fall through to blocked */ }
+      }
+    }
+    if (reportText === null) {
+      const detail = { ok: false, story: opts.story, blocked: true, code: 'no-test-report', reason: 'no test report available: pass --report <path>, or run `cadet-agent harness verify --gate testsPassed` first so its artifact can be read.' };
+      if (opts.format === 'json') emit(opts, '', detail);
+      else console.error(`❌ ${detail.reason}`);
+      process.exit(1);
+    }
+
+    const inventory = parseTestInventory(reportText);
+    const coverage = compareCoverage(criteria, inventory);
+    const gaps = describeCoverageGaps(coverage);
+
+    // Under strict closure an unknown/empty inventory can never prove coverage,
+    // even if every AC declared no tests in a way that looked consistent.
+    const unknownInventory = inventory.format === 'unknown' || inventory.names.length === 0;
+    const effectiveOk = coverage.ok && !unknownInventory;
+
+    if (!strict) {
+      // v2/v3 parity: report, write nothing, exit 0.
+      if (opts.format === 'json') {
+        emit(opts, '', { ok: effectiveOk, story: opts.story, ac: coverage.ac, inventorySize: coverage.inventorySize, format: inventory.format, gateSet: false, reportPath });
+      } else if (effectiveOk) {
+        console.log(`✅ AC coverage verified for ${opts.story} (${coverage.ac.length} criteria, ${coverage.inventorySize} tests in inventory).`);
+        console.log('   strictClosure is off — reported only, state.json unchanged.');
+      } else {
+        console.error(`⚠️  AC coverage gaps in ${opts.story} (strictClosure off — reported only):`);
+        if (unknownInventory) console.error(`   no test inventory could be derived from ${reportPath || 'the report'} (format: ${inventory.format}).`);
+        for (const g of gaps) console.error(g);
+      }
+      if (!effectiveOk) process.exit(1);
+      return;
+    }
+
+    if (!effectiveOk) {
+      const detail = { ok: false, story: opts.story, ac: coverage.ac, inventorySize: coverage.inventorySize, format: inventory.format, gateSet: false, code: unknownInventory ? 'inventory-unknown' : 'coverage-gap' };
+      if (opts.format === 'json') emit(opts, '', detail);
+      else {
+        console.error(`❌ Cannot set acceptanceCriteriaValidated for ${opts.story}:`);
+        if (unknownInventory) console.error(`   no test inventory could be derived from ${reportPath || 'the report'} (format: ${inventory.format}). An unparseable report proves nothing.`);
+        for (const g of gaps) console.error(g);
+      }
+      process.exit(1);
+    }
+
+    const at = new Date();
+    const criteriaStrings = coverage.ac.flatMap((a) => [a.id, ...a.declared]);
+    const nowIso = at.toISOString();
+    const evidence = createEvidence({
+      evidenceId: newId(),
+      workItemId,
+      acceptanceCriterionId: null,
+      phase,
+      gate: 'acceptanceCriteriaValidated',
+      status: 'passed',
+      command: `harness verify-acs --story ${opts.story}`,
+      result: `AC coverage verified: ${coverage.ac.length} criteria, inventory ${coverage.inventorySize} (${inventory.format})`,
+      exitCode: 0,
+      inputTreeHash: computeInputTreeHash(opts.targetDir, [opts.story, ...(reportPath ? [reportPath] : [])]),
+      criteriaHash: hashCriteria(criteriaStrings),
+      relevantFiles: [opts.story, ...(reportPath ? [reportPath] : [])].map((f) => f.replace(/\\/g, '/')),
+      createdAt: at,
+      expiresAt: null,
+      freshnessPolicy: 'current-story',
+      source: 'automated',
+    });
+
+    let coveragePath = null;
+    if (opts.writeCoverage) {
+      const base = opts.story.replace(/\.md$/, '');
+      coveragePath = `${base}.coverage.json`;
+      const doc = {
+        schemaVersion: 1,
+        story: opts.story.replace(/\\/g, '/'),
+        generatedAt: nowIso,
+        ac: coverage.ac,
+        inventorySize: coverage.inventorySize,
+        format: inventory.format,
+      };
+      try { writeFileSync(coveragePath, `${JSON.stringify(doc, null, 2)}\n`, 'utf-8'); } catch { coveragePath = null; }
+    }
+
+    // Ledger first, then state — the v3 ordering: fail toward "less proven".
+    const ledger = new RunLedger({ targetDir: opts.targetDir, policy, runId: state?.activeRunId || null, workItemId, phase });
+    ledger.addEvidence(evidence);
+    ledger.addDecision({ kind: 'stop', reason: `AC coverage verified via ${reportSource}`, scope: `${coverage.ac.length} criteria` });
+    ledger.finalize({ status: 'ok' });
+    const ledgerPath = ledger.persist();
+
+    if (exists) {
+      const next = { ...state };
+      const priorEv = Array.isArray(state.gateEvidence) ? state.gateEvidence : [];
+      next.gateEvidence = [
+        ...priorEv.map((e) => (e.gate === 'acceptanceCriteriaValidated' && (e.status === 'passed' || e.status === 'manual-confirmation')
+          ? { ...e, status: 'superseded', supersededBy: evidence.evidenceId }
+          : e)),
+        evidence,
+      ];
+      next.gates = { ...(state.gates || {}), acceptanceCriteriaValidated: true };
+      writeState(opts.targetDir, next);
+    }
+
+    if (opts.format === 'json') {
+      emit(opts, '', { ok: true, story: opts.story, ac: coverage.ac, inventorySize: coverage.inventorySize, format: inventory.format, gateSet: exists, coveragePath, evidenceId: evidence.evidenceId, runId: ledger.runId, path: ledgerPath });
+    } else {
+      console.log(`✅ acceptanceCriteriaValidated for ${opts.story} (${coverage.ac.length} criteria, inventory ${coverage.inventorySize}, ${inventory.format}).`);
+      console.log(`   Ledger: ${ledgerPath}`);
+      if (coveragePath) console.log(`   Coverage: ${coveragePath}`);
+    }
+    return;
+  }
+
   if (sub === 'report') {
     const runs = listRuns(opts.targetDir);
     const target = opts.runId || runs[0]?.runId;
@@ -556,7 +720,7 @@ async function cmdHarness(opts) {
     return;
   }
 
-  fail(opts, `Unknown harness subcommand: ${sub || '(none)'}. Use record|confirm|verify|report|cleanup|capabilities.`);
+  fail(opts, `Unknown harness subcommand: ${sub || '(none)'}. Use record|confirm|verify|verify-acs|report|cleanup|capabilities.`);
 }
 
 export async function run(argv) {

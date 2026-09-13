@@ -1,6 +1,6 @@
-# Harness Contract (v3)
+# Harness Contract (v4)
 
-> Status: **frozen** 2026-09-13 (v2 frozen 2026-09-11).
+> Status: **frozen** 2026-09-13 (v2 frozen 2026-09-11; v4 frozen 2026-09-13).
 > Canonical runtime rules live in `.cadet/agent/core/Harness.md`. This document freezes
 > the data contract and the compatibility invariants that later phases are tested against.
 >
@@ -9,6 +9,13 @@
 > flag absent or `false`, behaviour is identical to v2 and a v2 document remains valid.
 > The full v3 rationale, the transition `revalidate` sets, the taxonomy table, the CLI
 > contract, and the test matrix are in [HarnessContract-v3.md](HarnessContract-v3.md).
+>
+> **v4 revision.** Contract v4 makes the acceptance-criterion → test mapping mechanical:
+> a story records the exact test identifiers that prove each AC, and under
+> `strictClosure.enabled` `acceptanceCriteriaValidated` cannot be set while a declared test
+> is absent from the run's test inventory. Also opt-in via `strictClosure.enabled`. The full
+> v4 rationale, extraction rules, coverage artifact, and CLI contract are in
+> [HarnessContract-v4.md](HarnessContract-v4.md).
 
 This file is the Phase 0 deliverable: the implementation contract, the compatibility
 invariants, and the contract test matrix. Any change to the items below is a breaking
@@ -29,6 +36,9 @@ These are frozen as requirements. Later phases may add fields but must not chang
 | C7 | Adapters remain thin pointers; no adapter restates canonical content. | `adapters.test.mjs` |
 | C8 | `sync` preserves `.cadet/harness.json`, `.cadet/runs/`, `.cadet/agent/policies/`, `.cadet/agent/project-plans/`, `.cadet/state.json`. | `sync.test.mjs` |
 | C9 | `.cadet/.repo-role` is neither a managed nor a preserved path, and `init`/`sync` write it as `consumer-project`; `detectRepoRole` reports `framework-source` for a tree with a manifest but no state and no project-plans. | `repo-role-marker.test.mjs`, `harness-repo-role.test.mjs` |
+| C10 | The story artifact records, for each acceptance criterion, a stable AC id and the declared test identifier(s) that prove it. The story is the single source of truth for the coverage claim; the epic coverage view is derived from it. | `harness-verify-acs.test.mjs`, `skills.test.mjs` |
+| C11 | Under `strictClosure.enabled`, `acceptanceCriteriaValidated` cannot be satisfied while any declared test is absent from the test inventory of the run that satisfied `testsPassed`, or while an AC declares no test. An unknown/empty inventory satisfies nothing. | `harness-verify-acs.test.mjs` |
+| C12 | `criteriaHash` for AC coverage is computed over the AC ids **and their declared test identifiers**, so renaming a declared test invalidates evidence bound to the old name. | `harness-verify-acs.test.mjs` |
 
 ## 2. Identifiers, hashes, freshness
 
@@ -171,6 +181,7 @@ Redaction runs before ledger persistence and before report display.
 | Adapter/skill pointers | pointers resolve | adapter restates canonical content | `adapters.test.mjs`, `skills.test.mjs` |
 | Accounting | exact + estimated usage | unknown usage never satisfies budget | `harness-ledger.test.mjs` |
 | Repository role | marker/structural detection resolves the role | malformed marker falls through; marker is not managed/preserved | `harness-repo-role.test.mjs`, `repo-role-marker.test.mjs` |
+| AC↔test coverage | declared tests found in the inventory ⇒ gate set | missing/undeclared test, or unknown inventory, ⇒ gate not set; strict-off writes nothing | `harness-verify-acs.test.mjs` |
 | Strict closure off (v3) | v2 behaviour byte-identical with the flag absent | stale implementation gate does NOT block closure when off | `harness-strict-closure.test.mjs`, `harness-state.test.mjs` |
 | Closure revalidation (v3) | fresh revalidation satisfies `validation→closed` | gate valid at `implementation` but stale at closure is rejected | `harness-strict-closure.test.mjs` |
 | Revalidation recency (v3) | record newer than the last transition accepted | unexpired but older record rejected | `harness-strict-closure.test.mjs` |

@@ -13,6 +13,9 @@ Technical Design: <slot id="technicalDesign" fmt="link"/>
 - [<slot id="done" opt=" |x"/>] <slot id="storyName"/> — <slot id="oneLineSummary"/>
 </slot>
 
+## Coverage
+<slot id="coverage" note="DERIVED — do not hand-author. Populate from each story's Declared tests via `cadet-agent harness verify-acs --story <path> --write-coverage`. A criterion with no executing test must render as an explicit gap, never as a plausible-looking row."/>
+
 ## Change History
 <slot id="changelog" repeat="true" header="Date|Change|Reason">
 | <slot id="date"/> | <slot id="change"/> | <slot id="reason"/> |

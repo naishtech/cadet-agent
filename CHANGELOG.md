@@ -13,6 +13,22 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.32.0] — 2026-09-13
+
+### Added
+
+- **Mechanical AC↔test verification (harness contract v4).** Closes the defect class where a recorded claim names an artifact that does not exist and nothing re-checks the name: an epic's TDD matrix named tests that were never written (`Grid_DerivedFromMap_…`, `PackageManifest_HasNoDungeonArchitect…`), and the drift was noticed only at the validation gate, after the story had merged.
+  - **C10 — declared tests.** `StoryTemplate.md` now records, per acceptance criterion, a stable AC id and the exact test identifier(s) that prove it. The story is the single source of truth for the coverage claim. `EpicTemplate.md` gains a **derived** `## Coverage` view that must never be hand-authored — the second copy of the claim is what drifted.
+  - **C11 — declared tests must have run.** New `cadet-agent harness verify-acs --story <path> [--report <path>] [--write-coverage]` extracts the identifiers of tests that actually executed (TAP, JUnit XML, and Unity JSON, auto-detected by content) and compares them against the story. Under `strictClosure.enabled`, any declared test absent from the inventory, any AC declaring no test, or any unknown/empty inventory means `acceptanceCriteriaValidated` is **not** set and the command exits 1, listing every gap with its AC id. With strict closure off it reports and exits 0 without touching `state.json` (v2/v3 parity).
+  - **C12 — drift is self-detecting.** `criteriaHash` for AC coverage is computed over the AC ids *and* their declared test identifiers, so renaming a declared test invalidates evidence bound to the old name.
+  - New `src/harness/verify-acs.mjs` (inventory extraction, story parsing, coverage comparison). An unparseable report yields an *unknown* inventory, which satisfies nothing — unknown is never silently passing (`Harness.md` §3).
+  - `Harness.md` gains a verification contract row and CLI entry for `verify-acs`; the StoryBreakdown and TDD skill contracts now require declared tests at breakdown and a `verify-acs` run during TDD.
+  - New `docs/core/HarnessContract-v4.md`; `docs/core/HarnessContract.md` records invariants C10–C12 and a contract test matrix row.
+
+### Changed
+
+- **`acceptanceCriteriaValidated` is command-backed under strict closure.** The gate was agent-owned prose; `harness verify-acs` now provides a mechanical path, and a manual confirmation for it must still pass the v3 manual-confirmation quality rules.
+
 ## [0.31.0] — 2026-09-13
 
 ## [0.30.0] — 2026-09-12

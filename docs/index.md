@@ -36,6 +36,7 @@ Cadet skills are phase-scoped instruction files. When invoked (via `/cadet-<skil
 ## Detailed process reference
 
 - [Harness Contract](core/HarnessContract.md) — frozen data contract, compatibility invariants, and the contract test matrix
+- [Harness Contract v4](core/HarnessContract-v4.md) — mechanical AC↔test verification: declared tests must appear in the run's inventory
 - [Unity CLI](core/UnityCli.md) — CLI commands vs MCP mode, and the gate→command contract
 
 ## Guidance
