@@ -13,6 +13,15 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.33.1] — 2026-09-13
+
+### Fixed
+
+- **Restored the next-story loop: `validation → implementation`.** The workflow's next-story loop is `VALIDATE → NEXT_STORY → yes → IMPL`, but `validation → implementation` was not a declared edge. 0.33.0 tightened the transition guard (replacing the "ungated ⇒ legal" fallback with an explicit edge list) and, as a side effect, made the correct way to start the next story in an epic unreachable — leaving `closed → implementation` (now correctly illegal) as the only apparent path. `validation → implementation` is now a declared ungated forward edge.
+  - `closed` remains **terminal**. It means the epic/plan is finished (`NEXT_STORY → no → CLOSED`; Resume: "All work is complete for the current epic(s)"), and it is deliberately not an escape hatch for starting the next story.
+  - Removing the pointlessness of the previous list: dropped a stray `story-breakdown → story-breakdown` self-edge (same-phase transitions are already rejected) and fixed a comment typo.
+  - Documented in README (phase-gating note), `docs/core/Workflow.md` (next-story vs. closure), and the Resume skill's `validation`/`closed` rows. Contract invariant C13 now names the next-story edge.
+
 ## [0.33.0] — 2026-09-13
 
 ### Added

@@ -134,3 +134,35 @@ describe('transition guard — illegal backward transitions', () => {
     assert.equal(evaluateTransition(stateIn('story-breakdown'), 'implementation').allowed, true);
   });
 });
+
+// ── Next-story re-entry (README: VALIDATE -> NEXT_STORY -> IMPL) ──────────────
+
+describe('next-story loop — validation → implementation', () => {
+  // The workflow's next-story loop is `VALIDATE -->|yes| IMPL` (README mermaid).
+  // `closed` is end-of-epic (`NEXT_STORY -->|no| CLOSED`), so the loop must be
+  // launchable from `validation` — not by escaping the terminal `closed` phase.
+  it('allows validation → implementation for the next story in the epic', () => {
+    const r = evaluateTransition(stateIn('validation'), 'implementation');
+    assert.equal(r.allowed, true, JSON.stringify(r));
+  });
+
+  it('is a real forwarded edge, not a loophole: closed → implementation stays rejected', () => {
+    assert.equal(evaluateTransition(stateIn('closed'), 'implementation').allowed, false);
+  });
+
+  it('closed remains terminal for every phase', () => {
+    for (const target of ['requirements', 'architecture', 'implementation', 'story-breakdown', 'validation', 'review']) {
+      assert.equal(
+        evaluateTransition(stateIn('closed'), target).allowed,
+        false,
+        `closed → ${target} must be rejected`,
+      );
+    }
+  });
+
+  it('does not make validation a general escape hatch', () => {
+    // validation only re-enters implementation; it is not a wildcard.
+    assert.equal(evaluateTransition(stateIn('validation'), 'requirements').allowed, false);
+    assert.equal(evaluateTransition(stateIn('validation'), 'architecture').allowed, false);
+  });
+});

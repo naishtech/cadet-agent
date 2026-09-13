@@ -1,6 +1,6 @@
 # Cadet-Agent Adapter Inventory
 
-> Generated: 2026-08-14 | Updated: 2026-09-13 | Framework version: 0.33.0
+> Generated: 2026-08-14 | Updated: 2026-09-13 | Framework version: 0.33.1
 
 This document tracks every IDE adapter file, its purpose, and its canonical dependency. The adapter contract is: **no IDE-specific file may duplicate canonical content from `.cadet/agent/core/`.** Each adapter must only contain frontmatter, file-reference instructions, and IDE-specific mechanics.
 

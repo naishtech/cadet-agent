@@ -718,8 +718,15 @@ const UNGATED_FORWARD_EDGES = Object.freeze([
   ['architectureComplete', 'story-breakdown'],
   ['spikes', 'story-breakdown'],
   ['story-breakdown', 'implementation'],
-  // Re-entering work for a new story/epic from a review/vallidation outcome.
-  ['story-breakdown', 'story-breakdown'],
+  // Next-story loop. The workflow is
+  //   VALIDATE -->|"gate: designArtifactSyncConfirmed"| NEXT_STORY
+  //   NEXT_STORY -->|"yes"| IMPL
+  //   NEXT_STORY -->|"no"| CLOSED
+  // so the next story in an epic re-enters implementation from `validation`.
+  // `closed` stays terminal — it means the epic/plan is finished
+  // (Resume: "All work is complete for the current epic(s)") — and is
+  // deliberately NOT an escape hatch for starting the next story.
+  ['validation', 'implementation'],
 ]);
 
 /** Is `from → to` one of the declared ungated forward edges? */
