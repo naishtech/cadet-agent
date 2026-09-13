@@ -340,6 +340,33 @@ describe('cli — harness verify-acs', () => {
       const state = JSON.parse(readFileSync(join(dir, '.cadet', 'state.json'), 'utf-8'));
       assert.equal(state.gates.acceptanceCriteriaValidated, true);
       assert.ok(state.gateEvidence.some((e) => e.gate === 'acceptanceCriteriaValidated' && e.status === 'passed'));
+
+      // The produced state must pass the tool's OWN validator. Without this the
+      // record shape can drift from the schema unnoticed (freshnessPolicy was
+      // written as a bare string while the validator requires an object).
+      const validate = runCli(['state', 'validate', '--target', dir, '--format', 'json']);
+      assert.equal(validate.status, 0, `state validate rejected verify-acs output: ${validate.stdout}${validate.stderr}`);
+      assert.equal(JSON.parse(validate.stdout).valid, true);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('writes a freshnessPolicy the schema accepts (object with a scope)', () => {
+    const { dir } = makeProject({ strict: true });
+    try {
+      const story = join(dir, 'story-ok.md');
+      writeFileSync(story, [
+        '## Acceptance Criteria',
+        '### AC-1: grid',
+        '- Given a, When b, Then c',
+        '- Declared tests: Grid_Foo',
+      ].join('\n'));
+      const res = runCli(['harness', 'verify-acs', '--story', story, '--report', join(dir, 'report.txt'), '--target', dir, '--format', 'json']);
+      assert.equal(res.status, 0, res.stderr);
+      const state = JSON.parse(readFileSync(join(dir, '.cadet', 'state.json'), 'utf-8'));
+      const ev = state.gateEvidence.find((e) => e.gate === 'acceptanceCriteriaValidated');
+      assert.ok(ev, 'evidence record must exist');
+      assert.equal(typeof ev.freshnessPolicy, 'object', 'freshnessPolicy must be an object, not a string');
+      assert.ok(['story', 'phase', 'run', 'manual'].includes(ev.freshnessPolicy.scope), 'scope must be one of story|phase|run|manual');
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 

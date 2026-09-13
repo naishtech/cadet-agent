@@ -652,7 +652,11 @@ async function cmdHarness(opts) {
       relevantFiles: [opts.story, ...(reportPath ? [reportPath] : [])].map((f) => f.replace(/\\/g, '/')),
       createdAt: at,
       expiresAt: null,
-      freshnessPolicy: 'current-story',
+      // Schema + validator require an object carrying a `scope`, not a bare
+      // string: state.schema.json#/$defs/evidence references
+      // harness.schema.json#/$defs/freshnessPolicy, which has required:["scope"]
+      // with scope ∈ story|phase|run|manual.
+      freshnessPolicy: { scope: 'story' },
       source: 'automated',
     });
 
