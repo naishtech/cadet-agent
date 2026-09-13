@@ -178,8 +178,8 @@ Based on `currentPhase` (after any reconciliation from Phase 2), determine the n
 | `story-breakdown` | Invoke the Story Breakdown skill — epics need to be broken into stories. |
 | `implementation` | Identify the current in-progress story. If none is `in-progress`, pick the first `planned` story. Invoke the TDD skill for that story. |
 | `review` | Identify the story that just completed implementation. Invoke the Code Review skill — the review hard gate must be satisfied before advancing. |
-| `validation` | Run through the validation gates. Confirm `designArtifactSyncConfirmed`, then transition to `closed`. |
-| `closed` | Report: "All work is complete for the current epic(s)." Ask if the user wants to start a new epic or close the session. |
+| `validation` | Run through the validation gates. If the epic has remaining stories, start the next one: set `activeWorkItem`, reset gates, then transition `validation → implementation` (the next-story loop). Only when no stories remain, confirm `designArtifactSyncConfirmed` and transition to `closed`. |
+| `closed` | Report: "All work is complete for the current epic(s)." `closed` is terminal — there is no transition out of it. To start new work, initialise a fresh session from `context-resolution` (or a new `story-breakdown` cycle) rather than transitioning from `closed`. Ask if the user wants to start a new epic or close the session. |
 
 ## Phase 4 — Resume
 

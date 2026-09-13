@@ -203,6 +203,13 @@ Security and quality gates apply to all paths:
 
 Set the gate to `true` in `.cadet/state.json` before advancing to `closed`.
 
+**Next story vs. closure.** `validation → closed` is taken only when the epic (and plan) has no remaining stories — `closed` is terminal, with no transition out of it. When stories remain, launch the next one from `validation`:
+
+1. Set `activeWorkItem` to the next story and reset its gates.
+2. Transition `validation → implementation` (the `NEXT_STORY → yes → IMPL` loop).
+
+Do not close each story individually. A project that closes per-story ends up in `closed` with more work to do, and `closed` cannot be left by a transition; recovering requires a deliberate, recorded state correction.
+
 ## Completion Criteria
 Work is complete when all applicable conditions are met.
 
