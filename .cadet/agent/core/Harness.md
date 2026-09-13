@@ -40,6 +40,37 @@ A gate is `true` only when backed by **fresh, structured evidence**.
   excluding generated run artifacts.
 - A gate exception is scoped to **one work item and one transition**, expires when that
   transition completes or at `expiresAt`, and never propagates to a new story.
+- **Strict closure** (`strictClosure.enabled`, opt-in, default off). When enabled, a transition
+  also re-derives the gates already satisfied in earlier phases, so a gate cannot go stale
+  during a long `review`/`validation` and still be carried into closure. With
+  `requireFreshRevalidation`, the record must be newer than the last transition, not merely
+  unexpired. When disabled, behaviour is identical to v2. See
+  `docs/core/HarnessContract-v3.md` §1–§2.
+
+## 2a. Manual-confirmation quality
+
+A `manual-confirmation` record is a human assertion with no file binding, so its only freshness
+control is its expiry. Under `strictClosure.enabled` it must carry:
+
+- `reason` — why automation was unavailable;
+- `expiresAt` — a concrete bound (`null` is rejected: declaring the key is not declaring a bound);
+- `environment` — `{ projectPath?, editorVersion?, tool?, ... }` describing what was verified;
+- `scope` — a non-empty array naming what the confirmation covers.
+
+`strictClosure.disallowManualFor` lists gates that may never be satisfied by human assertion
+(default: `testsPassed`, which is automatable everywhere). `compileCheckConfirmed` is
+deliberately not in that default list: it legitimately falls back to manual confirmation when
+the Unity CLI is absent. Prefer `cadet-agent harness confirm` over hand-editing state — it
+enforces these rules at creation time and writes the ledger and state atomically.
+
+## 2b. Exception taxonomy
+
+Under `strictClosure.enabled`, every `gate-exception` must declare a `category` from:
+`manual-compile`, `budget-override`, `analyzer-fallback`, `unscoped-freshness`,
+`documentation-only`, `tooling-gap`. The category determines the expiry window and whether a
+`closureReviewNote` is required, and an unknown category is rejected with the valid set named.
+A categorised exception is still scoped to one work item and one transition — the taxonomy
+classifies an exception, it never widens one.
 
 ## 3. Budgets
 
@@ -192,6 +223,7 @@ budget state is missing.
 - `cadet-agent state migrate` — atomically migrate v1 → v2 (original preserved on failure).
 - `cadet-agent state transition --to <phase>` — enforce the transition matrix + evidence.
 - `cadet-agent harness record` — append a sanitized span/evidence/decision event.
+- `cadet-agent harness confirm --gate <gate> --reason <t> --expires-at <iso> --environment <k=v,...> --scope <a,b> [--files a,b]` — record `manual-confirmation` evidence, the first-class path for a gate automation cannot satisfy. Validates the strict-closure metadata *before* writing, rejects a gate in `disallowManualFor`, bounds the validity window, and binds the record to files exactly as `harness verify` does. Writes the ledger and then `state.json` atomically; prior passing evidence for the gate is marked `superseded`, never deleted. Use this instead of hand-editing `state.json` — the rules in §2a are checked at creation time, when the human still remembers what was verified.
 - `cadet-agent harness verify --gate <gate> [--files a,b]` — run a bounded, classified verification loop. Evidence is bound to the relevant files given by `--files` (or the working tree's changed files). A `testsPassed` green result requires a prior red record. On success it records the new evidence in `state.json → gateEvidence` and flips the gate; prior passing evidence for that gate is marked `superseded`. The full attempt history is written to the run ledger.
 - `cadet-agent harness report` — summarize budget consumption and failures (no secrets).
 - `cadet-agent harness cleanup` — apply the retention policy to `.cadet/runs/`.

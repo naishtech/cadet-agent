@@ -127,7 +127,34 @@
         "model": { "type": ["string", "null"] },
         "analyzerCommand": { "type": ["string", "null"] },
         "compileCommand": { "type": ["string", "null"] },
-        "testCommand": { "type": ["string", "null"] }
+        "testCommand": { "type": ["string", "null"] },
+        "strictClosure": {
+          "type": "object",
+          "description": "Contract v3 strict closure. Absent or enabled:false is byte-identical v2 behaviour. Setting any other field while enabled is false is rejected as inert (contract v3 §2).",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "revalidateOnClosure": { "type": "boolean", "default": true },
+            "requireFreshRevalidation": { "type": "boolean", "default": true },
+            "manualConfirmation": {
+              "type": "object",
+              "properties": {
+                "requireReason": { "type": "boolean", "default": true },
+                "requireExpiresAt": { "type": "boolean", "default": true },
+                "requireEnvironment": { "type": "boolean", "default": true },
+                "requireScope": { "type": "boolean", "default": true },
+                "maxValidityMs": { "type": ["integer", "null"], "minimum": 1, "default": 86400000 },
+                "clockSkewToleranceMs": { "type": "integer", "minimum": 0, "default": 60000 }
+              },
+              "additionalProperties": false
+            },
+            "disallowManualFor": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/gate" },
+              "default": ["testsPassed"]
+            }
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": false
     },
@@ -171,7 +198,28 @@
         "expiresAt": { "type": ["string", "null"], "format": "date-time" },
         "freshnessPolicy": { "oneOf": [{ "$ref": "#/$defs/freshnessPolicy" }, { "type": "null" }] },
         "supersededBy": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
-        "source": { "type": "string", "enum": ["automated", "manual-confirmation", "provider"] }
+        "source": { "type": "string", "enum": ["automated", "manual-confirmation", "provider"] },
+        "reason": {
+          "type": "string",
+          "description": "v3: why automation was unavailable. Required on a manual-confirmation under strictClosure (contract v3 §3)."
+        },
+        "environment": {
+          "type": "object",
+          "description": "v3: what was actually verified and against which toolchain. Required on a manual-confirmation under strictClosure. At least one of projectPath/tool must be present.",
+          "properties": {
+            "projectPath": { "type": ["string", "null"] },
+            "editorVersion": { "type": ["string", "null"] },
+            "tool": { "type": ["string", "null"] },
+            "host": { "type": ["string", "null"] },
+            "os": { "type": ["string", "null"] }
+          },
+          "additionalProperties": true
+        },
+        "scope": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "v3: what the confirmation covers. Required non-empty on a manual-confirmation under strictClosure. Distinct from the free-text result, which is never machine-read."
+        }
       },
       "additionalProperties": false
     },

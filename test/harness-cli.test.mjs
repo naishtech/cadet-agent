@@ -68,7 +68,8 @@ describe('cli — state', () => {
       assert.equal(res.status, 0);
       assert.equal(JSON.parse(res.stdout).migrated, true);
       const after = JSON.parse(readFileSync(join(dir, '.cadet', 'state.json'), 'utf-8'));
-      assert.equal(after.version, 2);
+      // v1 migrates to the current version (contract v3 §1 C6).
+      assert.equal(after.version, 3);
       assert.equal(existsSync(join(dir, '.cadet', 'state.json.v1.bak')), true);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });

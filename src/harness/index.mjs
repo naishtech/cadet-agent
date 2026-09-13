@@ -8,7 +8,8 @@
 export {
   PHASES, GATES, TRANSITIONS, EVIDENCE_STATUSES, RETRY_CLASSES, CONTEXT_TIERS,
   DEFAULT_BUDGETS, HARD_CEILINGS, DEFAULT_ARCHIVE_LIMITS, DEFAULT_OUTPUT_POLICY,
-  DEFAULT_RETENTION, DEFAULT_ESTIMATION, DEFAULT_HOOK_POLICY,
+  DEFAULT_RETENTION, DEFAULT_ESTIMATION, DEFAULT_HOOK_POLICY, DEFAULT_STRICT_CLOSURE,
+  EXCEPTION_CATEGORIES, EXCEPTION_EXPIRY_DAYS, EXCEPTION_REQUIRES_REVIEW_NOTE, AGENT_OWNED_GATES,
   validatePolicy, defaultPolicy, loadPolicy, budgetForScope, policyPath, PolicyError,
 } from './policy.mjs';
 
@@ -22,9 +23,9 @@ export {
 } from './util.mjs';
 
 export {
-  STATE_VERSION, validateState, migrateStateV1toV2, migrateStateFile,
+  STATE_VERSION, READABLE_STATE_VERSIONS, validateState, migrateStateV1toV2, migrateStateFile,
   createEvidence, computeInputTreeHash, workItemIdOf, evidenceFreshness,
-  latestEvidenceForGate, activeExceptions, requiredGates, evaluateTransition,
+  latestEvidenceForGate, activeExceptions, requiredGates, evaluateTransition, resolveStrict,
   applyTransition, resetGatesForNewWorkItem, statePathFor, readState, writeState, writeJsonAtomic, StateError,
 } from './state.mjs';
 

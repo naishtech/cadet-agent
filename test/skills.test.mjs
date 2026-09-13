@@ -160,12 +160,36 @@ describe('state.schema.json', () => {
     }
   });
 
-  it('accepts both v1 and v2 state documents', () => {
+  it('accepts v1, v2 and v3 state documents', () => {
     const schema = JSON.parse(readFileSync(join(coreDir, 'state.schema.json'), 'utf-8'));
-    assert.deepEqual(schema.properties.version.enum, [1, 2]);
+    // Enum updated in lockstep with the contract v3 bump. v1 and v2 remain
+    // readable: the bump must not invalidate existing documents.
+    assert.deepEqual(schema.properties.version.enum, [1, 2, 3]);
     for (const field of ['stateVersion', 'gateEvidence', 'activeRunId', 'activeWorkItem', 'lastTransition']) {
-      assert.ok(schema.properties[field], `v2 schema must define ${field}`);
+      assert.ok(schema.properties[field], `v2/v3 schema must define ${field}`);
     }
+  });
+
+  it('declares the v3 strict-closure policy and evidence fields', () => {
+    const stateSchema = JSON.parse(readFileSync(join(coreDir, 'state.schema.json'), 'utf-8'));
+    const harnessSchema = JSON.parse(readFileSync(join(coreDir, 'harness.schema.json'), 'utf-8'));
+    // The policy knob must exist in the schema, or a user could not enable it.
+    const strict = harnessSchema.$defs.policy.properties.strictClosure;
+    assert.ok(strict, 'harness.schema.json must define policy.strictClosure');
+    assert.equal(strict.properties.enabled.default, false, 'strictClosure must default to off (opt-in)');
+    assert.deepEqual(strict.properties.disallowManualFor.default, ['testsPassed']);
+    // The manual-confirmation quality fields must be expressible.
+    for (const field of ['reason', 'environment', 'scope']) {
+      assert.ok(harnessSchema.$defs.evidence.properties[field], `evidence schema must define ${field}`);
+    }
+    // The exception taxonomy must be expressible on a gate-exception entry.
+    const changeEntry = stateSchema.properties.changeHistory.items.properties;
+    assert.ok(changeEntry.category, 'changeHistory entry must define category');
+    assert.ok(changeEntry.closureReviewNote, 'changeHistory entry must define closureReviewNote');
+    assert.deepEqual(changeEntry.category.enum, [
+      'manual-compile', 'budget-override', 'analyzer-fallback',
+      'unscoped-freshness', 'documentation-only', 'tooling-gap',
+    ]);
   });
 });
 

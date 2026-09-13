@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import {
   validateState, migrateStateV1toV2, migrateStateFile, evaluateTransition, applyTransition,
   createEvidence, computeInputTreeHash, evidenceFreshness, latestEvidenceForGate,
-  resetGatesForNewWorkItem, workItemIdOf, requiredGates, StateError, GATES, PHASES,
+  resetGatesForNewWorkItem, workItemIdOf, requiredGates, StateError, GATES, PHASES, STATE_VERSION,
 } from '../src/harness/state.mjs';
 import { newId, hashCriteria, sha256, hashTree } from '../src/harness/util.mjs';
 
@@ -196,12 +196,14 @@ describe('state — validation', () => {
 });
 
 describe('state — migration', () => {
-  it('migrates v1 to v2 and fills every gate', () => {
+  it('migrates v1 to the current version and fills every gate', () => {
     const v1 = load('v1-minimal-valid.json');
     const { state, changed } = migrateStateV1toV2(v1);
     assert.equal(changed, true);
-    assert.equal(state.version, 2);
-    assert.equal(state.stateVersion, 2);
+    // v1 migrates straight to the current version. Contract v3 §1 C6 keeps v2
+    // readable but does not leave a migrated document at v2.
+    assert.equal(state.version, STATE_VERSION);
+    assert.equal(state.stateVersion, STATE_VERSION);
     for (const gate of GATES) assert.equal(typeof state.gates[gate], 'boolean');
     assert.deepEqual(state.gateEvidence, []);
     assert.equal(state.session.currentPhase, 'implementation');
@@ -219,8 +221,24 @@ describe('state — migration', () => {
   });
 
   it('is idempotent on an already-v2 document', () => {
-    const { changed } = migrateStateV1toV2(load('v2-minimal-valid.json'));
+    const { changed, state } = migrateStateV1toV2(load('v2-minimal-valid.json'));
     assert.equal(changed, false);
+    // A v2 document is NOT silently rewritten to v3 by a read: the version bump
+    // must not invalidate existing evidence, so an explicit migration is needed.
+    assert.equal(state.version, 2);
+  });
+
+  it('is idempotent on an already-v3 document', () => {
+    const { changed, state } = migrateStateV1toV2({ version: STATE_VERSION, session: {}, gates: {} });
+    assert.equal(changed, false);
+    assert.equal(state.version, STATE_VERSION);
+  });
+
+  it('does not retroactively invalidate legacy manual evidence when read as v3', () => {
+    // The opt-in guarantee at migration level: v2 evidence keeps its shape.
+    const v2 = load('v2-minimal-valid.json');
+    const r = validateState({ ...v2, version: 3, stateVersion: 3 }, { structuralOnly: true });
+    assert.equal(r.valid, true, JSON.stringify(r.errors));
   });
 
   it('migrates atomically on disk and leaves a backup', () => {
@@ -232,7 +250,7 @@ describe('state — migration', () => {
       const result = migrateStateFile(statePath);
       assert.equal(result.migrated, true);
       const after = JSON.parse(readFileSync(statePath, 'utf-8'));
-      assert.equal(after.version, 2);
+      assert.equal(after.version, STATE_VERSION);
       assert.equal(existsSync(`${statePath}.v1.bak`), true);
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -255,9 +273,34 @@ describe('state — migration', () => {
 
 describe('state — transitions', () => {
   it('exposes the frozen transition requirements', () => {
+    // C4: the `gates` list per transition is unchanged by contract v3.
     assert.deepEqual(requiredGates('review').gates, ['testsPassed', 'compileCheckConfirmed', 'unityAnalyzerClean', 'storyTrackingUpdated']);
     assert.deepEqual(requiredGates('validation').gates, ['codeReviewCompleted', 'securityReviewPassed', 'acceptanceCriteriaValidated']);
     assert.deepEqual(requiredGates('closed').gates, ['designArtifactSyncConfirmed']);
+  });
+
+  it('exposes the v3 revalidation sets (C4 revised)', () => {
+    // C4 revised: `revalidate` is new in v3 and is applied only under
+    // strictClosure. Pinned here so the rule cannot drift from the contract doc.
+    assert.deepEqual(requiredGates('review').revalidate, []);
+    assert.deepEqual(requiredGates('validation').revalidate, ['testsPassed', 'compileCheckConfirmed', 'unityAnalyzerClean', 'storyTrackingUpdated']);
+    assert.deepEqual(requiredGates('closed').revalidate, [
+      'codeReviewCompleted', 'securityReviewPassed', 'acceptanceCriteriaValidated',
+      'testsPassed', 'compileCheckConfirmed', 'unityAnalyzerClean', 'storyTrackingUpdated',
+    ]);
+  });
+
+  it('does not apply revalidation when strictClosure is absent', () => {
+    // The opt-in guarantee: a stale implementation gate must NOT block closure
+    // when the flag is off, or v2 repositories would break on upgrade.
+    const state = v2State({
+      session: { workflowPath: 'large', currentPhase: 'validation', trackingMode: 'markdown' },
+      gates: { designArtifactSyncConfirmed: true },
+      gateEvidence: [passingEvidence('designArtifactSyncConfirmed', { phase: 'validation' })],
+    });
+    const r = evaluateTransition(state, 'closed', { inputTreeHash: sha256('tree') });
+    assert.equal(r.allowed, true, JSON.stringify(r));
+    assert.deepEqual(r.revalidated, []);
   });
 
   it('rejects an illegal transition and lists the missing gates', () => {
