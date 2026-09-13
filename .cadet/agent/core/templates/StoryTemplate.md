@@ -6,7 +6,9 @@ Estimate: <slot id="estimate" opt="Small|Medium" note="completable in a single s
 
 ## Acceptance Criteria
 <slot id="ac" repeat="true">
+### <slot id="acId" fmt="AC-N"/>: <slot id="acTitle"/>
 - Given <slot id="given"/>, When <slot id="when"/>, Then <slot id="then"/>
+- Declared tests: <slot id="declaredTests" note="exact test identifiers that prove this AC; one per line; must appear in the test report"/>
 </slot>
 
 ## Scope

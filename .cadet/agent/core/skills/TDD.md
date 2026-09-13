@@ -43,9 +43,10 @@ Apply mandatory test-driven development so behavior is validated before and afte
 4. **Verify through the harness, not by assertion:** run `cadet-agent harness verify --gate testsPassed` (or `npm test` / `unity test <project> --format json` for Unity). The result creates fresh evidence bound to the work item, input tree hash, and acceptance criterion.
 5. Refactor safely while keeping tests green; re-run verification after every refactor.
 6. Add or adjust coverage for edge cases and regression protection.
-7. Map tests to acceptance criteria and planned tasks.
-8. Report test outcomes clearly, including the evidence IDs that back each criterion.
-9. If Unity code changed, ask the user to focus the Unity window and trigger recompilation; record a `manual-confirmation` for `compileCheckConfirmed` unless Unity CLI is available.
+7. Map tests to acceptance criteria and planned tasks. Record the **exact test identifiers** against the AC they prove, in the story — this is the declared-test mapping, and it is what makes coverage checkable.
+8. **Verify declared tests actually ran:** run `cadet-agent harness verify-acs --story <path>`. A declared test that does not appear in the test report is a renamed or unwritten test; fix the story or write the test. Do not mark coverage complete on the strength of the declaration alone.
+9. Report test outcomes clearly, including the evidence IDs that back each criterion.
+10. If Unity code changed, ask the user to focus the Unity window and trigger recompilation; record a `manual-confirmation` for `compileCheckConfirmed` unless Unity CLI is available.
 
 ## Retry and stop rules
 

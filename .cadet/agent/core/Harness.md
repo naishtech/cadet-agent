@@ -122,6 +122,7 @@ Every attempt gets a span and evidence record. A retry never overwrites a failed
 | `testsPassed` | `npm test` (this repo) / `unity test <project> --format json` | exit 0 + report | nonzero; parse the report (path + hash are evidence) |
 | `compileCheckConfirmed` | `unity build <project> --target StandaloneWindows64 -o <tmp> --format json` or a configured compile command | exit 0 | nonzero |
 | `unityAnalyzerClean` | `unity run <project> --command <analyzer-cmd> --format json` | exit 0 + zero `UNT*` | nonzero or any `UNT*` |
+| `acceptanceCriteriaValidated` | `cadet-agent harness verify-acs --story <path>` | every declared AC test appears in the run's inventory | a declared test is absent, an AC declares none, or the inventory is unknown |
 
 - If Unity CLI is unavailable, `compileCheckConfirmed` may be satisfied by a user
   `manual-confirmation` record (project path, editor version, timestamp, scope).
@@ -129,6 +130,12 @@ Every attempt gets a span and evidence record. A retry never overwrites a failed
 - **Evidence is bound to relevant files.** `cadet-agent harness verify` hashes the files given by
   `--files` (or the working tree's changed files by default) into the evidence `inputTreeHash`, so a
   later edit to any of them invalidates the evidence and blocks the transition.
+- **A declared test must actually run.** Each acceptance criterion in a story records the exact
+  test identifiers that prove it. Under `strictClosure.enabled`, `acceptanceCriteriaValidated`
+  cannot be set while any declared test is absent from the inventory of the run that satisfied
+  `testsPassed`. The check is mechanical: an unparseable report yields an *unknown* inventory,
+  which proves nothing and cannot satisfy the gate. Editing a declared test name invalidates
+  evidence bound to the old name, because AC ids and test names participate in `criteriaHash`.
 - **Freshness cannot be silently skipped.** If Git cannot be queried and no `--files` are given,
   verification is blocked (`freshness-unavailable`) rather than recorded against an empty input tree.
   A project may opt out explicitly with `allowEmptyFreshness: true` in `.cadet/harness.json`.
@@ -209,7 +216,7 @@ budget state is missing.
 | Requirements | Tier 0/1 context | context manifest, assumption notes | per run | policy/state unreadable |
 | Architecture | requirements evidence | context manifest, ADR links, verification plan | per run | requirements not finalized |
 | Spike | unverified assumption | bounded spike evidence artifact | `maxToolCalls`, `maxWallClockMs` | spike budget exhausted |
-| StoryBreakdown | design evidence | per-story verification commands + evidence outputs | per run | acceptance criteria unmapped |
+| StoryBreakdown | design evidence | per-story verification commands + evidence outputs, AC ids + declared tests | per run | acceptance criteria unmapped or an AC declares no test |
 | TDD | red record, acceptance criterion | `testsPassed` red→green evidence | `maxRetriesPerStep` | no red record for a testable change |
 | Debugging | reproduce record | per-attempt spans, regression evidence | `maxTotalRetries` | deterministic failure retried blindly |
 | CodeReview | run ledger, gate evidence | review decision + findings | per run | gate evidence stale/missing |
@@ -225,6 +232,7 @@ budget state is missing.
 - `cadet-agent harness record` — append a sanitized span/evidence/decision event.
 - `cadet-agent harness confirm --gate <gate> --reason <t> --expires-at <iso> --environment <k=v,...> --scope <a,b> [--files a,b]` — record `manual-confirmation` evidence, the first-class path for a gate automation cannot satisfy. Validates the strict-closure metadata *before* writing, rejects a gate in `disallowManualFor`, bounds the validity window, and binds the record to files exactly as `harness verify` does. Writes the ledger and then `state.json` atomically; prior passing evidence for the gate is marked `superseded`, never deleted. Use this instead of hand-editing `state.json` — the rules in §2a are checked at creation time, when the human still remembers what was verified.
 - `cadet-agent harness verify --gate <gate> [--files a,b]` — run a bounded, classified verification loop. Evidence is bound to the relevant files given by `--files` (or the working tree's changed files). A `testsPassed` green result requires a prior red record. On success it records the new evidence in `state.json → gateEvidence` and flips the gate; prior passing evidence for that gate is marked `superseded`. The full attempt history is written to the run ledger.
+- `cadet-agent harness verify-acs --story <path> [--report <path>] [--write-coverage]` — mechanically verify that every test a story declares for an acceptance criterion actually ran. The story is the single source of truth for the AC→test mapping; the inventory is extracted from a test report (TAP, JUnit XML, or Unity JSON), auto-detected by content. Under `strictClosure.enabled`, any declared test absent from the inventory, any AC that declares no test, or an unknown/empty inventory means `acceptanceCriteriaValidated` is **not** set and the command exits 1, listing every gap with its AC id. With strict closure off it reports and exits 0 without touching `state.json`. `--write-coverage` additionally writes a derived `*.coverage.json` artifact.
 - `cadet-agent harness report` — summarize budget consumption and failures (no secrets).
 - `cadet-agent harness cleanup` — apply the retention policy to `.cadet/runs/`.
 - `cadet-agent harness capabilities` — report available CLI/Unity/MCP/hook/token/cost telemetry.
