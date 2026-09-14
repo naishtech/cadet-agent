@@ -126,8 +126,9 @@ truncated region).
 ```
 
 `status` ∈ `covered | missing | undeclared`. `undeclared` means the AC declares no test (a C10
-violation). The artifact is **derived**, so it is never hand-edited; regenerating it is cheap and
-idempotent apart from `generatedAt`.
+violation). **It does not mean the inverse** — see §5.2 for orphaned tests, which are the direction
+this field's name misleadingly suggests. The artifact is **derived**, so it is never hand-edited;
+regenerating it is cheap and idempotent apart from `generatedAt`.
 
 ## 5. CLI: `cadet-agent harness verify-acs`
 
@@ -135,7 +136,7 @@ idempotent apart from `generatedAt`.
 cadet-agent harness verify-acs \
   --story .cadet/agent/project-plans/epic-1-player-movement/story-2-grid.md \
   --report .cadet/runs/<runId>/artifacts/<artifact> \
-  [--run <runId>] [--write-coverage] [--format json]
+  [--run <runId>] [--write-coverage] [--strict-orphans] [--format json]
 ```
 
 ### 5.1 Behaviour contract
@@ -157,9 +158,27 @@ cadet-agent harness verify-acs \
    `criteriaHash`), the gate is flipped, and prior passing evidence for the gate is superseded —
    the same lifecycle as any other gate.
 7. **`--write-coverage`** additionally writes the §4 artifact.
-8. **`--format json`** returns `{ ok, story, ac, inventorySize, format, gateSet, coveragePath }`.
+8. **`--format json`** returns `{ ok, story, ac, orphaned, inventorySize, format, gateSet, coveragePath }`.
 
-### 5.2 Relationship to `acceptanceCriteriaValidated`
+### 5.2 Orphaned tests (the inverse direction)
+
+The declared→delivered comparison in §5.1 step 3 iterates the criteria, so it cannot see a test
+that **ran but is declared on no acceptance criterion**. Such tests were invisible to `verify-acs`;
+the drift was historically caught by hand. §5.2 closes that direction.
+
+- `compareCoverage` returns `orphaned`: the normalized names of inventory tests that appear in no
+  AC's declared list, in report order and deduped. The union of all declared names is used, so a
+  test declared on *any* criterion is not an orphan.
+- **Orphans do not affect `ok` and are not fatal by default.** Consumers legitimately carry helper
+  tests, fixtures and parameterised wrappers that prove no single criterion; making orphans fatal
+  would fail every such story. They are reported on stderr — including on the success path — so
+  they remain visible when stdout is piped or parsed as JSON.
+- **`--strict-orphans`** makes them fatal: `ok` is false, exit is 1, and under strict closure the
+  gate is left unset with `code: "orphaned-tests"`.
+- An empty or unparseable inventory produces `orphaned: []`. Unknown is never silently zero, but it
+  is also not evidence of drift in either direction.
+
+### 5.3 Relationship to `acceptanceCriteriaValidated`
 
 v2/v3 classify `acceptanceCriteriaValidated` as agent-owned
 (`docs/core/UnityCli.md`). v4 makes it **command-backed when strict closure is on**, without

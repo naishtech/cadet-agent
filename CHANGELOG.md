@@ -13,6 +13,16 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.34.0] — 2026-09-14
+
+### Added
+
+- **`harness verify-acs` now detects orphaned tests — the inverse of the existing declared→delivered check.** `compareCoverage` previously iterated only the acceptance criteria, so a test that *ran* but was declared on no criterion was invisible to the tool. The drift was found repeatedly by hand (four times in one project) and never by `verify-acs`, because the check only ever looked in one direction. Its `undeclared` status made this worse than a gap: the name reads as though it covers the inverse case, but it actually means "this AC declares no tests".
+  - `compareCoverage` returns a new `orphaned` array (normalized names, in report order, deduped). `describeCoverageGaps` gains `{ includeOrphans: true }`.
+  - Orphans are **reported by default and are not fatal**, because consumers legitimately carry helper tests and fixtures that belong to no single criterion; making them fatal would have broken every existing story. Pass `--strict-orphans` to make them fail the check (`code: "orphaned-tests"`, gate left unset).
+  - Warnings are written to stderr, so an orphan stays visible even when the command succeeds and stdout is piped or parsed as JSON.
+  - Tests cover the inverse direction directly, including a discrimination check that fails when the detection is removed — the assertion the old behaviour lacked.
+
 ## [0.33.1] — 2026-09-13
 
 ### Fixed

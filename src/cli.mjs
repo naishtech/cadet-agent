@@ -94,6 +94,7 @@ function parseArgs(argv) {
       case '--story': opts.story = argv[++i]; break;
       case '--report': opts.report = argv[++i]; break;
       case '--write-coverage': opts.writeCoverage = true; break;
+      case '--strict-orphans': opts.strictOrphans = true; break;
       case '--dry-run': opts.dryRun = true; break;
       case '--older-than-ms': opts.olderThanMs = Number(argv[++i]); break;
       case '--agents-md': opts.agentsMd = argv[++i]; break;
@@ -618,37 +619,58 @@ async function cmdHarness(opts) {
     const inventory = parseTestInventory(reportText);
     const coverage = compareCoverage(criteria, inventory);
     const gaps = describeCoverageGaps(coverage);
+    // The inverse direction: tests that ran but are declared on no AC. Always
+    // reported; only fatal when explicitly requested, because a consumer may
+    // legitimately carry helper tests that belong to no single criterion.
+    const orphanGaps = describeCoverageGaps(coverage, { includeOrphans: true }).slice(gaps.length);
+    const orphans = coverage.orphaned || [];
 
     // Under strict closure an unknown/empty inventory can never prove coverage,
     // even if every AC declared no tests in a way that looked consistent.
     const unknownInventory = inventory.format === 'unknown' || inventory.names.length === 0;
-    const effectiveOk = coverage.ok && !unknownInventory;
+    const orphanBlocking = opts.strictOrphans === true && orphans.length > 0;
+    const effectiveOk = coverage.ok && !unknownInventory && !orphanBlocking;
 
     if (!strict) {
       // v2/v3 parity: report, write nothing, exit 0.
       if (opts.format === 'json') {
-        emit(opts, '', { ok: effectiveOk, story: opts.story, ac: coverage.ac, inventorySize: coverage.inventorySize, format: inventory.format, gateSet: false, reportPath });
+        emit(opts, '', { ok: effectiveOk, story: opts.story, ac: coverage.ac, orphaned: orphans, inventorySize: coverage.inventorySize, format: inventory.format, gateSet: false, reportPath });
       } else if (effectiveOk) {
         console.log(`✅ AC coverage verified for ${opts.story} (${coverage.ac.length} criteria, ${coverage.inventorySize} tests in inventory).`);
         console.log('   strictClosure is off — reported only, state.json unchanged.');
+        if (orphans.length > 0) {
+          // A warning goes to stderr even on the success path, so it is not lost
+          // in stdout piping and matches how every other warning is emitted.
+          console.error(`   ⚠️  ${orphans.length} test(s) declared on no acceptance criterion (reported only):`);
+          for (const g of orphanGaps) console.error(g);
+        }
       } else {
         console.error(`⚠️  AC coverage gaps in ${opts.story} (strictClosure off — reported only):`);
         if (unknownInventory) console.error(`   no test inventory could be derived from ${reportPath || 'the report'} (format: ${inventory.format}).`);
         for (const g of gaps) console.error(g);
+        for (const g of orphanGaps) console.error(g);
       }
       if (!effectiveOk) process.exit(1);
       return;
     }
 
     if (!effectiveOk) {
-      const detail = { ok: false, story: opts.story, ac: coverage.ac, inventorySize: coverage.inventorySize, format: inventory.format, gateSet: false, code: unknownInventory ? 'inventory-unknown' : 'coverage-gap' };
+      const detail = { ok: false, story: opts.story, ac: coverage.ac, orphaned: orphans, inventorySize: coverage.inventorySize, format: inventory.format, gateSet: false, code: unknownInventory ? 'inventory-unknown' : (orphanBlocking ? 'orphaned-tests' : 'coverage-gap') };
       if (opts.format === 'json') emit(opts, '', detail);
       else {
         console.error(`❌ Cannot set acceptanceCriteriaValidated for ${opts.story}:`);
         if (unknownInventory) console.error(`   no test inventory could be derived from ${reportPath || 'the report'} (format: ${inventory.format}). An unparseable report proves nothing.`);
         for (const g of gaps) console.error(g);
+        if (orphanBlocking) for (const g of orphanGaps) console.error(g);
       }
       process.exit(1);
+    }
+
+    if (orphans.length > 0) {
+      // Passing, but the inverse-direction drift is visible rather than silent.
+      const notice = `⚠️  ${orphans.length} test(s) ran but are declared on no acceptance criterion (not fatal; pass --strict-orphans to enforce).`;
+      if (opts.format === 'json') console.error(notice);
+      else for (const g of [notice, ...orphanGaps]) console.error(g);
     }
 
     const at = new Date();
