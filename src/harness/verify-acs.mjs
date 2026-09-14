@@ -240,9 +240,20 @@ function splitTestList(text) {
 /**
  * Compare a story's declared tests against a run's inventory.
  *
- * Returns `{ ok, ac: [{ id, declared, found, status }], inventorySize, format }`.
+ * Returns `{ ok, ac: [{ id, declared, found, status }], orphaned, inventorySize, format }`.
  * `status` is `covered` (all declared found), `missing` (some declared absent),
  * or `undeclared` (the AC declares no test at all).
+ *
+ * `orphaned` is the INVERSE direction: tests that ran but are declared on no AC.
+ * This module previously checked only declared→delivered, so a delivered test
+ * attached to no criterion was invisible — the drift that recurred three times
+ * before this was added. Note the status name `undeclared` does NOT cover this
+ * case: it means "this AC declares no tests", not "this test is on no AC".
+ *
+ * `orphaned` deliberately does NOT affect `ok`. Consumers legitimately have
+ * helper tests and parameterised fixtures that belong to no single criterion, so
+ * making orphans fatal would break every existing story. Callers that want
+ * enforcement pass `--strict-orphans` (see describeCoverageGaps and cli.mjs).
  *
  * Every gap is reported together; the caller renders all of them, never just the
  * first.
@@ -252,8 +263,13 @@ export function compareCoverage(criteria, inventory) {
   const ac = [];
   let ok = true;
 
+  // Union of everything declared anywhere, so a test declared on any AC is not
+  // an orphan just because it is not on the AC being examined.
+  const declaredAnywhere = new Set();
+
   for (const c of criteria) {
     const declared = (c.tests || []).map((t) => String(t));
+    for (const t of declared) declaredAnywhere.add(normalizeTestName(t));
     if (declared.length === 0) {
       ok = false;
       ac.push({ id: c.id, declared: [], found: [], status: 'undeclared' });
@@ -265,16 +281,34 @@ export function compareCoverage(criteria, inventory) {
     ac.push({ id: c.id, declared, found: present, status });
   }
 
+  // Preserve report order and the report's own spelling, deduped by normalized
+  // name so an inventory that repeats a test does not repeat the warning.
+  const orphaned = [];
+  const seenOrphan = new Set();
+  for (const raw of inventory?.names || []) {
+    const key = normalizeTestName(raw);
+    if (!key || declaredAnywhere.has(key) || seenOrphan.has(key)) continue;
+    seenOrphan.add(key);
+    orphaned.push(key);
+  }
+
   return {
     ok,
     ac,
+    orphaned,
     inventorySize: (inventory?.names || []).length,
     format: inventory?.format || 'unknown',
   };
 }
 
-/** Format the gaps as concrete, actionable lines (spec §5.1 step 4). */
-export function describeCoverageGaps(coverage) {
+/**
+ * Format the gaps as concrete, actionable lines (spec §5.1 step 4).
+ *
+ * `includeOrphans` appends the inverse-direction gaps. It is opt-in so the
+ * default call site keeps its previous output shape, and so a caller can report
+ * orphans without treating them as failures.
+ */
+export function describeCoverageGaps(coverage, { includeOrphans = false } = {}) {
   const lines = [];
   for (const entry of coverage.ac) {
     if (entry.status === 'undeclared') {
@@ -285,6 +319,11 @@ export function describeCoverageGaps(coverage) {
       for (const t of absent) {
         lines.push(`   ${entry.id}: declared test "${t}" did not appear in the test report — either it was renamed (update the story) or it was never written.`);
       }
+    }
+  }
+  if (includeOrphans) {
+    for (const t of coverage.orphaned || []) {
+      lines.push(`   "${t}" ran but is declared on no acceptance criterion — attach it to the criterion it proves, or remove it.`);
     }
   }
   return lines;

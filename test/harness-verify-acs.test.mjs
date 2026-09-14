@@ -258,6 +258,77 @@ describe('compareCoverage', () => {
   });
 });
 
+// ── Orphan detection (the inverse direction) ─────────────────────────────────
+//
+// The declared→delivered check cannot see a test that RAN but is declared on no
+// AC: it only iterates the criteria. That drift has recurred repeatedly, so the
+// inverse is checked explicitly here.
+
+describe('compareCoverage — orphaned tests', () => {
+  it('reports a test that ran but is declared on no AC', () => {
+    const c = compareCoverage(
+      [{ id: 'AC-1', tests: ['Declared_A'] }],
+      { names: ['Declared_A', 'Ran_But_Undeclared'], format: 'tap' },
+    );
+    assert.deepEqual(c.orphaned, ['Ran_But_Undeclared']);
+  });
+
+  it('reports no orphans when every inventory test is declared', () => {
+    const c = compareCoverage(
+      [{ id: 'AC-1', tests: ['A', 'B'] }],
+      { names: ['A', 'B'], format: 'tap' },
+    );
+    assert.deepEqual(c.orphaned, []);
+  });
+
+  it('does not count a test declared on ANY ac as an orphan', () => {
+    const c = compareCoverage(
+      [{ id: 'AC-1', tests: ['A'] }, { id: 'AC-2', tests: ['B'] }],
+      { names: ['A', 'B'], format: 'tap' },
+    );
+    assert.deepEqual(c.orphaned, []);
+  });
+
+  it('normalizes orphan names the same way as the declared side', () => {
+    // A trailing duplicate-index suffix and surrounding whitespace are not drift.
+    const c = compareCoverage(
+      [{ id: 'AC-1', tests: ['A'] }],
+      { names: ['A', '  B (1) '], format: 'tap' },
+    );
+    assert.deepEqual(c.orphaned, ['B']);
+  });
+
+  it('keeps orphans non-fatal: ok stays true when only orphans exist', () => {
+    // Consumers legitimately have helper tests declared on no AC. Reporting them
+    // must not silently break every existing story.
+    const c = compareCoverage(
+      [{ id: 'AC-1', tests: ['A'] }],
+      { names: ['A', 'Helper_Not_On_An_AC'], format: 'tap' },
+    );
+    assert.equal(c.ok, true);
+  });
+
+  it('surfaces orphans through describeCoverageGaps only when asked', () => {
+    const c = compareCoverage(
+      [{ id: 'AC-1', tests: ['A'] }],
+      { names: ['A', 'Orphaned_One', 'Orphaned_Two'], format: 'tap' },
+    );
+    // Default: the declared→delivered gap list is unchanged (backward compatible).
+    assert.deepEqual(describeCoverageGaps(c), []);
+    const withOrphans = describeCoverageGaps(c, { includeOrphans: true });
+    assert.equal(withOrphans.length, 2);
+    assert.match(withOrphans.join('\n'), /Orphaned_One/);
+    assert.match(withOrphans.join('\n'), /Orphaned_Two/);
+    assert.match(withOrphans.join('\n'), /declared on no acceptance criterion/);
+  });
+
+  it('does not invent orphans from an unknown-format (empty) inventory', () => {
+    // Unknown is never silently zero — but it is also never evidence of drift.
+    const c = compareCoverage([{ id: 'AC-1', tests: ['A'] }], { names: [], format: 'unknown' });
+    assert.deepEqual(c.orphaned, []);
+  });
+});
+
 // ── CLI: harness verify-acs (spec §5) ────────────────────────────────────────
 
 const cli = join(repoRoot, 'bin', 'cli.mjs');
@@ -411,6 +482,71 @@ describe('cli — harness verify-acs', () => {
       const res = runCli(['harness', 'verify-acs', '--story', story, '--report', junk, '--target', dir, '--format', 'json']);
       assert.equal(res.status, 1);
       assert.equal(JSON.parse(res.stdout).code, 'inventory-unknown');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('reports orphans without failing by default (strictClosure off)', () => {
+    const { dir } = makeProject();
+    try {
+      const story = join(dir, 'story-ok.md');
+      writeFileSync(story, ['## Acceptance Criteria', '### AC-1: a', '- Given a, When b, Then c', '- Declared tests: Grid_Foo'].join('\n'));
+      const report = join(dir, 'orphan-report.txt');
+      writeFileSync(report, ['TAP version 13', 'ok 1 - Grid_Foo', 'ok 2 - Helper_On_No_AC', '1..2'].join('\n'));
+      const res = runCli(['harness', 'verify-acs', '--story', story, '--report', report, '--target', dir, '--format', 'json']);
+      assert.equal(res.status, 0, res.stderr);
+      const out = JSON.parse(res.stdout);
+      assert.equal(out.ok, true, 'orphans alone must not fail the check');
+      assert.deepEqual(out.orphaned, ['Helper_On_No_AC']);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('lists orphans on stderr when strictClosure is off but still passes', () => {
+    const { dir } = makeProject();
+    try {
+      const story = join(dir, 'story-ok.md');
+      writeFileSync(story, ['## Acceptance Criteria', '### AC-1: a', '- Given a, When b, Then c', '- Declared tests: Grid_Foo'].join('\n'));
+      const report = join(dir, 'orphan-report.txt');
+      writeFileSync(report, ['TAP version 13', 'ok 1 - Grid_Foo', 'ok 2 - Helper_On_No_AC', '1..2'].join('\n'));
+      const res = runCli(['harness', 'verify-acs', '--story', story, '--report', report, '--target', dir]);
+      assert.equal(res.status, 0, res.stderr);
+      assert.match(res.stderr, /declared on no acceptance criterion/);
+      assert.match(res.stderr, /Helper_On_No_AC/);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  // ── Discrimination: the new check must be ABLE to fail ──────────────────────
+  // Without this, --strict-orphans could silently become a no-op and still
+  // "pass" — the exact defect class F57 recorded for the old behaviour.
+
+  it('--strict-orphans fails and reports code orphaned-tests (strict)', () => {
+    const { dir } = makeProject({ strict: true });
+    try {
+      const story = join(dir, 'story-ok.md');
+      writeFileSync(story, ['## Acceptance Criteria', '### AC-1: a', '- Given a, When b, Then c', '- Declared tests: Grid_Foo'].join('\n'));
+      const report = join(dir, 'orphan-report.txt');
+      writeFileSync(report, ['TAP version 13', 'ok 1 - Grid_Foo', 'ok 2 - Helper_On_No_AC', '1..2'].join('\n'));
+      const res = runCli(['harness', 'verify-acs', '--story', story, '--report', report, '--target', dir, '--strict-orphans', '--format', 'json']);
+      assert.equal(res.status, 1, 'an orphan must fail under --strict-orphans');
+      const out = JSON.parse(res.stdout);
+      assert.equal(out.ok, false);
+      assert.equal(out.code, 'orphaned-tests');
+      assert.equal(out.gateSet, false);
+      assert.deepEqual(out.orphaned, ['Helper_On_No_AC']);
+      const state = JSON.parse(readFileSync(join(dir, '.cadet', 'state.json'), 'utf-8'));
+      assert.notEqual(state.gates.acceptanceCriteriaValidated, true, 'the gate must stay unset');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('--strict-orphans still passes when there are no orphans (control)', () => {
+    const { dir } = makeProject({ strict: true });
+    try {
+      const story = join(dir, 'story-ok.md');
+      writeFileSync(story, ['## Acceptance Criteria', '### AC-1: a', '- Given a, When b, Then c', '- Declared tests: Grid_Foo'].join('\n'));
+      const report = join(dir, 'no-orphan-report.txt');
+      writeFileSync(report, ['TAP version 13', 'ok 1 - Grid_Foo', '1..1'].join('\n'));
+      const res = runCli(['harness', 'verify-acs', '--story', story, '--report', report, '--target', dir, '--strict-orphans', '--format', 'json']);
+      assert.equal(res.status, 0, res.stderr);
+      assert.equal(JSON.parse(res.stdout).gateSet, true);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });
