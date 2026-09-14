@@ -15,6 +15,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [0.34.0] — 2026-09-14
 
+## [0.34.0] — 2026-09-14
+
 ### Added
 
 - **`harness verify-acs` now detects orphaned tests — the inverse of the existing declared→delivered check.** `compareCoverage` previously iterated only the acceptance criteria, so a test that *ran* but was declared on no criterion was invisible to the tool. The drift was found repeatedly by hand (four times in one project) and never by `verify-acs`, because the check only ever looked in one direction. Its `undeclared` status made this worse than a gap: the name reads as though it covers the inverse case, but it actually means "this AC declares no tests".
