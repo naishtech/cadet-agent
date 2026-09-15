@@ -231,19 +231,37 @@ export function validateState(state, context = {}) {
     // It is an ERROR, not a warning, because a `done` story with no evidence is
     // indistinguishable from a story that was never verified — which is the
     // condition the framework exists to prevent. Projects that closed stories
-    // before the harness existed can resolve it with a scoped gate exception or
-    // by re-recording; silently tolerating it is what let the gap grow.
+    // before the harness existed resolve it with a scoped `pre-harness-story`
+    // exception naming the story's work item; silently tolerating it is what let
+    // the gap grow.
     if (isPlainObject(state.epics) && Array.isArray(state.gateEvidence)) {
       const evidenced = new Set(
         state.gateEvidence
           .map((e) => (isPlainObject(e) ? e.workItemId : null))
           .filter((id) => typeof id === 'string' && id.length > 0),
       );
+      // A scoped exception is the FIRST-CLASS escape for a permanent historical
+      // gap. `activeExceptions` is keyed on the ACTIVE work item, which is the
+      // current story — the wrong scope here, where we walk every completed story
+      // — so the scope match is done explicitly against each story's work-item id.
+      // Only a valid, categorised exception counts: an unknown category is not a
+      // loophole, it is a typo, and `validateGateException` rejects it separately.
+      const excepted = new Set();
+      if (Array.isArray(state.changeHistory)) {
+        for (const entry of state.changeHistory) {
+          if (!isPlainObject(entry) || entry.type !== 'gate-exception') continue;
+          if (!EXCEPTION_CATEGORIES.includes(entry.category)) continue;
+          const scope = Array.isArray(entry.scope) ? entry.scope : (entry.scope ? [entry.scope] : []);
+          for (const s of scope) excepted.add(String(s));
+        }
+      }
       for (const [epicId, epic] of Object.entries(state.epics)) {
         if (!isPlainObject(epic) || !isPlainObject(epic.stories)) continue;
         for (const [storyId, status] of Object.entries(epic.stories)) {
           if (status !== 'done') continue;
-          if (evidenced.has(`${epicId}::${storyId}`)) continue;
+          const workItemId = `${epicId}::${storyId}`;
+          if (evidenced.has(workItemId)) continue;
+          if (excepted.has(workItemId)) continue;
           errors.push({
             path: `epics.${epicId}.stories.${storyId}`,
             message: `story "${storyId}" is marked done but has no evidence record for its work item `

@@ -356,10 +356,16 @@ describe('strict closure — exception taxonomy', () => {
   it('defines the category set and per-category expiries', () => {
     assert.deepEqual([...EXCEPTION_CATEGORIES].sort(), [
       'analyzer-fallback', 'budget-override', 'documentation-only',
-      'manual-compile', 'tooling-gap', 'unscoped-freshness',
+      'manual-compile', 'pre-harness-story', 'tooling-gap', 'unscoped-freshness',
     ]);
     assert.equal(EXCEPTION_EXPIRY_DAYS['manual-compile'], 7);
     assert.equal(EXCEPTION_EXPIRY_DAYS['unscoped-freshness'], 1);
+    // `pre-harness-story` is deliberately unbounded: it records a PERMANENT
+    // historical fact (a story closed before the harness existed), so a timed
+    // exception would re-raise the same unchanged finding every N days.
+    // Asserted explicitly so a future edit cannot quietly add an expiry and
+    // turn a permanent record into a recurring chore.
+    assert.equal(EXCEPTION_EXPIRY_DAYS['pre-harness-story'], null);
   });
 
   it('accepts a categorised exception with a closure review note', () => {

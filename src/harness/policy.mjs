@@ -162,6 +162,7 @@ export const EXCEPTION_CATEGORIES = Object.freeze([
   'unscoped-freshness',
   'documentation-only',
   'tooling-gap',
+  'pre-harness-story',
 ]);
 
 /** Default expiry (in days) per category. `null` means "no default bound". */
@@ -172,6 +173,11 @@ export const EXCEPTION_EXPIRY_DAYS = Object.freeze({
   'unscoped-freshness': 1,
   'documentation-only': null,   // scoped to the work item
   'tooling-gap': 14,
+  // No default bound: this records a PERMANENT historical fact (a story closed
+  // before the harness existed, whose gates were never recorded as evidence).
+  // The gap will never close on its own, so a time-bounded exception would only
+  // re-raise the same finding every N days without anything having changed.
+  'pre-harness-story': null,
 });
 
 /** Categories whose exception must carry a closure review note. */

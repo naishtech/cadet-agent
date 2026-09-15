@@ -142,6 +142,56 @@ describe('AR-2 — a done story with no evidence is not silently valid', () => {
     const r = validateState(state, { structuralOnly: true });
     assert.equal(r.valid, true, JSON.stringify(r.errors));
   });
+
+  it('honours a pre-harness-story exception, so the documented escape actually works', () => {
+    // Before this, the check had no exception path at all: the comment said a
+    // project "can resolve it with a scoped gate exception", but the code only
+    // consulted gateEvidence, so the escape it promised did not exist.
+    const state = v3State({
+      epics: { 'epic-1': { status: 'done', stories: { 'story-1.md': 'done' } } },
+      changeHistory: [{
+        type: 'gate-exception',
+        gate: 'storyCoverage',
+        category: 'pre-harness-story',
+        scope: ['epic-1::story-1.md'],
+        rationale: 'Story closed before the harness existed; gates recorded in narrative only.',
+      }],
+    });
+    const r = validateState(state, { structuralOnly: true });
+    assert.equal(r.valid, true, JSON.stringify(r.errors));
+  });
+
+  it('an exception for one story does not excuse a different story', () => {
+    const state = v3State({
+      epics: { 'epic-1': { status: 'done', stories: { 'story-1.md': 'done', 'story-2.md': 'done' } } },
+      changeHistory: [{
+        type: 'gate-exception',
+        gate: 'storyCoverage',
+        category: 'pre-harness-story',
+        scope: ['epic-1::story-1.md'],
+        rationale: 'Story 1 only.',
+      }],
+    });
+    const r = validateState(state, { structuralOnly: true });
+    assert.equal(r.valid, false, 'the unexcepted story must still be reported');
+    assert.ok(r.errors.some((e) => /story-2/.test(e.message)), JSON.stringify(r.errors));
+    assert.ok(!r.errors.some((e) => /story-1\.md/.test(e.message)), 'story 1 is excepted');
+  });
+
+  it('an unknown exception category is rejected rather than silently honoured', () => {
+    const state = v3State({
+      epics: { 'epic-1': { status: 'done', stories: { 'story-1.md': 'done' } } },
+      changeHistory: [{
+        type: 'gate-exception',
+        gate: 'storyCoverage',
+        category: 'because-i-said-so',
+        scope: ['epic-1::story-1.md'],
+        rationale: 'not a real category',
+      }],
+    });
+    const r = validateState(state, { structuralOnly: true });
+    assert.equal(r.valid, false, 'an unclassifiable exception must not work');
+  });
 });
 
 describe('AR-5 — matrix test-name reconciliation is mechanical', () => {
