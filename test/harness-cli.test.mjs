@@ -1,7 +1,7 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
@@ -191,11 +191,29 @@ describe('cli — harness', () => {
     try {
       runRedThenGreen(dir, 'testsPassed', 'node -e "process.exit(0)"');
       runCli(['harness', 'verify', '--gate', 'testsPassed', '--command', 'node -e "process.exit(2)"', '--files', 'src/a.mjs', '--target', dir]);
-      const res = runCli(['harness', 'cleanup', '--target', dir, '--format', 'json']);
+      // `cleanup` deletes run records irreversibly, so an unattended run must
+      // state a bound on what it deletes. `--older-than-ms 0` keeps the original
+      // intent (everything is old enough) while satisfying the guard.
+      const res = runCli(['harness', 'cleanup', '--older-than-ms', '0', '--target', dir, '--format', 'json']);
       assert.equal(res.status, 0);
       const out = JSON.parse(res.stdout);
       assert.ok(out.deleted.length >= 1);
       assert.ok(out.kept.length >= 1);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('refuses to clean up unattended without an explicit bound', () => {
+    // The guard that makes `cleanup` safe to hand to an agent that does not know
+    // what it does: no bound means no deletion, regardless of what the agent
+    // intends.
+    const dir = makeProject(v1State());
+    try {
+      runRedThenGreen(dir, 'testsPassed', 'node -e "process.exit(0)"');
+      const before = readdirSync(join(dir, '.cadet', 'runs')).length;
+      const res = runCli(['harness', 'cleanup', '--target', dir, '--format', 'json']);
+      assert.notEqual(res.status, 0);
+      assert.equal(JSON.parse(res.stderr).code, 'unattended-requirement-missing');
+      assert.equal(readdirSync(join(dir, '.cadet', 'runs')).length, before, 'nothing may be deleted without a bound');
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 

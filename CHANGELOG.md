@@ -11,6 +11,30 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ---
 
+## [Unreleased]
+
+Every command now **declares whether it writes**, and the declaration is enforced by the dispatcher and asserted by tests. A consumer reported that `harness record --help` wrote a ledger — "on this CLI, checking the help is not a read-only operation." An audit found the reported bug was one instance of a class: safety was a convention the *caller* had to remember, so it protected exactly the callers who already knew.
+
+### Added
+
+- **Command registry (`src/harness/commands.mjs`)** — the single source of truth for `mutates`, `writes`, and unattended requirements, replacing two hand-written dispatch chains that declared nothing. `resolveCommand` / `describeAllCommands` / `checkUnattendedRequirements` are exported through the harness index.
+- **`harness capabilities --format json` now returns `commands[]`**, so an agent can *ask* which commands write instead of inferring it from a name or trusting a flag it must remember to pass. The guarantee does not depend on the agent reading it: the dispatcher enforces the registry regardless.
+- **Global `--dry-run`.** Previously parsed globally but honoured by exactly one command, so `harness record --dry-run` silently wrote a ledger. It is now intercepted for every registered mutating command. A new mutating command is covered the moment it is registered — there is no per-handler check to forget. `state transition` is the one declared exception (`evaluatesOnDryRun`): its dry run reports the identical verdict a real transition would, which is the flag's entire value.
+- **Read-only commands are asserted, not assumed.** A table-driven test invokes every command declared `mutates: false` across its flags and asserts zero filesystem writes, so a future write in `report` or `matrix-check` fails the build rather than the user. (`matrix-check` previously carried a "Read-only" comment and nothing more.)
+- **`--older-than-ms` is now required by `harness cleanup`.** It deletes run records irreversibly, and unattended agents cannot be prompted, so the bound must be content-bearing: the caller states *what* to delete, not merely *that* it approves deleting something. Without it the command refuses and deletes nothing. `--dry-run` reports what would be deleted without deleting.
+
+### Fixed
+
+- **`harness record --help` (and every nested `--help`) wrote state.** `--help` was recognised only as `argv[2]`, so at any deeper position it fell into the parser's `rest` array and was ignored by the handler. Reproduced across the CLI: `record` appended a ledger, `cleanup` applied the retention policy and deleted records, and `migrate` wrote a `.v1.bak`. `state transition --help` was saved only by the gate check rejecting it first — with gates satisfied it would have advanced the phase. `--help`/`-h` is now a global read-only short-circuit, detected against raw argv (before parsing can consume it as another flag's value) and honoured at any depth.
+- **A failed `state migrate` left a `.v1.bak` behind.** The backup was copied *before* the migrated document was validated, so a rejected migration still wrote a file the caller never got. Validation now runs first, so a failed migration leaves the tree exactly as it found it — and cannot overwrite a previous good backup.
+- **A missing option value silently consumed the next flag.** `parseArgs` did `argv[++i]` unchecked, so `harness record --target --format` bound the literal string `--format` as the target directory and wrote a ledger into a directory named `--format/`, reporting success. A missing value is now a loud usage error. Negative numeric values (`--older-than-ms -1`) remain valid, and the deliberate empty-`--files ""` rejection still reports its own specific error rather than being masked.
+
+### Changed
+
+- **`docs/core/HarnessContract.md` C13 rewritten** from "a command documented as a check performs no writes" (scoped to `transition --dry-run`, guarded by one test) to the write-declaration invariant, naming the three properties and their guard tests. The old wording was narrow enough that the `--help` and `record --dry-run` bugs both satisfied it.
+- **`Harness.md` §12 documents the write-declaration contract** and the per-command posture, including why `record` carries no unattended bound (requiring a flag to log evidence would push agents to skip logging) and why a failing `verify` still persists its ledger (it *is* the red record).
+- **Compatibility note:** `harness cleanup` without `--older-than-ms` now exits 1 and deletes nothing. Callers relying on the previous unconditional behaviour must pass a bound; the pre-existing test suite was updated to the new contract.
+
 ## [0.37.0] — 2026-09-15
 
 ### Fixed

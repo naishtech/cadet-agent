@@ -52,7 +52,7 @@ Do **not** hand-edit `gateEvidence` or flip a gate to `true`. The CLI rejects a 
 2. Choose one:
    - Start a **new run** (fresh budget) for the remaining work.
    - Apply an **explicit, recorded** budget override in `.cadet/harness.json` **and** record a user-approved `budget-override` decision in the ledger. A repository may not lower a hard safety ceiling, and may exceed one only with `allowBudgetCeilingOverride: true` plus user approval.
-3. Clean up old ledgers if disk retention is the concern: `cadet-agent harness cleanup`.
+3. Clean up old ledgers if disk retention is the concern: `cadet-agent harness cleanup --older-than-ms <n>`. The bound is required because the command deletes irreversibly; `--dry-run` reports what it would delete without deleting.
 
 Hard stops are never silent: the run is marked `exhausted` and the ledger is persisted before returning.
 
