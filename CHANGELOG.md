@@ -11,6 +11,20 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ---
 
+## [0.37.0] — 2026-09-15
+
+### Fixed
+
+- **The `done`-story coverage check now honours a scoped exception, so the escape the docs promised actually exists.** The 0.36.0 check reported a `done` story with no evidence as an error, and its own comment said a project "can resolve it with a scoped gate exception or by re-recording" — but the implementation only consulted `gateEvidence` and never looked at `changeHistory`, so a gate exception had no effect. That is the defect class this whole line of work exists to remove: a claim the code does not support.
+  - The check now treats a `gate-exception` with a **valid category** and a matching `scope` as satisfying coverage for the named story work-item ids. Scope is matched per story, so an exception for one story never excuses another; an unknown category is not a loophole and still fails validation.
+  - Scope is matched explicitly rather than through `activeExceptions`, which is keyed on the *active* work item — the wrong key for a walk over every completed story.
+
+### Added
+
+- **`pre-harness-story` exception category.** The documented escape for the one gap that re-verification can never close: a story marked `done` whose gates were recorded before the harness existed, so no evidence for its work item was ever written.
+  - **No default expiry** (`null`), unlike every other category. The fact it records is a permanent historical one, so a time-bounded exception would re-raise an identical finding every N days without anything having changed. Asserted explicitly in `harness-strict-closure.test.mjs` so a later edit cannot quietly add an expiry and turn a permanent record into a recurring chore.
+  - Scope it to the work-item ids it covers (`epic-N::story-M.md`). `Harness.md` §2b documents the category, why it is unbounded, and the per-story scoping.
+
 ## [0.36.1] — 2026-09-15
 
 ### Fixed

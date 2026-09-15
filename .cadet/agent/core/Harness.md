@@ -84,10 +84,18 @@ enforces these rules at creation time and writes the ledger and state atomically
 
 Under `strictClosure.enabled`, every `gate-exception` must declare a `category` from:
 `manual-compile`, `budget-override`, `analyzer-fallback`, `unscoped-freshness`,
-`documentation-only`, `tooling-gap`. The category determines the expiry window and whether a
+`documentation-only`, `tooling-gap`, `pre-harness-story`. The category determines the expiry window and whether a
 `closureReviewNote` is required, and an unknown category is rejected with the valid set named.
 A categorised exception is still scoped to one work item and one transition — the taxonomy
 classifies an exception, it never widens one.
+
+`pre-harness-story` is the documented escape for the one gap that can never be closed by
+re-verification: a story marked `done` whose gates were recorded before the harness existed,
+so no `gateEvidence` for its work item was ever written (see §1's `done`-story coverage rule).
+It has **no default expiry**, because the fact it records is permanent and a timed exception
+would only re-raise an unchanged finding. Scope it to the story work-item ids it covers
+(`epic-N::story-M.md`), one entry per epic or per story; the coverage check matches on scope, so
+an exception for one story never excuses another.
 
 ## 3. Budgets
 
