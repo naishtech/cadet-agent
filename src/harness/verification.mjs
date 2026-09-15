@@ -252,6 +252,7 @@ export async function runVerificationLoop({
   relevantFiles = [],
   criteria = [],
   rootDir = process.cwd(),
+  commit = null,
   policy,
   budgets,
   runCommandImpl = runCommand,
@@ -327,6 +328,7 @@ export async function runVerificationLoop({
       inputTreeHash,
       criteriaHash,
       relevantFiles,
+      commit,
       createdAt: startedAt,
       source: 'automated',
     });
@@ -461,7 +463,7 @@ function finalize({ status, attempts, tracker, inputTreeHash, criteriaHash, stop
 export function manualConfirmation({
   gate, workItemId, phase, projectPath, editorVersion, scope, acceptanceCriterionId = null,
   relevantFiles = [], criteria = [], rootDir = process.cwd(), approvedBy = 'user', at = new Date(),
-  reason = null, expiresAt = null, environment = null, expiresInMs = null,
+  reason = null, expiresAt = null, environment = null, expiresInMs = null, commit = null,
 } = {}) {
   const inputTreeHash = computeInputTreeHash(rootDir, relevantFiles);
   // v3 quality fields. `scope` is declared both as the free-text `result` line
@@ -504,6 +506,7 @@ export function manualConfirmation({
       relevantFiles,
       createdAt: at,
       expiresAt: expiry,
+      commit,
       source: 'manual-confirmation',
     }),
     // Present only when supplied, so a v2-shaped record is unchanged when the

@@ -11,6 +11,34 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ---
 
+## [0.36.0] — 2026-09-15
+
+Three gaps found by an Agent Reviewer audit of a real consumer project (a story review and PR that had already been merged). All three share a cause: a rule the framework stated but could not mechanically check, so it was satisfied by human diligence or not at all.
+
+### Added
+
+- **`--commit <sha>` on `harness verify` and `harness confirm`, and a `commit` field on every evidence record.** The Agent Reviewer skill already required a gate-related fix claim to cite its `workItemId`, `relevantFiles`, and **commit** — but no evidence field carried a commit and no CLI flag could supply one, so the requirement was **structurally unverifiable**: a claim could name its work item and its files and never the revision. On the audited project all eight gates of the story under review had `toolVersion: null`, and the commit appeared only inside free-text `reason`.
+  - Optional and `null` by default, so existing v2-shaped records stay valid and no migration is needed.
+  - A **branch or tag name is rejected** (4–40 hex characters required): those move, so a citation naming one could not be checked later. That failure mode — a citation that reads as proof and is not — is the one the field exists to prevent.
+  - Validated at both creation (`createEvidence`) and validation (`state validate`) time, and declared in `harness.schema.json`.
+- **`cadet-agent harness matrix-check --matrix <path> [--report <path> | --inventory <path>]`.** Mechanically reconciles a TDD matrix's test-name claims against a compiled inventory, so a row naming a test that was never written is caught at **authoring** time rather than at the validation gate two stories later.
+  - Keeps two directions strictly separate: a name in a `DELIVERED` row absent from the inventory is a **defect** (exit 1), while a name in an undelivered row is an **intention** and is never reported. Collapsing them produces false failures, and a false failure is how a real check gets switched off.
+  - Undelivered intentions that *have* landed are reported informationally, so a row that should have been marked `DELIVERED` is visible rather than silent.
+  - Read-only — it never writes state — and it exits 1 when given no inventory rather than reporting success it cannot support.
+  - Deliberately narrow in what it reads: only the declared-tests column, and within a delivered row only the text before the `DELIVERED` marker, because a row's later columns discuss the design in prose and legitimately name types and symbols in backticks.
+
+### Fixed
+
+- **`state validate` no longer reports a `done` story with no evidence as valid.** Every gate check was scoped to the **active** work item, so a state document could validate clean (`valid: true`, 0 errors, 0 warnings) while completed stories had no evidence records at all. On the audited project **eight** `done` stories had zero records, one of them in the epic being closed.
+  - A `done` story whose work item appears nowhere in `gateEvidence` is now an error naming the story and the expected work-item id.
+  - Scoped to **coverage, not gate completeness**: it asks only "is there any evidence for this story?" Whether each required gate was satisfied for the correct phase stays enforced at transition time, where the phase is known, so the transition matrix is not duplicated.
+  - Stories closed before the harness existed legitimately trip this; `AgentReviewer.md` now says to report that as coverage debt with its reason rather than as evidence tampering.
+
+### Documentation
+
+- `Harness.md` §1 documents the `commit` field, why a symbolic revision is refused, and the new `done`-story coverage rule; §12 documents `matrix-check` and the new flag.
+- `AgentReviewer.md` clarifies that a `null` commit is a **real finding about that record** rather than a schema error, warns against substituting a commit read from git history for the one the record should carry, and adds the `done`-story check to the harness audit.
+
 ## [0.35.0] — 2026-09-15
 
 ### Added

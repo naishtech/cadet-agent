@@ -69,3 +69,7 @@ export {
   normalizeTestName, parseTestInventory, parseStoryCriteria, parseStoryCriteriaText,
   compareCoverage, describeCoverageGaps,
 } from './verify-acs.mjs';
+
+export {
+  collectDeclaredTestNames, reconcileTestNames, inventoryFromCSharpSources,
+} from './matrix-check.mjs';

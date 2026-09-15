@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { install, sync } from './install.mjs';
 import {
   validateState, migrateStateFile, readState, writeState, evaluateTransition, applyTransition,
@@ -9,6 +9,7 @@ import {
   detectRepoRole, describeRepoRole, GATES, manualConfirmation,
   parseTestInventory, parseStoryCriteria, compareCoverage, describeCoverageGaps,
   createEvidence, newId, computeInputTreeHash, hashCriteria,
+  collectDeclaredTestNames, reconcileTestNames,
 } from './harness/index.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -96,6 +97,11 @@ function parseArgs(argv) {
       case '--files': opts.filesGiven = true; opts.files = (argv[++i] || '').split(',').map((s) => s.trim()).filter(Boolean); break;
       case '--story': opts.story = argv[++i]; break;
       case '--report': opts.report = argv[++i]; break;
+      // AR-1: the revision a gate record attests, so a gate-related fix claim
+      // can be traced to the commit that contains it.
+      case '--commit': opts.commitGiven = true; opts.commit = argv[++i]; break;
+      case '--matrix': opts.matrix = argv[++i]; break;
+      case '--inventory': opts.inventory = argv[++i]; break;
       case '--write-coverage': opts.writeCoverage = true; break;
       case '--strict-orphans': opts.strictOrphans = true; break;
       case '--dry-run': opts.dryRun = true; break;
@@ -361,6 +367,7 @@ async function cmdHarness(opts) {
       relevantFiles,
       rootDir: opts.targetDir,
       approvedBy: opts.approvedBy || 'user',
+      commit: opts.commit || null,
       at,
     });
 
@@ -526,6 +533,7 @@ async function cmdHarness(opts) {
       phase: ledger.phase || 'implementation',
       relevantFiles,
       rootDir: opts.targetDir,
+      commit: opts.commit || null,
       policy,
       budgets: ledger.tracker,
       artifactDir: join(runsDir(opts.targetDir), 'artifacts'),
@@ -764,6 +772,95 @@ async function cmdHarness(opts) {
     return;
   }
 
+  // AR-5. Reconcile a TDD matrix's DELIVERED test-name claims against a compiled
+  // inventory. Read-only: it reports, and never writes state, so it can be run at
+  // authoring time (before anything has been implemented) as well as in a gate.
+  if (sub === 'matrix-check') {
+    if (!opts.matrix) fail(opts, 'harness matrix-check requires --matrix <path-to-matrix.md>');
+    const matrixPath = resolve(opts.targetDir, opts.matrix);
+    let matrixText;
+    try {
+      matrixText = readFileSync(matrixPath, 'utf-8');
+    } catch (err) {
+      fail(opts, `cannot read matrix ${opts.matrix}: ${err.message}`, () => 2);
+    }
+
+    // The inventory may come from a run report (strongest: it proves the test
+    // RAN) or from C# sources (a name inventory only). Prefer a report.
+    let inventory = null;
+    let inventorySource = null;
+    if (opts.report) {
+      const reportPath = resolve(opts.targetDir, opts.report);
+      let reportText;
+      try {
+        reportText = readFileSync(reportPath, 'utf-8');
+      } catch (err) {
+        fail(opts, `cannot read report ${opts.report}: ${err.message}`, () => 2);
+      }
+      const parsed = parseTestInventory(reportText);
+      if (parsed && parsed.format !== 'unknown' && parsed.names.length > 0) {
+        inventory = new Set(parsed.names);
+        inventorySource = `${opts.report} (${parsed.format})`;
+      }
+    }
+    if (!inventory && opts.inventory) {
+      const invPath = resolve(opts.targetDir, opts.inventory);
+      let raw;
+      try {
+        raw = readFileSync(invPath, 'utf-8');
+      } catch (err) {
+        fail(opts, `cannot read inventory ${opts.inventory}: ${err.message}`, () => 2);
+      }
+      inventory = new Set(String(raw).split(/\r?\n/).map((s) => s.trim()).filter(Boolean));
+      inventorySource = opts.inventory;
+    }
+
+    const collected = collectDeclaredTestNames(matrixText);
+    if (!inventory) {
+      // Without an inventory this cannot prove anything, so it must not report
+      // success. Returning the collected names is still useful at authoring time:
+      // it shows what the matrix claims, and the caller can spot a name they know
+      // they never wrote.
+      const detail = {
+        ok: false,
+        code: 'inventory-unavailable',
+        matrix: opts.matrix,
+        claims: collected.claims,
+        intents: collected.intents,
+      };
+      if (opts.format === 'json') emit(opts, '', detail);
+      else {
+        console.error('❌ No inventory supplied, so no claim can be checked. Pass --report <test-results> (preferred, proves the test ran) or --inventory <names.txt>.');
+        console.error(`   The matrix declares ${collected.claims.length} delivered claim(s) across ${collected.intents.length} undelivered intention(s).`);
+      }
+      process.exit(1);
+    }
+
+    const result = reconcileTestNames(collected, inventory);
+    const ok = result.missingFromInventory.length === 0;
+    const detail = {
+      ok,
+      matrix: opts.matrix,
+      inventory: inventorySource,
+      checked: result.checked,
+      intents: collected.intents.length,
+      missingFromInventory: result.missingFromInventory,
+      unmatchedIntents: result.unmatchedIntents,
+    };
+    if (opts.format === 'json') emit(opts, '', detail);
+    else if (ok) {
+      console.log(`✅ Every delivered test-name claim exists in the inventory (${result.checked} checked from ${inventorySource}).`);
+      if (result.unmatchedIntents.length > 0) {
+        console.log(`   ℹ️  ${result.unmatchedIntents.length} undelivered intention(s) now exist and the row may be stale — consider marking it DELIVERED.`);
+      }
+    } else {
+      console.error(`❌ ${result.missingFromInventory.length} delivered test-name claim(s) do not exist in the inventory (${inventorySource}):`);
+      for (const n of result.missingFromInventory) console.error(`   "${n}" — declared as delivered but absent. Attach it to the criterion it proves, or correct the name.`);
+    }
+    if (!ok) process.exit(1);
+    return;
+  }
+
   if (sub === 'cleanup') {
     const { deleted, kept } = cleanupRuns(opts.targetDir, policy, {
       olderThanMs: Number.isFinite(opts.olderThanMs) ? opts.olderThanMs : null,
@@ -772,7 +869,7 @@ async function cmdHarness(opts) {
     return;
   }
 
-  fail(opts, `Unknown harness subcommand: ${sub || '(none)'}. Use record|confirm|verify|verify-acs|report|cleanup|capabilities.`);
+  fail(opts, `Unknown harness subcommand: ${sub || '(none)'}. Use record|confirm|verify|verify-acs|matrix-check|report|cleanup|capabilities.`);
 }
 
 export async function run(argv) {
