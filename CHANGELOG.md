@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.38.0] — 2026-09-16
+
 Every command now **declares whether it writes**, and the declaration is enforced by the dispatcher and asserted by tests. A consumer reported that `harness record --help` wrote a ledger — "on this CLI, checking the help is not a read-only operation." An audit found the reported bug was one instance of a class: safety was a convention the *caller* had to remember, so it protected exactly the callers who already knew.
 
 ### Added
