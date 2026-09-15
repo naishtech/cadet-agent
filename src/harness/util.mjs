@@ -106,9 +106,29 @@ export function changedFiles(cwd, { runner = defaultGitRunner } = {}) {
 }
 
 /**
+ * Cadet's own bookkeeping — never a meaningful verification input.
+ *
+ * `state.json` is rewritten by the very command that records a gate, and
+ * `runs/*.json` gains a new ledger on every harness invocation. If either were
+ * auto-detected as a relevant file, the evidence hash would describe a file the
+ * recording itself mutates: the gate would be stale the moment it was written,
+ * and the resulting record would certify no story code. Excluded here, at the
+ * single scan used by both `harness verify` and `harness confirm`.
+ */
+const CADET_MACHINERY = ['.cadet/state.json', '.cadet/runs/'];
+
+/** True when a repository-relative path is Cadet's own bookkeeping. */
+function isCadetMachinery(relPath) {
+  return CADET_MACHINERY.some((p) => (p.endsWith('/') ? relPath.startsWith(p) : relPath === p));
+}
+
+/**
  * List changed files and report whether git was actually queryable.
  * Returns `{ available, files, reason }`. `available: false` means freshness
  * coverage could not be established and callers must fail safe.
+ *
+ * Cadet's own machinery (`.cadet/state.json`, `.cadet/runs/**`) is filtered out
+ * of `files`; see `CADET_MACHINERY`.
  */
 export function gitChangedFiles(cwd, { runner = defaultGitRunner } = {}) {
   let res;
@@ -134,7 +154,10 @@ export function gitChangedFiles(cwd, { runner = defaultGitRunner } = {}) {
     let path = line.slice(3).trim();
     if (path.includes(' -> ')) path = path.split(' -> ').pop().trim();
     path = path.replace(/^"|"$/g, '');
-    if (path) files.add(path.replace(/\\/g, '/'));
+    if (!path) continue;
+    const rel = path.replace(/\\/g, '/');
+    if (isCadetMachinery(rel)) continue;
+    files.add(rel);
   }
   return { available: true, files: [...files].sort(), reason: null };
 }

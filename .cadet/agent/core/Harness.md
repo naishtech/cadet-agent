@@ -49,8 +49,10 @@ A gate is `true` only when backed by **fresh, structured evidence**.
 
 ## 2a. Manual-confirmation quality
 
-A `manual-confirmation` record is a human assertion with no file binding, so its only freshness
-control is its expiry. Under `strictClosure.enabled` it must carry:
+A `manual-confirmation` record is a human assertion. It binds to the same relevant files as an
+automated record — those given by `--files`, or the working tree's changed files when the flag is
+omitted — so a later edit to any of them invalidates it. Its `expiresAt` is an *additional* bound,
+not its only one. Under `strictClosure.enabled` it must carry:
 
 - `reason` — why automation was unavailable;
 - `expiresAt` — a concrete bound (`null` is rejected: declaring the key is not declaring a bound);
@@ -130,6 +132,12 @@ Every attempt gets a span and evidence record. A retry never overwrites a failed
 - **Evidence is bound to relevant files.** `cadet-agent harness verify` hashes the files given by
   `--files` (or the working tree's changed files by default) into the evidence `inputTreeHash`, so a
   later edit to any of them invalidates the evidence and blocks the transition.
+- **Cadet's own files are never relevant files.** `.cadet/state.json` and `.cadet/runs/**` are
+  excluded from the working-tree scan. `state.json` is rewritten by the very command that records a
+  gate, and `runs/` gains a ledger on every harness invocation; binding evidence to either would
+  make a gate stale the instant it was written and would certify no story code. Pass `--files`
+  explicitly to bind evidence to the work itself rather than to whatever happens to be dirty. An
+  empty `--files ""` is rejected (`empty-files`) rather than silently falling back to the scan.
 - **A declared test must actually run.** Each acceptance criterion in a story records the exact
   test identifiers that prove it. Under `strictClosure.enabled`, `acceptanceCriteriaValidated`
   cannot be set while any declared test is absent from the inventory of the run that satisfied
