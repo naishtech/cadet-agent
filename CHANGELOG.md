@@ -11,6 +11,12 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ---
 
+## [0.36.1] — 2026-09-15
+
+### Fixed
+
+- **`--help` now documents every harness flag.** `--commit` (added in 0.36.0) and the pre-existing `--story`, `--report`, and the new `--matrix`/`--inventory` were all absent from the option list, so the only way to discover them was to read the parser. Documentation-only; no behaviour change.
+
 ## [0.36.0] — 2026-09-15
 
 Three gaps found by an Agent Reviewer audit of a real consumer project (a story review and PR that had already been merged). All three share a cause: a rule the framework stated but could not mechanically check, so it was satisfied by human diligence or not at all.
