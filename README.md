@@ -190,15 +190,29 @@ Gates are backed by **evidence**, not assertion. Each claimed gate must have a f
 
 ```bash
 cadet-agent state validate                       # validate state against the schema
-cadet-agent state migrate                        # atomically upgrade v1 → v2
+cadet-agent state migrate                        # atomically upgrade v1 → v2 (no writes if it fails)
 cadet-agent state transition --to review         # enforce the matrix + evidence
 cadet-agent harness verify --gate testsPassed --files src/a.cs   # bounded, classified loop
 cadet-agent harness report                       # budget consumption and failures (no secrets)
-cadet-agent harness cleanup                      # apply the retention policy
+cadet-agent harness cleanup --older-than-ms <n>  # apply the retention policy (bound required)
 cadet-agent harness capabilities                 # available CLI/Unity/MCP/hook/token/cost telemetry
 ```
 
 Every command supports `--format human|json` and exits nonzero for invalid state, failed verification, budget exhaustion, stale evidence, or safety rejection.
+
+Every command also **declares whether it writes**, and the declaration is enforced rather than
+trusted. `--help` is read-only at any depth, `--dry-run` is honoured by every mutating command, and a
+command declared read-only is tested to perform no writes. A destructive command that may run
+unattended must require a content-bearing bound — `cleanup` requires `--older-than-ms` — so an agent
+states *what* it acts on rather than merely *that* it approves. Run
+`cadet-agent harness capabilities --format json` to read the registry.
+
+Two refusals exist so an unattended agent cannot destroy evidence by accident:
+
+```bash
+cadet-agent harness cleanup                      # exits 1: deletes nothing without a bound
+cadet-agent harness record --dry-run             # reports what it would write, writes nothing
+```
 
 See `docs/guidance/HarnessTroubleshooting.md` for stale evidence, budget exhaustion, unavailable Unity CLI, and live MCP connection failures.
 

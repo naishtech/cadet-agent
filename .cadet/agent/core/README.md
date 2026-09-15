@@ -43,13 +43,17 @@ Cadet runs under an observable, bounded harness. In short:
 
 ```bash
 cadet-agent state validate          # validate state against the schema
-cadet-agent state migrate           # atomically upgrade v1 → v2
+cadet-agent state migrate           # atomically upgrade v1 → v2 (no writes if it fails)
 cadet-agent state transition --to <phase>
 cadet-agent harness verify --gate <gate>
 cadet-agent harness report
-cadet-agent harness cleanup
+cadet-agent harness cleanup --older-than-ms <n>   # required: states the age bound it deletes by
 cadet-agent harness capabilities
 ```
+
+Every command declares whether it writes, and the declaration is enforced rather than trusted:
+`--help` is read-only at any depth, and `--dry-run` is honoured by every mutating command. Run
+`cadet-agent harness capabilities --format json` to read the registry.
 
 Read `Harness.md` for the full contract. See `docs/core/HarnessContract.md` for the frozen data contract and compatibility invariants.
 

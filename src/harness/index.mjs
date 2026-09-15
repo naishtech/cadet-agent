@@ -73,3 +73,8 @@ export {
 export {
   collectDeclaredTestNames, reconcileTestNames, inventoryFromCSharpSources,
 } from './matrix-check.mjs';
+
+export {
+  COMMANDS, mutatingCommands, readOnlyCommands, resolveCommand,
+  describeCommand, describeAllCommands, checkUnattendedRequirements,
+} from './commands.mjs';

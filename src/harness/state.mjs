@@ -601,16 +601,22 @@ export function migrateStateFile(statePath, { backup = true } = {}) {
   const tmpPath = join(tmpDir, 'state.json');
   try {
     writeFileSync(tmpPath, JSON.stringify(state, null, 2) + '\n', 'utf-8');
-    if (backup) {
-      copyFileSync(statePath, `${statePath}.v1.bak`);
-    }
-    // A failed rename leaves the original in place; validate before committing.
+    // Validate BEFORE writing anything to the real tree. The backup is an
+    // artifact of a *successful* migration, so producing one and then failing
+    // would leave a write the caller never got and did not ask for — a failed
+    // `migrate` must leave the directory exactly as it found it. Checking first
+    // also means a bad migration cannot overwrite a previous good backup.
+    //
     // This is a structural-only check: a freshly migrated state has no on-disk
     // evidence to bind, so freshness is intentionally not evaluated here.
     const check = validateState(state, { structuralOnly: true });
     if (!check.valid) {
       throw new StateError(`migrated state failed validation: ${check.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
     }
+    if (backup) {
+      copyFileSync(statePath, `${statePath}.v1.bak`);
+    }
+    // A failed rename leaves the original in place.
     renameSync(tmpPath, statePath);
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });

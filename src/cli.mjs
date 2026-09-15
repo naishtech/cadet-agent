@@ -10,6 +10,7 @@ import {
   parseTestInventory, parseStoryCriteria, compareCoverage, describeCoverageGaps,
   createEvidence, newId, computeInputTreeHash, hashCriteria,
   collectDeclaredTestNames, reconcileTestNames,
+  resolveCommand, describeCommand, describeAllCommands, checkUnattendedRequirements, COMMANDS,
 } from './harness/index.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -68,50 +69,93 @@ function showHelp() {
     --matrix       TDD matrix markdown to check (harness matrix-check)
     --inventory    Newline-separated test names, when no report is available (harness matrix-check)
     --agents-md    keep|overwrite|merge for an existing AGENTS.md (init/sync)
+    --older-than-ms  Age bound, in ms, for records cleanup may delete (harness cleanup; required)
+    --dry-run      Report what a mutating command would do and write nothing (all mutating commands)
     --yes, -y      Never prompt; keep existing files (non-interactive installs)
-    --help, -h    Show this help
+    --help, -h    Show this help (valid at any depth; never writes)
     --version, -v Show version number
 `);
+}
+
+/**
+ * Does the invocation ask for help?
+ *
+ * Scanned against the raw argv rather than the parsed options on purpose. Once
+ * parsing begins, `--help` in a value position (`--target --help`) is consumed
+ * as another flag's argument and never seen again — so it must be detected
+ * before `parseArgs` runs. `--` ends flag scanning, so a literal `--help` after
+ * it is an operand and does not trigger help.
+ */
+function wantsHelp(argv) {
+  for (let i = 2; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--') return false;
+    if (a === '--help' || a === '-h') return true;
+  }
+  return false;
 }
 
 function parseArgs(argv) {
   const opts = { format: 'human', targetDir: process.cwd(), sourceUrl: null, rest: [] };
   // argv[2] is the top-level command (`state`/`harness`/`init`/...); argv[3] begins
   // the subcommand and its options.
-  for (let i = 3; i < argv.length; i++) {
+  //
+  // `value()` reads the argument a flag expects and rejects the case where the
+  // next token is itself a flag. Without this check `--target --format` bound
+  // the literal string "--format" as the target directory and then wrote a
+  // ledger into a directory named `--format/` — a stray write, from a typo, in
+  // an arbitrary place. A silently swallowed option is worse than a rejected
+  // one because the command still reports success.
+  //
+  // A negative number is allowed through: it is a plausible value (`--older-than-ms -1`)
+  // and cannot be mistaken for one of this CLI's flags, all of which are words.
+  //
+  // `i` is declared here, outside the loop, because `value()` must advance the
+  // shared cursor — a closure over a loop-scoped `i` would not exist yet at
+  // definition time.
+  let i = 3;
+  const value = (flag) => {
+    const next = argv[i + 1];
+    if (next === undefined || (next.startsWith('-') && !/^-\d/.test(next))) {
+      fail(opts, `Option ${flag} requires a value.`, () => 1, { ok: false, code: 'missing-option-value', option: flag });
+    }
+    i += 1;
+    return next;
+  };
+  for (i = 3; i < argv.length; i++) {
     const a = argv[i];
     switch (a) {
-      case '--target': case '-t': opts.targetDir = argv[++i]; break;
-      case '--source': opts.sourceUrl = argv[++i]; break;
-      case '--format': opts.format = argv[++i] || 'human'; break;
-      case '--to': opts.to = argv[++i]; break;
-      case '--gate': opts.gate = argv[++i]; break;
-      case '--command': opts.command = argv[++i]; break;
-      case '--work-item': opts.workItemId = argv[++i]; break;
-      case '--phase': opts.phase = argv[++i]; break;
-      case '--run': opts.runId = argv[++i]; break;
-      case '--type': opts.type = argv[++i]; break;
-      case '--reason': opts.reason = argv[++i]; break;
-      case '--expires-at': opts.expiresAt = argv[++i]; break;
-      case '--environment': opts.environment = argv[++i]; break;
-      case '--scope': opts.scope = (argv[++i] || '').split(',').map((s) => s.trim()).filter(Boolean); break;
-      case '--evidence-status': opts.evidenceStatus = argv[++i]; break;
+      case '--target': case '-t': opts.targetDir = value(a); break;
+      case '--source': opts.sourceUrl = value(a); break;
+      case '--format': opts.format = value(a); break;
+      case '--to': opts.to = value(a); break;
+      case '--gate': opts.gate = value(a); break;
+      case '--command': opts.command = value(a); break;
+      case '--work-item': opts.workItemId = value(a); break;
+      case '--phase': opts.phase = value(a); break;
+      case '--run': opts.runId = value(a); break;
+      case '--type': opts.type = value(a); break;
+      case '--reason': opts.reason = value(a); break;
+      case '--expires-at': opts.expiresAt = value(a); break;
+      case '--environment': opts.environment = value(a); break;
+      case '--scope': opts.scope = value(a).split(',').map((s) => s.trim()).filter(Boolean); break;
+      case '--evidence-status': opts.evidenceStatus = value(a); break;
       // Track that the flag was supplied even when its value is empty, so an
       // empty `--files ""` is rejected rather than silently falling back to the
       // working-tree scan (which could bind evidence to Cadet's own files).
-      case '--files': opts.filesGiven = true; opts.files = (argv[++i] || '').split(',').map((s) => s.trim()).filter(Boolean); break;
-      case '--story': opts.story = argv[++i]; break;
-      case '--report': opts.report = argv[++i]; break;
+      case '--files': opts.filesGiven = true; opts.files = value(a).split(',').map((s) => s.trim()).filter(Boolean); break;
+      case '--story': opts.story = value(a); break;
+      case '--report': opts.report = value(a); break;
       // AR-1: the revision a gate record attests, so a gate-related fix claim
       // can be traced to the commit that contains it.
-      case '--commit': opts.commitGiven = true; opts.commit = argv[++i]; break;
-      case '--matrix': opts.matrix = argv[++i]; break;
-      case '--inventory': opts.inventory = argv[++i]; break;
+      case '--commit': opts.commitGiven = true; opts.commit = value(a); break;
+      case '--matrix': opts.matrix = value(a); break;
+      case '--inventory': opts.inventory = value(a); break;
       case '--write-coverage': opts.writeCoverage = true; break;
       case '--strict-orphans': opts.strictOrphans = true; break;
       case '--dry-run': opts.dryRun = true; break;
-      case '--older-than-ms': opts.olderThanMs = Number(argv[++i]); break;
-      case '--agents-md': opts.agentsMd = argv[++i]; break;
+      case '--older-than-ms': opts.olderThanMs = Number(value(a)); break;
+      case '--agents-md': opts.agentsMd = value(a); break;
       case '--yes': case '-y': opts.yes = true; break;
       default: opts.rest.push(a);
     }
@@ -270,7 +314,13 @@ async function cmdHarness(opts) {
 
   if (sub === 'capabilities') {
     const caps = detectCapabilities({ targetDir: opts.targetDir });
-    if (opts.format === 'json') emit(opts, '', { ok: true, capabilities: caps });
+    // The command registry is published here so an agent can *ask* which
+    // commands write instead of inferring it from a name or trusting a flag it
+    // must remember to pass. It is informational: the safety guarantee does not
+    // depend on the agent reading it, because the dispatcher enforces the
+    // registry regardless.
+    const commands = describeAllCommands();
+    if (opts.format === 'json') emit(opts, '', { ok: true, capabilities: caps, commands });
     else {
       console.log('Cadet-Agent capability report');
       console.log(`  CLI:            ${caps.cli ? 'available' : 'unavailable'}`);
@@ -280,6 +330,11 @@ async function cmdHarness(opts) {
       console.log(`  Token telemetry:${caps.tokenTelemetry.provider ? ' provider' : ' estimate/unknown'}`);
       console.log(`  Cost telemetry: ${caps.costTelemetry.available ? 'available' : `unavailable (${caps.costTelemetry.reason})`}`);
       console.log(`  Note: ${caps.hook.note}`);
+      console.log('  Commands (mutating commands honour --dry-run; nothing writes without it being declared):');
+      for (const c of commands) {
+        const bound = c.requiresForUnattended.length ? ` [unattended requires ${c.requiresForUnattended.join(', ')}]` : '';
+        console.log(`    ${c.mutates ? 'WRITES ' : 'read   '} ${c.command}${bound}`);
+      }
     }
     return;
   }
@@ -879,7 +934,61 @@ async function cmdHarness(opts) {
 
 export async function run(argv) {
   const command = argv[2];
+
+  // `--help`/`-h` is a global, read-only flag: it must be honoured at ANY depth
+  // (`harness record --help`, `state transition --help`) and must short-circuit
+  // before dispatch. Previously it was only recognised as `argv[2]`, so a nested
+  // help flag fell through into `parseArgs`'s `rest` array — and mutating
+  // subcommands acted on it. `harness record --help` appended a ledger,
+  // `harness cleanup --help` applied the retention policy and deleted run
+  // records, and `state migrate --help` wrote a `.v1.bak` backup. "Checking the
+  // help" is not a read-only operation if help is never actually checked.
+  if (wantsHelp(argv)) {
+    showHelp();
+    return;
+  }
+
   const opts = parseArgs(argv);
+  const commandKey = resolveCommand(argv);
+
+  // Global `--dry-run`, driven by the registry rather than by each handler.
+  //
+  // This is the structural fix for the class of bug where a mutating command
+  // simply did not check the flag: `--dry-run` was parsed globally but honoured
+  // by one command, so `harness record --dry-run` wrote a ledger and
+  // `cleanup --dry-run` would have deleted records. Declaring which commands
+  // write, and honouring the flag for all of them here, means a new mutating
+  // command is covered the moment it is registered — no per-handler check to
+  // remember, and no way to forget one.
+  //
+  // A read-only command needs no interception: it is asserted not to write.
+  // A command may opt out when its dry-run is an *evaluation* rather than a
+  // no-op: `state transition --dry-run` reports the same verdict a real
+  // transition would, so its handler owns the flag. See `evaluatesOnDryRun`.
+  if (opts.dryRun === true && commandKey && COMMANDS[commandKey].mutates === true && COMMANDS[commandKey].evaluatesOnDryRun !== true) {
+    emit(
+      opts,
+      `✅ Dry run: \"${commandKey}\" would run and may write ${(COMMANDS[commandKey].writes || []).join(', ') || 'state'} — nothing was written.`,
+      {
+        ok: true,
+        dryRun: true,
+        applied: false,
+        command: commandKey,
+        mutates: true,
+        writes: COMMANDS[commandKey].writes || [],
+      },
+    );
+    return;
+  }
+
+  // A destructive command that may run unattended must carry an explicit,
+  // content-bearing bound on what it acts on. `--older-than-ms` states *what*
+  // to delete; a bare confirmation flag would only state *that* something was
+  // approved, which an agent can pass without knowing what it is approving.
+  if (commandKey) {
+    const guard = checkUnattendedRequirements(commandKey, opts);
+    if (!guard.ok) fail(opts, guard.reason, () => 1, { ok: false, command: commandKey, code: 'unattended-requirement-missing', missing: guard.missing });
+  }
 
   // Validate the create-only policy flag early so a typo fails loudly.
   const AGENTS_MD_MODES = ['keep', 'overwrite', 'merge'];

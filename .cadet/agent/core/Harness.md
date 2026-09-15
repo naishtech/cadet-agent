@@ -257,17 +257,36 @@ budget state is missing.
 
 ## 12. CLI surface
 
-- `cadet-agent state validate` — validate state against the v2 schema.
-- `cadet-agent state migrate` — atomically migrate v1 → v2 (original preserved on failure).
+**Every command declares whether it writes.** The registry in `src/harness/commands.mjs` is the
+single source of truth: `mutates`, `writes`, and any required unattended bound. Two consequences
+matter to a skill, and neither depends on the caller remembering a flag:
+
+- `--help` is honoured at any depth and writes nothing. "Checking the help" is always read-only.
+- `--dry-run` is honoured **globally and automatically** for every mutating command. You do not need
+  to know that a command supports it; passing it is sufficient, and omitting it is the only way to
+  write. `state transition` is the one declared exception: its dry run returns the identical verdict
+  a real transition would, rather than a bare acknowledgement.
+- A command declared read-only performs no writes, ever. This is asserted for every such command, so
+  a new write in `report` or `matrix-check` fails the build rather than the user.
+- A command that acts irreversibly and may run unattended must require a **content-bearing bound**
+  rather than a confirmation flag — `cleanup` requires `--older-than-ms`, so an agent must state
+  *what* it deletes, not merely *that* it approves deleting something.
+
+Run `cadet-agent harness capabilities --format json` to read the registry instead of inferring it.
+
+- `cadet-agent state validate` — validate state against the v2 schema. Read-only.
+- `cadet-agent state migrate` — atomically migrate v1 → v2. **On failure the tree is left exactly as found**, backup included: the backup is written only after the migrated document validates.
 - `cadet-agent state transition --to <phase> [--dry-run]` — enforce the transition matrix + evidence. **`--dry-run` reports the same verdict and writes nothing** — use it for every inspection; without the flag the transition is applied and `state.json` is written. A transition is legal only when it is a gated transition in the matrix or a declared ungated forward edge (bootstrap + planning progression); `closed` is terminal, so leaving it is rejected. A rejection lists every missing or stale gate.
-- `cadet-agent harness record` — append a sanitized span/evidence/decision event.
+- `cadet-agent harness record` — append a sanitized span/evidence/decision event. Honours `--dry-run`. Append-only, so it carries no unattended bound: requiring a flag to record evidence would push agents to skip logging.
 - `cadet-agent harness confirm --gate <gate> --reason <t> --expires-at <iso> --environment <k=v,...> --scope <a,b> [--files a,b] [--commit <sha>]` — record `manual-confirmation` evidence, the first-class path for a gate automation cannot satisfy. Validates the strict-closure metadata *before* writing, rejects a gate in `disallowManualFor`, bounds the validity window, and binds the record to files exactly as `harness verify` does. Writes the ledger and then `state.json` atomically; prior passing evidence for the gate is marked `superseded`, never deleted. Use this instead of hand-editing `state.json` — the rules in §2a are checked at creation time, when the human still remembers what was verified.
-- `cadet-agent harness verify --gate <gate> [--files a,b] [--commit <sha>]` — run a bounded, classified verification loop. Evidence is bound to the relevant files given by `--files` (or the working tree's changed files). A `testsPassed` green result requires a prior red record. On success it records the new evidence in `state.json → gateEvidence` and flips the gate; prior passing evidence for that gate is marked `superseded`. The full attempt history is written to the run ledger.
+- `cadet-agent harness verify --gate <gate> [--files a,b] [--commit <sha>]` — run a bounded, classified verification loop. Evidence is bound to the relevant files given by `--files` (or the working tree's changed files). A `testsPassed` green result requires a prior red record. On success it records the new evidence in `state.json → gateEvidence` and flips the gate; prior passing evidence for that gate is marked `superseded`. The full attempt history is written to the run ledger. A **failing** verification still persists its ledger: that is the red record, and suppressing it would break TDD evidence.
 - `cadet-agent harness verify-acs --story <path> [--report <path>] [--write-coverage]` — mechanically verify that every test a story declares for an acceptance criterion actually ran. The story is the single source of truth for the AC→test mapping; the inventory is extracted from a test report (TAP, JUnit XML, or Unity JSON), auto-detected by content. Under `strictClosure.enabled`, any declared test absent from the inventory, any AC that declares no test, or an unknown/empty inventory means `acceptanceCriteriaValidated` is **not** set and the command exits 1, listing every gap with its AC id. With strict closure off it reports and exits 0 without touching `state.json`. `--write-coverage` additionally writes a derived `*.coverage.json` artifact.
 - `cadet-agent harness matrix-check --matrix <path> [--report <path> | --inventory <path>]` — reconcile a TDD matrix's **delivered** test-name claims against a compiled inventory. A matrix row is authored during architecture, before implementation, so a name can be an intention that changes or never happens while nothing re-checks the row; this is the mechanical check for that. Read-only — it never writes state, so it runs at authoring time as well as in a gate. Two directions are kept deliberately separate: a name in a `DELIVERED` row absent from the inventory is a **defect** (exit 1), while a name in an undelivered row is an **intention** and is never reported. Collapsing the two produces false failures, and a false failure is how a real check gets switched off. Undelivered intentions that *have* landed are reported informationally, so a stale row is visible rather than silent. Without `--report` or `--inventory` nothing can be proven, so the command exits 1 rather than reporting success.
-- `cadet-agent harness report` — summarize budget consumption and failures (no secrets).
-- `cadet-agent harness cleanup` — apply the retention policy to `.cadet/runs/`.
-- `cadet-agent harness capabilities` — report available CLI/Unity/MCP/hook/token/cost telemetry.
+- `cadet-agent harness report` — summarize budget consumption and failures (no secrets). Read-only.
+- `cadet-agent harness cleanup --older-than-ms <n>` — apply the retention policy to `.cadet/runs/`. **Deletes run records irreversibly, so `--older-than-ms` is required**: an unattended agent must state the age bound it is deleting by. Without it the command refuses and deletes nothing, so a caller that does not know what the command does cannot destroy evidence by accident. `--dry-run` reports what would be deleted without deleting it.
+- `cadet-agent harness capabilities` — report available CLI/Unity/MCP/hook/token/cost telemetry, plus the command registry (`commands[]`) with each command's `mutates`, `writes`, and unattended requirements. Read-only.
 
 Every command supports `--format human|json` and returns nonzero for invalid state, failed
 verification, budget exhaustion, stale evidence, or safety rejection. It never prints secrets.
+An option with a missing value is a usage error, never a silently swallowed next flag: a stray
+`--target --format` previously wrote a ledger into a directory named `--format/`.
