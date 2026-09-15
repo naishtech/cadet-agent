@@ -212,6 +212,47 @@ export function validateState(state, context = {}) {
         if (lt.to !== undefined && !PHASES.includes(lt.to)) errors.push({ path: 'lastTransition.to', message: `unknown phase "${lt.to}"` });
       }
     }
+
+    // AR-2. A story marked `done` must have SOME evidence record of its own.
+    //
+    // WHY THIS IS NEEDED. Every gate rule in this file is scoped to the ACTIVE
+    // work item, so `state validate` could report a document as fully valid while
+    // an already-completed story had no evidence whatsoever. In one real project
+    // eight `done` stories had zero records and validation said "valid, 0 errors,
+    // 0 warnings" — the gaps were invisible until they were looked for by hand.
+    //
+    // SCOPE, DELIBERATELY NARROW. This asserts COVERAGE, not gate completeness:
+    // it asks only "is there any evidence for this story at all?". Whether every
+    // required gate was satisfied for the right phase is already enforced at
+    // transition time, against the active work item, where the phase is known.
+    // Re-deciding that here would duplicate the transition matrix and risk the
+    // two disagreeing.
+    //
+    // It is an ERROR, not a warning, because a `done` story with no evidence is
+    // indistinguishable from a story that was never verified — which is the
+    // condition the framework exists to prevent. Projects that closed stories
+    // before the harness existed can resolve it with a scoped gate exception or
+    // by re-recording; silently tolerating it is what let the gap grow.
+    if (isPlainObject(state.epics) && Array.isArray(state.gateEvidence)) {
+      const evidenced = new Set(
+        state.gateEvidence
+          .map((e) => (isPlainObject(e) ? e.workItemId : null))
+          .filter((id) => typeof id === 'string' && id.length > 0),
+      );
+      for (const [epicId, epic] of Object.entries(state.epics)) {
+        if (!isPlainObject(epic) || !isPlainObject(epic.stories)) continue;
+        for (const [storyId, status] of Object.entries(epic.stories)) {
+          if (status !== 'done') continue;
+          if (evidenced.has(`${epicId}::${storyId}`)) continue;
+          errors.push({
+            path: `epics.${epicId}.stories.${storyId}`,
+            message: `story "${storyId}" is marked done but has no evidence record for its work item `
+              + `"${epicId}::${storyId}". A completed story must be backed by at least one evidence `
+              + 'record; otherwise it is indistinguishable from one that was never verified.',
+          });
+        }
+      }
+    }
   } else if (state.gateEvidence !== undefined) {
     warnings.push({ path: 'gateEvidence', message: 'gateEvidence on a v1 state is ignored until migration' });
   }
@@ -274,6 +315,15 @@ function validateEvidenceShape(ev, strict = null) {
   }
   if (ev.result !== undefined && ev.result !== null && typeof ev.result !== 'string') {
     errors.push({ path: 'result', message: 'result must be a string or null' });
+  }
+  // AR-1. `commit` is optional (a v2-shaped record omits it) but must be a real
+  // revision identifier when present — a branch or tag name would read as a
+  // citation while being uncheckable later, which is worse than none.
+  if (ev.commit !== undefined && ev.commit !== null && !/^[0-9a-fA-F]{4,40}$/.test(String(ev.commit))) {
+    errors.push({
+      path: 'commit',
+      message: 'commit must be a 4-40 character hex revision identifier, or null',
+    });
   }
   if (ev.createdAt !== undefined && ev.createdAt !== null && Number.isNaN(Date.parse(ev.createdAt))) {
     errors.push({ path: 'createdAt', message: 'createdAt must be an ISO-8601 date-time' });
@@ -552,6 +602,30 @@ export function migrateStateFile(statePath, { backup = true } = {}) {
 
 // ── Evidence ────────────────────────────────────────────────────────────────
 
+/**
+ * AR-1. Normalize and validate a commit citation.
+ *
+ * Accepts a full SHA or an abbreviated one (git's default short form is 7, but
+ * 4–40 hex characters are all unambiguous enough to store). A symbolic name such
+ * as a branch or tag is REJECTED: those move, so a record naming one cannot be
+ * checked later, which defeats the purpose of citing a revision at all.
+ *
+ * Returns null for an absent value so a v2-shaped record is unchanged.
+ */
+export function normalizeCommit(commit) {
+  if (commit === null || commit === undefined) return null;
+  const value = String(commit).trim();
+  if (value === '') return null;
+  if (!/^[0-9a-fA-F]{4,40}$/.test(value)) {
+    throw new StateError(
+      `commit must be a 4-40 character hex revision identifier, but was "${value}". `
+      + 'A branch or tag name is not accepted: it moves, so the citation could not be '
+      + 'checked later. Pass an abbreviated or full SHA.',
+    );
+  }
+  return value.toLowerCase();
+}
+
 /** Build an evidence record. `id` defaults to a fresh UUIDv4. */
 export function createEvidence({
   evidenceId,
@@ -569,12 +643,19 @@ export function createEvidence({
   criteriaHash = null,
   relevantFiles = [],
   toolVersion = null,
+  commit = null,
   createdAt = new Date(),
   expiresAt = null,
   freshnessPolicy = null,
   source = 'automated',
   id,
 }) {
+  // AR-1. A gate record must be able to name the revision it attests, or a
+  // "gate-related fix claim" cannot be traced to the code it claims to cover.
+  // Validated rather than trusted: this value is persisted into state.json and
+  // read back by the Reviewer, so a malformed one would make a claim look
+  // verified while naming nothing.
+  const normalizedCommit = normalizeCommit(commit);
   return {
     evidenceId: evidenceId || id || undefined,
     workItemId,
@@ -591,6 +672,7 @@ export function createEvidence({
     criteriaHash: criteriaHash || hashCriteria([]),
     relevantFiles,
     toolVersion,
+    commit: normalizedCommit,
     createdAt: timestamp(createdAt),
     expiresAt: expiresAt ? timestamp(expiresAt) : null,
     freshnessPolicy,

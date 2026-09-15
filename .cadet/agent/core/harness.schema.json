@@ -194,6 +194,11 @@
         "criteriaHash": { "$ref": "#/$defs/sha256" },
         "relevantFiles": { "type": "array", "items": { "type": "string" } },
         "toolVersion": { "type": ["string", "null"] },
+        "commit": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-fA-F]{4,40}$",
+          "description": "Optional. The revision this evidence attests, as an abbreviated or full SHA. Supplied via --commit on `harness verify`/`harness confirm`. A branch or tag name is rejected because it moves, so the citation could not be checked later. Null when the recorder supplied none, which keeps v2-shaped records valid."
+        },
         "createdAt": { "type": "string", "format": "date-time" },
         "expiresAt": { "type": ["string", "null"], "format": "date-time" },
         "freshnessPolicy": { "oneOf": [{ "$ref": "#/$defs/freshnessPolicy" }, { "type": "null" }] },
