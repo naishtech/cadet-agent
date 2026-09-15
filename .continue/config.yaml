@@ -82,3 +82,10 @@ customCommands:
     description: Audit Cadet Agent's work against framework rules and process requirements
     prompt: |
       Read `.cadet/agent/core/cadet-agent.md`, then read `.cadet/agent/core/skills/AgentReviewer.md` as the primary instruction context — in full, including the `<role>` block. Follow every step in that file.
+
+  - name: cadet-handoff
+    description: Summarize this session's work and record what must happen next so a new chat can continue
+    prompt: |
+      Read `.cadet/agent/core/cadet-agent.md` for the global directive.
+      Read `.cadet/agent/core/skills/Handoff.md` as the primary instruction context.
+      Follow every step in that skill file. Record state as-is — never advance a phase or satisfy a gate.

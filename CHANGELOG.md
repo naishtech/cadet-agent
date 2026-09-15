@@ -11,7 +11,24 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ---
 
-## [Unreleased]
+## [0.35.0] — 2026-09-15
+
+### Added
+
+- **New first-class skill: `/cadet-handoff`.** Captures the current session's work and the next session's obligations so a user can start a fresh chat and the next agent continues without re-discovery. State alone records *where* the workflow is; a handoff records *what was learned getting there* — decisions, rejected approaches, blockers, and uncommitted work.
+  - Canonical process in `.cadet/agent/core/skills/Handoff.md`, wired across all five adapter surfaces: Copilot prompt (`/cadet-handoff`), Cursor rule, Continue rule + `config.yaml` command, `.claude/skills/cadet-handoff`, and `.agents/skills/cadet-handoff`.
+  - Writes a durable record to `.cadet/handoffs/<timestamp>.md`, decoupled from the published copy, and appends a `handoff` entry to `state.json → changeHistory`. `.cadet/handoffs` is a **preserved path**, so framework sync never clobbers a consumer's handoff history.
+  - The skill's core discipline is separating **verified** work (evidence-backed) from **claimed/unverified** work, plus explicit sections for open questions, uncommitted work, budget state, and "do not redo" dead ends — so an incoming agent inherits no false assumptions.
+  - It never advances a phase or satisfies a gate; it inspects the next legal transition with `state transition --to <phase> --dry-run` so the inspection cannot mutate state.
+  - Registered in `cadet-agent.md`'s Skill Inventory and `FrameworkManifest.json` managed paths; guard tests cover the canonical skill, all five adapters, and the `--dry-run`/no-state-advance discipline.
+
+### Fixed
+
+- **Freshness evidence no longer binds to Cadet's own files.** `gitChangedFiles` returned every entry of `git status --porcelain --untracked-files=all` unfiltered, so the working-tree default picked up `.cadet/state.json` and `.cadet/runs/*.json` as "relevant files" whenever they were dirty. Because recording a gate rewrites `state.json`, and every harness invocation adds a ledger, the recorded evidence hashed a file the recording itself mutated: the gate was reported stale one command later (`gate is backed by stale evidence: the input tree hash no longer matches the current files`) and the record certified no story code. The trap was unwinnable by retrying — each attempt rewrote the file it had just hashed — and it fired for `harness verify` and `harness confirm` alike, including `manual-confirmation` records that the docs described as having no file binding.
+  - `.cadet/state.json` and `.cadet/runs/**` are now excluded at the single scan in `gitChangedFiles` (`src/harness/util.mjs`), so both commands are fixed at once.
+  - An explicitly empty `--files ""` is now rejected (`code: "empty-files"`) instead of silently falling back to the working-tree scan, which previously produced the same bad binding with no warning.
+  - `Harness.md` §2a corrected: a `manual-confirmation` *does* bind to relevant files, and its expiry is an additional bound rather than its only one. §5 documents the exclusion.
+  - Tests pin the exclusion, the minimised self-reference case (only `state.json` dirty), the auto-detect path, verbatim honouring of a non-empty `--files`, and the empty-`--files` rejection.
 
 ## [0.34.0] — 2026-09-14
 

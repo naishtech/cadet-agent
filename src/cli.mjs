@@ -90,7 +90,10 @@ function parseArgs(argv) {
       case '--environment': opts.environment = argv[++i]; break;
       case '--scope': opts.scope = (argv[++i] || '').split(',').map((s) => s.trim()).filter(Boolean); break;
       case '--evidence-status': opts.evidenceStatus = argv[++i]; break;
-      case '--files': opts.files = (argv[++i] || '').split(',').map((s) => s.trim()).filter(Boolean); break;
+      // Track that the flag was supplied even when its value is empty, so an
+      // empty `--files ""` is rejected rather than silently falling back to the
+      // working-tree scan (which could bind evidence to Cadet's own files).
+      case '--files': opts.filesGiven = true; opts.files = (argv[++i] || '').split(',').map((s) => s.trim()).filter(Boolean); break;
       case '--story': opts.story = argv[++i]; break;
       case '--report': opts.report = argv[++i]; break;
       case '--write-coverage': opts.writeCoverage = true; break;
@@ -320,6 +323,9 @@ async function cmdHarness(opts) {
     // Freshness binding mirrors `harness verify`: never record a gate against an
     // unknown input tree unless the repository explicitly opted out.
     const allowEmpty = policy?.allowEmptyFreshness === true;
+    if (opts.filesGiven && (!opts.files || opts.files.length === 0)) {
+      fail(opts, '--files was given with no paths. Pass a comma-separated list of the files this gate covers (e.g. --files src/Foo.cs,test/FooTests.cs), or omit --files to auto-detect changed files.', () => 1, { ok: false, gate, code: 'empty-files' });
+    }
     let relevantFiles;
     if (opts.files && opts.files.length) {
       relevantFiles = opts.files.map((f) => f.replace(/\\/g, '/'));
@@ -459,6 +465,9 @@ async function cmdHarness(opts) {
     const allowEmpty = policy?.allowEmptyFreshness === true;
     let relevantFiles;
     let filesSource;
+    if (opts.filesGiven && (!opts.files || opts.files.length === 0)) {
+      fail(opts, '--files was given with no paths. Pass a comma-separated list of the files this gate covers (e.g. --files src/Foo.cs,test/FooTests.cs), or omit --files to auto-detect changed files.', () => 1, { ok: false, gate, code: 'empty-files' });
+    }
     if (opts.files && opts.files.length) {
       relevantFiles = opts.files.map((f) => f.replace(/\\/g, '/'));
       filesSource = 'explicit';

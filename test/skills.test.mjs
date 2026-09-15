@@ -23,6 +23,7 @@ const expectedSkills = [
   'CodeReview.md',
   'Resume.md',
   'MCPSetup.md',
+  'Handoff.md',
 ];
 
 const expectedPrompts = [
@@ -35,6 +36,7 @@ const expectedPrompts = [
   'cadet-review.prompt.md',
   'cadet-resume.prompt.md',
   'cadet-mcp-setup.prompt.md',
+  'cadet-handoff.prompt.md',
 ];
 
 describe('Skill files', () => {
@@ -300,5 +302,24 @@ describe('Skill harness contract', () => {
     const content = readFileSync(join(skillsDir, 'AgentReviewer.md'), 'utf-8');
     assert.ok(/Harness Audit/i.test(content), 'AgentReviewer must have a harness audit');
     assert.ok(/ledger/i.test(content), 'AgentReviewer must audit the ledger');
+  });
+
+  it('Handoff separates verified from claimed and records the next action', () => {
+    const content = readFileSync(join(skillsDir, 'Handoff.md'), 'utf-8');
+    assert.ok(/verified/i.test(content), 'Handoff must separate verified work from claimed work');
+    assert.ok(/unverified|claimed/i.test(content), 'Handoff must name the unverified/claimed category');
+    assert.ok(/next step/i.test(content), 'Handoff must record next steps');
+    assert.ok(/uncommitted/i.test(content), 'Handoff must report uncommitted work');
+    assert.ok(/harness report/i.test(content), 'Handoff must load the run report');
+  });
+
+  it('Handoff writes a durable artifact and never advances state', () => {
+    const content = readFileSync(join(skillsDir, 'Handoff.md'), 'utf-8');
+    assert.ok(content.includes('.cadet/handoffs/'), 'Handoff must write to .cadet/handoffs/');
+    assert.ok(/dry-run/.test(content), 'Handoff must use --dry-run when inspecting the next transition');
+    assert.ok(
+      /never (transition|advance)/i.test(content),
+      'Handoff must state that it never advances the phase',
+    );
   });
 });

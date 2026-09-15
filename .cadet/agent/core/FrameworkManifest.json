@@ -1,6 +1,6 @@
 {
   "frameworkName": "Cadet-Agent",
-  "frameworkVersion": "0.34.0",
+  "frameworkVersion": "0.35.0",
   "distributionMode": "cross-ide-universal-package",
   "canonicalRepository": "https://github.com/naishtech/cadet-agent",
   "preferredUpdateChannel": "releases",
@@ -27,16 +27,20 @@
     ".github/prompts/cadet-resume.prompt.md",
     ".github/prompts/cadet-mcp-setup.prompt.md",
     ".github/prompts/cadet-planning-review.prompt.md",
+    ".github/prompts/cadet-handoff.prompt.md",
     ".cursor/rules/cadet-agent.md",
     ".cursor/rules/cadet-agent-reviewer.md",
     ".cursor/rules/cadet-planning-review.md",
+    ".cursor/rules/cadet-handoff.md",
     ".continue/rules/cadet-agent.md",
     ".continue/rules/cadet-agent-reviewer.md",
     ".continue/rules/cadet-planning-review.md",
+    ".continue/rules/cadet-handoff.md",
     ".continue/config.yaml",
     ".claude/skills/cadet-agent",
     ".claude/skills/cadet-agent-reviewer",
     ".claude/skills/cadet-planning-review",
+    ".claude/skills/cadet-handoff",
     ".claude/skills/cadet-requirements",
     ".claude/skills/cadet-architecture",
     ".claude/skills/cadet-spike",
@@ -48,6 +52,7 @@
     ".claude/skills/cadet-mcp-setup",
     ".agents/skills/cadet-agent",
     ".agents/skills/cadet-agent-reviewer",
+    ".agents/skills/cadet-handoff",
     ".agents/skills/cadet-requirements",
     ".agents/skills/cadet-architecture",
     ".agents/skills/cadet-spike",
@@ -71,7 +76,8 @@
     ".cadet/agent/project-plans",
     ".cadet/state.json",
     ".cadet/harness.json",
-    ".cadet/runs"
+    ".cadet/runs",
+    ".cadet/handoffs"
   ],
   "createOnlyPaths": [
     "AGENTS.md"

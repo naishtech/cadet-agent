@@ -780,3 +780,137 @@ describe('G4 — validateState freshness is wired, not silently skipped', () => 
     assert.equal(r.warnings.some((w) => /freshness was not verified/.test(w.message)), false);
   });
 });
+
+// ── F7: freshness must not bind to Cadet's own machinery ────────────────────
+//
+// `.cadet/state.json` is rewritten every time a gate is recorded, and
+// `.cadet/runs/*.json` gains a new ledger on every harness command. When the
+// working-tree scan picks them up, the recorded evidence hashes a file that the
+// recording itself mutates — so the gate is stale the instant it is written.
+// This is unwinnable by retrying and certifies no story code. These tests pin
+// the exclusion so the trap cannot return.
+
+function gitProject() {
+  const dir = mkdtempSync(join(tmpdir(), 'cadet-selfref-'));
+  mkdirSync(join(dir, '.cadet', 'runs'), { recursive: true });
+  mkdirSync(join(dir, 'src'), { recursive: true });
+  writeFileSync(join(dir, 'src', 'a.mjs'), 'export const a = 1;\n');
+  writeFileSync(join(dir, '.gitignore'), 'node_modules/\n');
+  const g = (args) => spawnSync('git', args, { cwd: dir, encoding: 'utf-8', windowsHide: true });
+  g(['init', '-q', '.']);
+  g(['config', 'user.email', 't@t.t']);
+  g(['config', 'user.name', 't']);
+  g(['add', '-A']);
+  g(['commit', '-qm', 'init']);
+  return { dir, g };
+}
+
+function v2State(extra = {}) {
+  return JSON.stringify({
+    version: 2, stateVersion: 2,
+    session: { workflowPath: 'large', currentPhase: 'implementation', trackingMode: 'markdown' },
+    activeWorkItem: { epicId: 'e', storyId: 's' }, epics: {},
+    gates: {
+      testsPassed: false, compileCheckConfirmed: false, unityAnalyzerClean: false,
+      storyTrackingUpdated: false, codeReviewCompleted: false, securityReviewPassed: false,
+      acceptanceCriteriaValidated: false, designArtifactSyncConfirmed: false,
+    },
+    gateEvidence: [], changeHistory: [], lastTransition: null, activeRunId: null,
+    ...extra,
+  });
+}
+
+describe('F7 — freshness bindings exclude Cadet machinery', () => {
+  it('gitChangedFiles omits .cadet/state.json and .cadet/runs/** from the changed set', () => {
+    const { dir, g } = gitProject();
+    try {
+      writeFileSync(join(dir, '.cadet', 'state.json'), v2State());
+      g(['add', '-A']); g(['commit', '-qm', 'state']);
+      // Now make Cadet's own files dirty, exactly as a live session does.
+      writeFileSync(join(dir, '.cadet', 'state.json'), v2State({ changeHistory: [{ note: 'wip' }] }));
+      writeFileSync(join(dir, '.cadet', 'runs', 'abc.json'), '{"run":true}');
+      // ...and a real story file alongside them.
+      writeFileSync(join(dir, 'src', 'b.mjs'), 'export const b = 2;\n');
+
+      const res = gitChangedFiles(dir);
+      assert.equal(res.available, true, res.reason);
+      assert.deepEqual(res.files, ['src/b.mjs']);
+      assert.equal(res.files.some((f) => f.startsWith('.cadet/')), false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('recording a gate against a dirty state.json yields fresh, self-consistent evidence', () => {
+    const { dir, g } = gitProject();
+    try {
+      writeFileSync(join(dir, '.cadet', 'state.json'), v2State());
+      g(['add', '-A']); g(['commit', '-qm', 'state']);
+      // state.json dirty with no other changes: the minimised self-reference case.
+      writeFileSync(join(dir, '.cadet', 'state.json'), v2State({ changeHistory: [{ note: 'wip' }] }));
+
+      const res = runCli(['harness', 'confirm', '--gate', 'compileCheckConfirmed',
+        '--type', 'manual-confirmation', '--reason', 'unity compiles clean', '--files', 'src/a.mjs',
+        '--target', dir, '--format', 'json']);
+      assert.equal(res.status, 0, res.stderr);
+
+      // The evidence must not name state.json, and validate must not go stale.
+      const state = JSON.parse(readFileSync(join(dir, '.cadet', 'state.json'), 'utf8'));
+      const ev = state.gateEvidence.at(-1);
+      assert.equal(ev.relevantFiles.includes('.cadet/state.json'), false);
+      const r = validateState(state, { rootDir: dir });
+      assert.equal(r.valid, true, JSON.stringify(r.errors));
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('auto-detected evidence does not self-invalidate when only Cadet files are dirty', () => {
+    const { dir, g } = gitProject();
+    try {
+      writeFileSync(join(dir, '.cadet', 'state.json'), v2State());
+      g(['add', '-A']); g(['commit', '-qm', 'state']);
+      writeFileSync(join(dir, '.cadet', 'state.json'), v2State({ changeHistory: [{ note: 'wip' }] }));
+      writeFileSync(join(dir, '.cadet', 'runs', 'ledger.json'), '{"run":true}');
+
+      // No --files: this is the path that used to bind to Cadet's own files.
+      const res = runCli(['harness', 'confirm', '--gate', 'compileCheckConfirmed',
+        '--type', 'manual-confirmation', '--reason', 'unity compiles clean',
+        '--target', dir, '--format', 'json']);
+      assert.equal(res.status, 0, res.stderr);
+
+      const state = JSON.parse(readFileSync(join(dir, '.cadet', 'state.json'), 'utf8'));
+      const ev = state.gateEvidence.at(-1);
+      assert.equal(ev.relevantFiles.some((f) => f.startsWith('.cadet/')), false,
+        `evidence bound to Cadet machinery: ${JSON.stringify(ev.relevantFiles)}`);
+      const r = validateState(state, { rootDir: dir });
+      assert.equal(r.valid, true, JSON.stringify(r.errors));
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('a non-empty --files list is still honoured verbatim', () => {
+    const { dir, g } = gitProject();
+    try {
+      writeFileSync(join(dir, '.cadet', 'state.json'), v2State());
+      g(['add', '-A']); g(['commit', '-qm', 'state']);
+      writeFileSync(join(dir, '.cadet', 'state.json'), v2State({ changeHistory: [{ note: 'wip' }] }));
+
+      const res = runCli(['harness', 'confirm', '--gate', 'securityReviewPassed',
+        '--type', 'manual-confirmation', '--reason', 'no secrets', '--files', 'src/a.mjs',
+        '--target', dir, '--format', 'json']);
+      assert.equal(res.status, 0, res.stderr);
+      const state = JSON.parse(readFileSync(join(dir, '.cadet', 'state.json'), 'utf8'));
+      assert.deepEqual(state.gateEvidence.at(-1).relevantFiles, ['src/a.mjs']);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('an explicitly empty --files value fails loudly instead of silently auto-binding', () => {
+    const { dir, g } = gitProject();
+    try {
+      writeFileSync(join(dir, '.cadet', 'state.json'), v2State());
+      g(['add', '-A']); g(['commit', '-qm', 'state']);
+      writeFileSync(join(dir, '.cadet', 'state.json'), v2State({ changeHistory: [{ note: 'wip' }] }));
+
+      const res = runCli(['harness', 'confirm', '--gate', 'compileCheckConfirmed',
+        '--type', 'manual-confirmation', '--reason', 'x', '--files', '',
+        '--target', dir, '--format', 'json']);
+      assert.notEqual(res.status, 0, 'empty --files must not silently fall back to the working tree');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});
