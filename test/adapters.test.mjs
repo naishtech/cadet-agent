@@ -25,6 +25,7 @@ const expectedSkills = [
   'Resume.md',
   'MCPSetup.md',
   'PlanningReview.md',
+  'Handoff.md',
 ];
 
 // ── Per-IDE expected adapter files ──────────────────────────────────────────
@@ -46,6 +47,7 @@ const ideAdapters = {
       'Debugging.md': 'cadet-debug.prompt.md',
       'CodeReview.md': 'cadet-review.prompt.md',
       'MCPSetup.md': 'cadet-mcp-setup.prompt.md',
+      'Handoff.md': 'cadet-handoff.prompt.md',
     },
     extraPrompts: ['cadet-resume.prompt.md', 'cadet-planning-review.prompt.md'],
   },
@@ -79,6 +81,7 @@ const ideAdapters = {
       'CodeReview.md': 'cadet-review/SKILL.md',
       'MCPSetup.md': 'cadet-mcp-setup/SKILL.md',
       'PlanningReview.md': 'cadet-planning-review/SKILL.md',
+      'Handoff.md': 'cadet-handoff/SKILL.md',
     },
     extraSkills: ['cadet-resume/SKILL.md'],
   },
@@ -97,6 +100,7 @@ const ideAdapters = {
       'CodeReview.md': 'cadet-review/SKILL.md',
       'MCPSetup.md': 'cadet-mcp-setup/SKILL.md',
       'PlanningReview.md': 'cadet-planning-review/SKILL.md',
+      'Handoff.md': 'cadet-handoff/SKILL.md',
     },
     extraSkills: ['cadet-resume/SKILL.md'],
   },
@@ -338,7 +342,7 @@ describe('Adapter inventory', () => {
         'cadet-requirements', 'cadet-architecture', 'cadet-spike',
         'cadet-breakdown', 'cadet-tdd', 'cadet-debug', 'cadet-review',
         'cadet-resume', 'cadet-mcp-setup', 'cadet-agent-reviewer',
-        'cadet-planning-review',
+        'cadet-planning-review', 'cadet-handoff',
       ];
       for (const name of skillNames) {
         assert.ok(
@@ -360,16 +364,21 @@ describe('Adapter inventory', () => {
   // ── Extra rule adapters (Cursor / Continue additional phase rules) ───────
 
   describe('Extra phase rules (Cursor / Continue)', () => {
+    // Each extra rule maps to the canonical skill it points at, so the
+    // canonical-target assertion tracks the real target rather than assuming
+    // every extra rule is a PlanningReview rule.
     const extras = [
-      ...(ideAdapters['cursor'].extraRules || []),
-      ...(ideAdapters['continue'].extraRules || []),
+      ['.cursor/rules/cadet-planning-review.md', 'PlanningReview.md'],
+      ['.continue/rules/cadet-planning-review.md', 'PlanningReview.md'],
+      ['.cursor/rules/cadet-handoff.md', 'Handoff.md'],
+      ['.continue/rules/cadet-handoff.md', 'Handoff.md'],
     ];
 
     it('has at least one extra phase rule', () => {
       assert.ok(extras.length >= 2, 'expected extra Cursor/Continue phase rules');
     });
 
-    for (const rel of extras) {
+    for (const [rel, canonical] of extras) {
       it(`extra rule ${rel} exists`, () => {
         assert.ok(fileExists(rel), `missing extra rule: ${rel}`);
       });
@@ -383,8 +392,8 @@ describe('Adapter inventory', () => {
       it(`extra rule ${rel} references its canonical skill`, () => {
         const content = readFile(rel);
         assert.ok(
-          content.includes('.cadet/agent/core/skills/PlanningReview.md'),
-          `${rel} must reference .cadet/agent/core/skills/PlanningReview.md`
+          content.includes(`.cadet/agent/core/skills/${canonical}`),
+          `${rel} must reference .cadet/agent/core/skills/${canonical}`
         );
       });
     }

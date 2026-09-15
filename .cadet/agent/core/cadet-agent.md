@@ -115,6 +115,7 @@ Cadet workflows are implemented as scoped skills. The global directive decides *
 | **Debugging** | `/cadet-debug` | On defect reports or unexpected behavior. |
 | **Code Review** | `/cadet-review` | After each completed story or change — **non-skippable**. |
 | **Resume** | `/cadet-resume` | On session start, after a break, or when state is unclear. |
+| **Handoff** | `/cadet-handoff` | When ending a session, wrapping up, or handing work to a new chat. |
 | **MCP Setup** | `/cadet-mcp-setup` | When the agent needs Unity Editor connectivity via Unity CLI/MCP. |
 | **Agent Reviewer** | `/cadet-agent-reviewer` | Audit-only mode — never writes code; after a story or on demand. |
 
