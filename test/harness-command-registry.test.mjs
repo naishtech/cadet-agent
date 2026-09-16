@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
@@ -200,5 +200,61 @@ describe('capabilities exposes the registry', () => {
       if (entry.mutates) assert.ok(entry.writes.length > 0);
       else assert.deepEqual(entry.writes, [], 'a read-only command must not claim writes');
     }
+  });
+});
+
+describe('a failed migrate leaves the tree exactly as it found it', () => {
+  // `state migrate` declares `atomicFailure` in the registry. That declaration
+  // is only meaningful if something asserts it: the backup used to be copied
+  // BEFORE the migrated document was validated, so a rejected migration still
+  // wrote a `.v1.bak` the caller never got — and would have overwritten a
+  // previous good backup on a retry.
+  const v1NoWorkflowPath = {
+    version: 1,
+    session: { currentPhase: 'implementation', trackingMode: 'markdown' },
+    gates: {},
+    changeHistory: [],
+  };
+
+  it('writes nothing when the migrated state fails validation', () => {
+    const dir = makeProject(v1NoWorkflowPath);
+    try {
+      const before = snapshot(dir);
+      const res = runCli(['state', 'migrate', '--target', dir, '--format', 'json']);
+      assert.notEqual(res.status, 0, 'a state that cannot migrate must fail');
+      const after = snapshot(dir);
+      assert.deepEqual(after, before, `failed migrate wrote: ${after.filter((f) => !before.includes(f)).join(', ')}`);
+      assert.ok(!existsSync(join(dir, '.cadet', 'state.json.v1.bak')), 'no backup may survive a failed migration');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('does not clobber an existing good backup on a failed retry', () => {
+    // A pre-existing backup from a real successful migration must be preserved
+    // when a later attempt fails — the failure path writes nothing at all.
+    const dir = makeProject(v1NoWorkflowPath);
+    try {
+      const bak = join(dir, '.cadet', 'state.json.v1.bak');
+      writeFileSync(bak, 'PRECIOUS PRIOR BACKUP\n');
+      const res = runCli(['state', 'migrate', '--target', dir, '--format', 'json']);
+      assert.notEqual(res.status, 0);
+      assert.equal(readFileSync(bak, 'utf-8'), 'PRECIOUS PRIOR BACKUP\n', 'a failed migrate must not touch an existing backup');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('still writes the backup on a successful migration', () => {
+    // Guards against "fixing" the ordering by never writing the backup.
+    const dir = makeProject({
+      version: 1,
+      session: { workflowPath: 'large', currentPhase: 'implementation', trackingMode: 'markdown' },
+      epics: {},
+      gates: {},
+      changeHistory: [],
+    });
+    try {
+      const res = runCli(['state', 'migrate', '--target', dir, '--format', 'json']);
+      assert.equal(res.status, 0, res.stderr);
+      assert.equal(JSON.parse(res.stdout).migrated, true);
+      assert.ok(existsSync(join(dir, '.cadet', 'state.json.v1.bak')), 'a successful migration must write its backup');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

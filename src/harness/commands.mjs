@@ -47,6 +47,9 @@ export const COMMANDS = {
     // A failed migration must leave the tree exactly as it found it: no backup,
     // no partial write. The backup is an artifact of a *successful* migration,
     // so producing one and then failing would be a write the caller did not get.
+    // Enforced by `harness-command-registry.test.mjs` ("a failed migrate leaves
+    // the tree exactly as it found it"), which fails if the backup is copied
+    // before validation — verified by reintroducing the original ordering.
     atomicFailure: true,
   },
   'state transition': {
