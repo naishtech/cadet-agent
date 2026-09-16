@@ -322,4 +322,29 @@ describe('Skill harness contract', () => {
       'Handoff must state that it never advances the phase',
     );
   });
+
+  it('Handoff names records chronologically so the latest is discoverable', () => {
+    const content = readFileSync(join(skillsDir, 'Handoff.md'), 'utf-8');
+    // Matches the template including its angle-bracket placeholders and the
+    // separators between them, e.g. `<YYYY-MM-DD-HHmm>-<description>.md`.
+    const template = content.match(/\.cadet\/handoffs\/<[^/`\s]+\.md/);
+    assert.ok(template, 'Handoff must state a concrete handoff filename template');
+    const shape = template[0];
+
+    // Date before time is what makes a plain `ls` chronological. Time-first
+    // names sort wrongly across days: `23:59-2026-09-15` sorts after
+    // `00:01-2026-09-16`.
+    assert.ok(shape.includes('YYYY-MM-DD'), `handoff name must lead with the date: ${shape}`);
+    assert.ok(shape.includes('HHmm'), `handoff name must include a zero-padded time: ${shape}`);
+    assert.ok(
+      shape.indexOf('YYYY-MM-DD') < shape.indexOf('HHmm'),
+      `handoff name must put the date before the time: ${shape}`,
+    );
+
+    // A colon is illegal on Windows, so it must never appear in the template.
+    assert.ok(!shape.includes(':'), `handoff filename must not contain a colon: ${shape}`);
+
+    // The name must carry a description, otherwise the directory is unreadable.
+    assert.ok(/description/.test(shape), `handoff name must include a description slug: ${shape}`);
+  });
 });

@@ -62,7 +62,11 @@ This is the core discipline of a handoff. An incoming agent inherits your mistak
 
 ## Phase 3 — Record the Handoff
 
-1. Write the handoff record to `.cadet/handoffs/<YYYY-MM-DD-HHmmss>.md`. Create the directory if absent. The file is the durable artifact the next chat reads.
+1. Write the handoff record to `.cadet/handoffs/<YYYY-MM-DD-HHmm>-<description>.md`. Create the directory if absent. The file is the durable artifact the next chat reads.
+   - The name is **chronologically sortable**: date first, then 24-hour time, zero-padded (`2026-09-16-0123-fix-cleanup-guard.md`). A plain `ls` therefore lists handoffs oldest-first, and the last entry is always the latest. Date-before-time is required for this — time-first names sort incorrectly across days, because `23:59-2026-09-15` sorts *after* `00:01-2026-09-16`.
+   - Do not use `:` in the filename. It is illegal on Windows and would break for a consumer even though a POSIX shell accepts it.
+   - `<description>` is a short kebab-case slug of the session's main outcome, so the directory is readable without opening files. Keep it brief — the timestamp carries the ordering, not the slug.
+   - If two handoffs land in the same minute, append a numeric suffix (`-2`) rather than overwriting an existing record. A handoff is never destroyed to make room for a new one.
 2. Use this structure:
 
 ```
@@ -111,20 +115,27 @@ This is the core discipline of a handoff. An incoming agent inherits your mistak
 1. Append a `handoff` entry to `.cadet/state.json → changeHistory` naming the handoff file path and the current phase. Do not otherwise modify state: no gate changes, no phase transition.
 2. If the handoff file cannot be written, say so explicitly and print the full summary in chat instead — never report a handoff as recorded when it is not.
 3. Print the summary in chat, including the handoff file path, so the user can paste the path into the new chat.
+4. If earlier handoffs already exist, note how many and name the most recent one. Because names sort chronologically, the latest is the last entry in a plain `ls` — state that plainly rather than making the user work out which file is current.
 
 ## Phase 5 — Resume Instructions
 
 Close with a copy-pasteable prompt for the new chat, naming the artifact and the next action, for example:
 
 ```
-Read .cadet/handoffs/<file>.md and .cadet/state.json, then continue with <next action>.
+Read .cadet/handoffs/2026-09-16-0123-fix-cleanup-guard.md and .cadet/state.json, then continue with <next action>.
+```
+
+Because handoff names sort chronologically, a new chat can always locate the most recent one without being told the exact filename:
+
+```
+Read the latest file in .cadet/handoffs/ and .cadet/state.json, then continue with <next action>.
 ```
 </process>
 
 <output>
 ## Expected Outputs
 
-- A handoff record at `.cadet/handoffs/<timestamp>.md`.
+- A handoff record at `.cadet/handoffs/<YYYY-MM-DD-HHmm>-<description>.md`, named so that a plain `ls` lists handoffs in chronological order.
 - A chat summary with the handoff path and the next action.
 - An explicit verified-vs-claimed separation.
 - Any unresolved blocker, stale evidence, budget pressure, or uncommitted work named as an open item.

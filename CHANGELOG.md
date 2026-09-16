@@ -13,6 +13,13 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Changed
+
+- **Handoff records are now named chronologically: `<YYYY-MM-DD-HHmm>-<description>.md`** (e.g. `2026-09-16-0123-fix-cleanup-guard.md`). The previous `<YYYY-MM-DD-HHmmss>.md` had no description, so a directory of handoffs was unreadable without opening each file, and the latest was not obvious at a glance.
+  - The **date leads the name deliberately**. A time-first shape (`01:23-YYYY-MM-DD-…`) cannot sort across days: `23:59-2026-09-15` sorts *after* `00:01-2026-09-16`, so a plain `ls` would not show the true latest. This is asserted by a test, alongside the rule that a handoff filename may never contain `:` — it is illegal on Windows, where the write would fail for a consumer even though a POSIX shell accepts it.
+  - Same-minute collisions append a numeric suffix rather than overwriting: a handoff is never destroyed to make room for a new one.
+  - `.cadet/handoffs` is a preserved path, so existing records are untouched; the new format applies to newly written handoffs only.
+
 ## [0.39.0] — 2026-09-16
 
 ## [0.38.0] — 2026-09-16
