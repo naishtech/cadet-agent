@@ -13,6 +13,11 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Added
+
+- **The read-only guarantee is now swept across flags, not just asserted per command.** The registry's `mutates: false` commands are exercised against every write-shaped flag in the CLI (`--write-coverage`, `--report`, `--inventory`, `--matrix`, `--story`, `--format`, `--dry-run`) and must produce zero filesystem writes in every combination — 28 command×flag pairs, up from 2 invocations per command. A command can no longer be read-only by default and write when handed a flag. Verified non-vacuous: injecting a real write into `harness report` fails the sweep with the offending filename.
+- **Three tests pin `state migrate`'s `atomicFailure` guarantee**, which was declared in the registry but asserted by nothing. A migration that fails validation writes nothing at all; a pre-existing good backup is not clobbered by a failed retry; a successful migration still writes its backup. Verified non-vacuous by reintroducing the original backup-before-validate ordering, which fails two of them.
+
 ### Changed
 
 - **Handoff records are now named chronologically: `<YYYY-MM-DD-HHmm>-<description>.md`** (e.g. `2026-09-16-0123-fix-cleanup-guard.md`). The previous `<YYYY-MM-DD-HHmmss>.md` had no description, so a directory of handoffs was unreadable without opening each file, and the latest was not obvious at a glance.

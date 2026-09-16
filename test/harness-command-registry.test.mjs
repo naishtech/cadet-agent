@@ -125,6 +125,42 @@ describe('declared read-only commands write nothing', () => {
       } finally { rmSync(dir, { recursive: true, force: true }); }
     });
   }
+
+  it('no read-only command writes under ANY of the write-shaped flags', () => {
+    // Testing one invocation per command is not enough: a command could stay
+    // read-only on its default path and write when handed a flag. This sweeps
+    // the flags that cause writes elsewhere in the CLI — notably
+    // `--write-coverage`, which is a real write for `verify-acs` — across every
+    // command declared read-only. `matrix-check` accepting and ignoring
+    // `--write-coverage` is exactly the kind of thing this pins down.
+    const WRITE_SHAPED_FLAGS = [
+      ['--write-coverage'],
+      ['--report', 'report.tap'],
+      ['--inventory', 'report.tap'],
+      ['--matrix', 'story.md'],
+      ['--story', 'story.md'],
+      ['--format', 'json'],
+      ['--dry-run'],
+    ];
+
+    for (const key of Object.keys(COMMANDS).filter((k) => !COMMANDS[k].mutates)) {
+      const args = READ_ONLY_INVOCATIONS[key];
+      for (const flags of WRITE_SHAPED_FLAGS) {
+        const dir = makeProject(v2State());
+        try {
+          writeFileSync(join(dir, 'report.tap'), 'TAP version 13\nok 1 - test_a\n');
+          writeFileSync(join(dir, 'story.md'), '## AC-1\nGiven a\nWhen b\nThen c\n\nDELIVERED: test_a\n');
+          const before = snapshot(dir);
+          runCli([...args, ...flags, '--target', dir], { cwd: dir });
+          const after = snapshot(dir);
+          assert.deepEqual(
+            after, before,
+            `${key} ${flags.join(' ')} wrote: ${after.filter((f) => !before.includes(f)).join(', ')}`,
+          );
+        } finally { rmSync(dir, { recursive: true, force: true }); }
+      }
+    }
+  });
 });
 
 describe('global --dry-run', () => {
