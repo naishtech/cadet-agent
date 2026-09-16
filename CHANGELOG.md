@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.40.0] — 2026-09-16
+
 ### Added
 
 - **The read-only guarantee is now swept across flags, not just asserted per command.** The registry's `mutates: false` commands are exercised against every write-shaped flag in the CLI (`--write-coverage`, `--report`, `--inventory`, `--matrix`, `--story`, `--format`, `--dry-run`) and must produce zero filesystem writes in every combination — 28 command×flag pairs, up from 2 invocations per command. A command can no longer be read-only by default and write when handed a flag. Verified non-vacuous: injecting a real write into `harness report` fails the sweep with the offending filename.
