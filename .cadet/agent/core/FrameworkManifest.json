@@ -1,6 +1,6 @@
 {
   "frameworkName": "Cadet-Agent",
-  "frameworkVersion": "0.40.0",
+  "frameworkVersion": "0.41.0",
   "distributionMode": "cross-ide-universal-package",
   "canonicalRepository": "https://github.com/naishtech/cadet-agent",
   "preferredUpdateChannel": "releases",

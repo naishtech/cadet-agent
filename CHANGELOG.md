@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.41.0] — 2026-09-18
+
 ### Added
 
 - **New phase skill: `VisualEvidence`** (`.cadet/agent/core/skills/VisualEvidence.md`), dispatched from **Debugging**, **Code Review**, and **Spike**. It turns a rendered frame into a *citable finding* for claims no assertion can reach — visibility, position, layout, and UI state.
