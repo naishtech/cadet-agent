@@ -43,7 +43,7 @@ Answer a focused feasibility or integration question so an unverified assumption
    - **Capabilities** — what the option can do.
    - **Limitations** — what it cannot do, constraints, edge cases.
    - **Recommendation** — use, avoid, or more research needed.
-5. Produce a spike file under `.cadet/agent/project-plans/spikes/` from `<document index="1"/>` — fill every `<slot/>`, strip all XML wrappers, write pure Markdown. Record the evidence artifact (command, output, or reference) that backs each finding.
+5. Produce a spike file under `.cadet/agent/project-plans/spikes/` from `<document index="1"/>` — fill every `<slot/>`, strip all XML wrappers, write pure Markdown. Record the evidence artifact (command, output, or reference) that backs each finding. **If the question is answered by a render** — does this pipeline draw this asset, does this shader resolve, does this camera see anything — dispatch the **Visual Evidence** skill (`.cadet/agent/core/skills/VisualEvidence.md`) and cite its finding as the artifact rather than describing the render.
 6. Update the source requirements/design assumption from **unverified** to **verified** with the spike results; promote verified assumptions into the design.
 7. Keep any spike code isolated and reference-only. Do not wire spike code into production paths.
 8. If the spike ends without answering the question, say so explicitly and escalate — do not present partial research as a verified assumption.

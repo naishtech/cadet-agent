@@ -13,6 +13,19 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Added
+
+- **New phase skill: `VisualEvidence`** (`.cadet/agent/core/skills/VisualEvidence.md`), dispatched from **Debugging**, **Code Review**, and **Spike**. It turns a rendered frame into a *citable finding* for claims no assertion can reach — visibility, position, layout, and UI state.
+  - **Why it exists.** A whole class of defect is invisible to every other check in the framework: a mesh can exist, be enabled, be inside the frustum, have a valid material, and still be drawn nowhere because its faces point the wrong way; a unit can walk the correct path and arrive at the wrong cell; a counter can increment correctly in data and never appear on screen. In each case every automated check answers a *different* question, and the missing question is "what does it look like?" — which no assertion asks, because a rendered frame is not reachable from a test. The framework previously had no skill that mentioned visual, image, screenshot, or PNG evidence anywhere.
+  - **Capture is produced, not scavenged.** The skill works an acquisition ladder: use an existing capture mechanism; if none exists, say so and **recommend building one or recommend a manual screenshot**; if the frame can only come from a running game, **ask the user to start the editor and Play, name the exact in-game state to reach, and ask them to capture at that moment**. Reaching for an old screenshot is explicitly forbidden — a frame from an unidentified build cannot support a claim about the current code.
+  - **Outcomes are honest.** A finding carries one of `passed`, `failed`, `blocked`, `inconclusive`, or `visionUnavailable`, plus the question it answered, the success condition decided *before* inspection, and a required statement of **what the frame cannot prove**.
+  - **An image-incapable model calls it out and continues.** `visionUnavailable` is deliberately **not** the same as `blocked`: the skill records the limitation and the artifact path, and the story, fix, and review all proceed. It never silently becomes a pass, and it never halts unrelated work.
+  - **Findings bind to the source, not the image.** The rendered file is a generated artifact, so the evidence record binds to the scene/prefab/renderer that produced it — a later edit to any of those correctly invalidates the record.
+- **New template: `VisualEvidenceTemplate.md`** (`.cadet/agent/core/templates/`) — the finding artifact, including capture route, build identity, and a required recommendation block when no frame could be produced.
+- **Adapters** for the new skill on every supported surface: `.github/prompts/cadet-visual-evidence.prompt.md`, `.claude/skills/cadet-visual-evidence/`, and `.agents/skills/cadet-visual-evidence/`.
+- **Dispatch wiring.** A `Visual Evidence` row in the Skill Inventory table (`cadet-agent.md`) and a contract row in `Harness.md` §11, plus one-line dispatch pointers in `Debugging.md`, `CodeReview.md`, and `Spike.md` (which reference the skill rather than restating it).
+- **Test coverage** for the new skill: a harness-contract assertion in `test/skills.test.mjs` (named artifact, statement of what the frame cannot prove, and the `visionUnavailable` outcome), plus adapter parity and size-budget coverage in `test/adapters.test.mjs`.
+
 ## [0.40.0] — 2026-09-16
 
 ### Added

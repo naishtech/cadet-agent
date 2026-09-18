@@ -250,6 +250,7 @@ budget state is missing.
 | StoryBreakdown | design evidence | per-story verification commands + evidence outputs, AC ids + declared tests | per run | acceptance criteria unmapped or an AC declares no test |
 | TDD | red record, acceptance criterion | `testsPassed` red→green evidence | `maxRetriesPerStep` | no red record for a testable change |
 | Debugging | reproduce record | per-attempt spans, regression evidence | `maxTotalRetries` | deterministic failure retried blindly |
+| VisualEvidence | rendered frame + source under test | inspected-frame finding (`passed`/`failed`/`blocked`/`visionUnavailable`/`inconclusive`) bound to the source, not the image | per run | frame missing or unreadable. **An image-incapable model does not block**: record `visionUnavailable` and continue |
 | CodeReview | run ledger, gate evidence | review decision + findings | per run | gate evidence stale/missing |
 | Resume | active run, ledger | validated next legal transition | per run | illegal/stale transition requested |
 | MCPSetup | Unity CLI/MCP availability | round-trip + mutation-approval evidence | per run | mutation without confirmation |

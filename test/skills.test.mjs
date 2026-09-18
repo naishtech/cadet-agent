@@ -20,6 +20,7 @@ const expectedSkills = [
   'StoryBreakdown.md',
   'TDD.md',
   'Debugging.md',
+  'VisualEvidence.md',
   'CodeReview.md',
   'Resume.md',
   'MCPSetup.md',
@@ -271,6 +272,16 @@ describe('Skill harness contract', () => {
     const content = readFileSync(join(skillsDir, 'Debugging.md'), 'utf-8');
     assert.ok(/deterministic/i.test(content), 'Debugging must classify deterministic failures');
     assert.ok(/transient/i.test(content), 'Debugging must classify transient failures');
+  });
+
+  it('VisualEvidence requires a named artifact and an honest outcome', () => {
+    const content = readFileSync(join(skillsDir, 'VisualEvidence.md'), 'utf-8');
+    // The finding must name the image it rests on, or it is an impression rather than evidence.
+    assert.ok(/artifact/i.test(content), 'VisualEvidence must require a named artifact');
+    // A frame is only evidence for what it shows; the finding must state its own limits.
+    assert.ok(/cannot (prove|show)/i.test(content), 'VisualEvidence must require a statement of what the frame cannot prove');
+    // An image-incapable model must not block unrelated work.
+    assert.ok(/visionUnavailable/.test(content), 'VisualEvidence must define the visionUnavailable outcome');
   });
 
   it('Resume validates the active run, stale evidence, and legal transition', () => {

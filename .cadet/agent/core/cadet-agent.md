@@ -113,6 +113,7 @@ Cadet workflows are implemented as scoped skills. The global directive decides *
 | **Story Breakdown** | `/cadet-breakdown` | Large changes, after architecture and any spikes. |
 | **TDD** | `/cadet-tdd` | Per story for large changes; per change for small changes. |
 | **Debugging** | `/cadet-debug` | On defect reports or unexpected behavior. |
+| **Visual Evidence** | `/cadet-visual-evidence` | From Debugging, Code Review, or Spike when a claim is about what was rendered — visibility, position, layout, or UI state — and no assertion can reach it. A model with no image input records `visionUnavailable` and continues; it never blocks the work. |
 | **Code Review** | `/cadet-review` | After each completed story or change — **non-skippable**. |
 | **Resume** | `/cadet-resume` | On session start, after a break, or when state is unclear. |
 | **Handoff** | `/cadet-handoff` | When ending a session, wrapping up, or handing work to a new chat. |
