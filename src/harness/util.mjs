@@ -114,8 +114,12 @@ export function changedFiles(cwd, { runner = defaultGitRunner } = {}) {
  * recording itself mutates: the gate would be stale the moment it was written,
  * and the resulting record would certify no story code. Excluded here, at the
  * single scan used by both `harness verify` and `harness confirm`.
+ *
+ * `.cadet/archive/` is excluded for the same reason, one level out: it is the
+ * append-only home of sealed evidence, so compaction writes it. Left in, a
+ * compaction run would invalidate every live record it had just archived.
  */
-const CADET_MACHINERY = ['.cadet/state.json', '.cadet/runs/'];
+const CADET_MACHINERY = ['.cadet/state.json', '.cadet/runs/', '.cadet/archive/'];
 
 /** True when a repository-relative path is Cadet's own bookkeeping. */
 function isCadetMachinery(relPath) {

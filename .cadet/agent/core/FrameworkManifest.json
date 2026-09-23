@@ -1,6 +1,6 @@
 {
   "frameworkName": "Cadet-Agent",
-  "frameworkVersion": "0.40.0",
+  "frameworkVersion": "0.42.0",
   "distributionMode": "cross-ide-universal-package",
   "canonicalRepository": "https://github.com/naishtech/cadet-agent",
   "preferredUpdateChannel": "releases",
@@ -28,6 +28,7 @@
     ".github/prompts/cadet-mcp-setup.prompt.md",
     ".github/prompts/cadet-planning-review.prompt.md",
     ".github/prompts/cadet-handoff.prompt.md",
+    ".github/prompts/cadet-visual-evidence.prompt.md",
     ".cursor/rules/cadet-agent.md",
     ".cursor/rules/cadet-agent-reviewer.md",
     ".cursor/rules/cadet-planning-review.md",
@@ -50,6 +51,7 @@
     ".claude/skills/cadet-review",
     ".claude/skills/cadet-resume",
     ".claude/skills/cadet-mcp-setup",
+    ".claude/skills/cadet-visual-evidence",
     ".agents/skills/cadet-agent",
     ".agents/skills/cadet-agent-reviewer",
     ".agents/skills/cadet-handoff",
@@ -63,6 +65,7 @@
     ".agents/skills/cadet-resume",
     ".agents/skills/cadet-mcp-setup",
     ".agents/skills/cadet-planning-review",
+    ".agents/skills/cadet-visual-evidence",
     ".cadet/agent/core",
     ".cadet/agent/core/templates",
     ".cadet/agent/core/skills",
@@ -77,7 +80,8 @@
     ".cadet/state.json",
     ".cadet/harness.json",
     ".cadet/runs",
-    ".cadet/handoffs"
+    ".cadet/handoffs",
+    ".cadet/archive"
   ],
   "createOnlyPaths": [
     "AGENTS.md"
@@ -88,6 +92,7 @@
     "Treat the packaged zip as a universal bootstrap package rather than the long-term source of truth.",
     "As of v0.5.0, the agent instruction set is condensed into cadet-agent.md. Full rationale, guidance, standards, and templates are in the docs/ directory (GitHub Pages).",
     "As of the harness modernization, .cadet/harness.json (policy overrides) and .cadet/runs/ (sanitized run ledgers) are preserved by sync and never deleted.",
-    "As of v0.28.0, install/sync write a .cadet/.repo-role marker (consumer-project|framework-source) so the framework-source vs consumer-project boundary is machine-checkable. It is neither a managed nor a preserved path."
+    "As of v0.28.0, install/sync write a .cadet/.repo-role marker (consumer-project|framework-source) so the framework-source vs consumer-project boundary is machine-checkable. It is neither a managed nor a preserved path.",
+    "As of contract v5 (state v4), .cadet/archive/ is preserved: it is the append-only home of evidence that has left state.json, so sync must never clobber it any more than it may clobber .cadet/handoffs/. Sealed evidence also lives in commit trailers, which sync never touches."
   ]
 }

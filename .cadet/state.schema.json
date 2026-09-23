@@ -1,20 +1,76 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://cadet-agent.dev/state-v2.json",
+  "$id": "https://cadet-agent.dev/state-v4.json",
   "title": "Cadet-Agent Session State",
-  "description": "Tracks workflow progress across a session. v2 adds evidence-backed gates, the active run/work item, and legal transition metadata. v1 documents remain valid input and are migrated atomically by `cadet-agent state migrate`. See docs/core/HarnessContract.md.",
+  "description": "Tracks workflow progress across a session. v2 added evidence-backed gates, the active run/work item, and legal transition metadata. v3 added strict closure, manual-confirmation quality fields, and a gate-exception taxonomy (opt-in via `strictClosure.enabled`). v4 moves evidence history out of this document: `gateEvidence` keeps only the active work item, `evidenceCoverage` indexes what left, gate exceptions get their own field, and `changeHistory` is retired — history lives in commit trailers (see gitmemo.mjs / HarnessContract-v5.md) and `.cadet/archive/`. v1-v3 documents remain readable and are migrated by `cadet-agent state migrate --to 4`.",
   "type": "object",
   "required": ["version", "session", "epics"],
+  "$defs": {
+    "gateException": {
+      "type": "object",
+      "description": "A scoped, expiring exception that permits a gate to be treated as satisfied without fresh evidence. Live state, not history: it is bounded by `expiresAt` and read by `activeExceptions`.",
+      "required": ["gate"],
+      "properties": {
+        "type": { "type": "string", "const": "gate-exception" },
+        "gate": { "type": "string" },
+        "scope": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ],
+          "description": "The work item id(s) this exception covers. An exception scoped to another work item never excuses the active one."
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "manual-compile", "budget-override", "analyzer-fallback", "unscoped-freshness",
+            "documentation-only", "tooling-gap", "pre-harness-story"
+          ],
+          "description": "v3: required on a gate-exception under strictClosure. Determines the default expiry window and whether closureReviewNote is required. The set must match EXCEPTION_CATEGORIES in policy.mjs."
+        },
+        "rationale": { "type": "string" },
+        "reason": { "type": "string", "description": "v3: why the exception was needed. Strict closure only." },
+        "date": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": ["string", "null"], "format": "date-time" },
+        "closureReviewNote": {
+          "type": "string",
+          "description": "v3: who accepted this exception and what would change that judgement. Required for categories that are not documentation-only. Strict closure only."
+        },
+        "expiryExtendedReason": {
+          "type": "string",
+          "description": "v3: required when the exception expires beyond its category default."
+        }
+      }
+    },
+    "evidenceCoverageRow": {
+      "type": "object",
+      "description": "v4: what survives compaction for one work item. It is what keeps the 'a done story owns evidence' check answerable once the records themselves have been archived or sealed into commits.",
+      "required": ["recordCount"],
+      "properties": {
+        "workItemId": { "type": "string" },
+        "recordCount": { "type": "integer", "minimum": 0 },
+        "gates": { "type": "array", "items": { "type": "string" } },
+        "firstAt": { "type": ["string", "null"], "format": "date-time" },
+        "lastAt": { "type": ["string", "null"], "format": "date-time" },
+        "sealedCommit": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-fA-F]{4,40}$",
+          "description": "The commit whose trailers carry this work item's evidence, or null when it was archived rather than sealed."
+        }
+      }
+    }
+  },
   "properties": {
     "version": {
       "type": "integer",
-      "enum": [1, 2],
-      "description": "Schema version. v1 is gate-only; v2 adds gateEvidence, activeRunId, activeWorkItem, and lastTransition."
+      "enum": [1, 2, 3, 4],
+      "description": "Schema version. v1 is gate-only; v2 adds gateEvidence, activeRunId, activeWorkItem, and lastTransition. v3 adds strict closure, manual-confirmation quality fields, and a gate-exception taxonomy — all opt-in via `strictClosure.enabled`, so a v2 document remains valid and is not retroactively invalidated. v4 scopes `gateEvidence` to the active work item, adds `evidenceCoverage` and `gateExceptions`, and retires `changeHistory`."
     },
     "stateVersion": {
       "type": "integer",
-      "const": 2,
-      "description": "Present on v2 documents. Redundant with version for tooling that reads stateVersion first."
+      "enum": [2, 3, 4],
+      "description": "Present on v2/v3/v4 documents. Redundant with version for tooling that reads stateVersion first."
     },
     "session": {
       "type": "object",
@@ -84,7 +140,7 @@
     },
     "gates": {
       "type": "object",
-      "description": "Mandatory hard gates that must be explicitly satisfied before phase transitions. In v2 a gate may be `true` only when backed by fresh evidence in `gateEvidence`; `cadet-agent state validate` rejects unsupported claims. Reset when moving to a new work item.",
+      "description": "Mandatory hard gates that must be explicitly satisfied before phase transitions. In v2+ a gate may be `true` only when backed by fresh evidence in `gateEvidence`; `cadet-agent state validate` rejects unsupported claims. Reset when moving to a new work item.",
       "properties": {
         "codeReviewCompleted": {
           "type": "boolean",
@@ -130,8 +186,18 @@
     },
     "gateEvidence": {
       "type": "array",
-      "description": "v2: immutable evidence records backing gate claims. See harness.schema.json#/$defs/evidence.",
+      "description": "Live evidence records backing gate claims. In v4 this holds only the active work item's records — a closed work item's evidence lives in its commit trailers and `.cadet/archive/`, summarised by `evidenceCoverage`. See harness.schema.json#/$defs/evidence.",
       "items": { "$ref": "harness.schema.json#/$defs/evidence" }
+    },
+    "evidenceCoverage": {
+      "type": "object",
+      "description": "v4: per-work-item summary of evidence that is no longer inline. Regenerable from git trailers via `coverageFromSealed`, and required for the framework to keep answering 'does every done story own evidence?' after compaction.",
+      "additionalProperties": { "$ref": "#/$defs/evidenceCoverageRow" }
+    },
+    "gateExceptions": {
+      "type": "array",
+      "description": "v4: the canonical home for gate exceptions, which are live state (scoped and expiring) rather than history. v1-v3 documents carry them in `changeHistory` instead; both are read, so a document validates the same either way.",
+      "items": { "$ref": "#/$defs/gateException" }
     },
     "activeRunId": {
       "oneOf": [
@@ -152,7 +218,7 @@
         },
         { "type": "null" }
       ],
-      "description": "v2: the epic/story whose gates and evidence are currently authoritative."
+      "description": "v2: the epic/story whose gates and evidence are currently authoritative. In v4 it also decides what stays inline in `gateEvidence`."
     },
     "lastTransition": {
       "oneOf": [
@@ -180,7 +246,7 @@
     },
     "changeHistory": {
       "type": "array",
-      "description": "Audit trail of state changes. v2 gate exceptions are recorded here with `type: \"gate-exception\"`, a `gate`, `scope`, `rationale`, and an `expiresAt`.",
+      "description": "v1-v3 only: audit trail of state changes, including gate exceptions for those versions. A v4 document omits this field entirely — transitions live in `lastTransition` and the sealing commit, handoff prose in `.cadet/handoffs/`, and gate exceptions in `gateExceptions`. An empty array is not written for v4, because a field that exists invites being filled again.",
       "items": {
         "type": "object",
         "required": ["date", "change"],
@@ -192,7 +258,24 @@
           "gate": { "type": "string" },
           "scope": { "type": "string" },
           "rationale": { "type": "string" },
-          "expiresAt": { "type": "string", "format": "date-time" }
+          "expiresAt": { "type": "string", "format": "date-time" },
+          "category": {
+            "type": "string",
+            "enum": [
+              "manual-compile", "budget-override", "analyzer-fallback", "unscoped-freshness",
+              "documentation-only", "tooling-gap", "pre-harness-story"
+            ],
+            "description": "v3: required on a gate-exception under strictClosure. Determines the default expiry window and whether closureReviewNote is required. Strict closure only."
+          },
+          "reason": { "type": "string", "description": "v3: why the exception was needed. Strict closure only." },
+          "closureReviewNote": {
+            "type": "string",
+            "description": "v3: who accepted this exception and what would change that judgement. Required for categories that are not documentation-only. Strict closure only."
+          },
+          "expiryExtendedReason": {
+            "type": "string",
+            "description": "v3: required when the exception expires beyond its category default."
+          }
         }
       }
     }

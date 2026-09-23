@@ -20,6 +20,7 @@ const expectedSkills = [
   'StoryBreakdown.md',
   'TDD.md',
   'Debugging.md',
+  'VisualEvidence.md',
   'CodeReview.md',
   'Resume.md',
   'MCPSetup.md',
@@ -162,14 +163,20 @@ describe('state.schema.json', () => {
     }
   });
 
-  it('accepts v1, v2 and v3 state documents', () => {
+  it('accepts v1, v2, v3 and v4 state documents', () => {
     const schema = JSON.parse(readFileSync(join(coreDir, 'state.schema.json'), 'utf-8'));
-    // Enum updated in lockstep with the contract v3 bump. v1 and v2 remain
-    // readable: the bump must not invalidate existing documents.
-    assert.deepEqual(schema.properties.version.enum, [1, 2, 3]);
+    // Enum updated in lockstep with the contract bumps. v1-v3 remain readable:
+    // a bump must not invalidate existing documents.
+    assert.deepEqual(schema.properties.version.enum, [1, 2, 3, 4]);
     for (const field of ['stateVersion', 'gateEvidence', 'activeRunId', 'activeWorkItem', 'lastTransition']) {
       assert.ok(schema.properties[field], `v2/v3 schema must define ${field}`);
     }
+    // v4 fields: evidence history left the document, but the index that keeps the
+    // done-story coverage check answerable must be expressible.
+    for (const field of ['evidenceCoverage', 'gateExceptions']) {
+      assert.ok(schema.properties[field], `v4 schema must define ${field}`);
+    }
+    assert.equal(schema.properties.evidenceCoverage.additionalProperties.$ref, '#/$defs/evidenceCoverageRow');
   });
 
   it('declares the v3 strict-closure policy and evidence fields', () => {
@@ -188,10 +195,25 @@ describe('state.schema.json', () => {
     const changeEntry = stateSchema.properties.changeHistory.items.properties;
     assert.ok(changeEntry.category, 'changeHistory entry must define category');
     assert.ok(changeEntry.closureReviewNote, 'changeHistory entry must define closureReviewNote');
+    // `pre-harness-story` was missing from this enum while policy.mjs declared it
+    // and Harness.md §2b documented it, so the schema rejected the one exception
+    // category the framework itself recommends for a permanent historical gap.
     assert.deepEqual(changeEntry.category.enum, [
       'manual-compile', 'budget-override', 'analyzer-fallback',
-      'unscoped-freshness', 'documentation-only', 'tooling-gap',
+      'unscoped-freshness', 'documentation-only', 'tooling-gap', 'pre-harness-story',
     ]);
+    // v4 keeps the same taxonomy on its dedicated field.
+    assert.deepEqual(
+      stateSchema.$defs.gateException.properties.category.enum,
+      changeEntry.category.enum,
+      'gateExceptions and changeHistory must agree on the taxonomy',
+    );
+    // A sealed record carries fields the codec stamps at read time; without them
+    // declared, `additionalProperties: false` would reject a record read back out
+    // of a commit.
+    for (const field of ['sealedCommit', 'partial']) {
+      assert.ok(harnessSchema.$defs.evidence.properties[field], `evidence schema must define ${field}`);
+    }
   });
 });
 
@@ -271,6 +293,16 @@ describe('Skill harness contract', () => {
     const content = readFileSync(join(skillsDir, 'Debugging.md'), 'utf-8');
     assert.ok(/deterministic/i.test(content), 'Debugging must classify deterministic failures');
     assert.ok(/transient/i.test(content), 'Debugging must classify transient failures');
+  });
+
+  it('VisualEvidence requires a named artifact and an honest outcome', () => {
+    const content = readFileSync(join(skillsDir, 'VisualEvidence.md'), 'utf-8');
+    // The finding must name the image it rests on, or it is an impression rather than evidence.
+    assert.ok(/artifact/i.test(content), 'VisualEvidence must require a named artifact');
+    // A frame is only evidence for what it shows; the finding must state its own limits.
+    assert.ok(/cannot (prove|show)/i.test(content), 'VisualEvidence must require a statement of what the frame cannot prove');
+    // An image-incapable model must not block unrelated work.
+    assert.ok(/visionUnavailable/.test(content), 'VisualEvidence must define the visionUnavailable outcome');
   });
 
   it('Resume validates the active run, stale evidence, and legal transition', () => {

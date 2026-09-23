@@ -184,13 +184,18 @@ Gates are backed by **evidence**, not assertion. Each claimed gate must have a f
 - When Git is unavailable and no `--files` are given, verification blocks (`freshness-unavailable`) rather than recording unscoped evidence.
 - `state validate` rejects a `true` gate whose evidence is missing, stale, expired, superseded, or bound to another work item; evidence records are schema-validated in full (`command`, `result`, `criteriaHash`, and a freshness bound).
 - Evidence must include a UUID, work item, phase, gate, status, command/result, input-tree hash, criteria hash, relevant files, timestamp, and either `expiresAt` or `freshnessPolicy`.
+- **Evidence history does not live in `state.json`.** A v4 document keeps only the active work item's records inline; a closed work item's evidence is written into the commit that closes it, as `Cadet-*` trailers, and archived to `.cadet/archive/`. `evidenceCoverage` indexes what left, so the "a done story owns evidence" check still works offline. Cadet still never commits: `state seal` prepares a message file and you commit with `git commit -F`.
 - Command output counts against the output budget; a configured cost budget cannot be satisfied by unmeasurable cost (the run is blocked, `budget-blocked`).
 - State and run ledgers are written atomically, so an interrupted write cannot truncate a record; persisted artifacts are redacted before hashing or writing.
 - Empty freshness coverage is an explicit policy decision: set `allowEmptyFreshness: true` in `.cadet/harness.json` only when unscoped evidence is acceptable.
 
 ```bash
-cadet-agent state validate                       # validate state against the schema
-cadet-agent state migrate                        # atomically upgrade v1 → v2 (no writes if it fails)
+cadet-agent state validate                       # validate state against the schema (read-only)
+cadet-agent state validate --verify-sealed       # also read evidence out of commit trailers
+cadet-agent state migrate                        # atomically upgrade v1 → the current version
+cadet-agent state migrate --to 4                 # archive closed work items' evidence; build the index
+cadet-agent state compact --keep active          # routine housekeeping on a v4 state
+cadet-agent state seal                           # write the active work item's evidence as commit trailers
 cadet-agent state transition --to review         # enforce the matrix + evidence
 cadet-agent harness verify --gate testsPassed --files src/a.cs   # bounded, classified loop
 cadet-agent harness report                       # budget consumption and failures (no secrets)

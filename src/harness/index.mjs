@@ -23,11 +23,19 @@ export {
 } from './util.mjs';
 
 export {
-  STATE_VERSION, READABLE_STATE_VERSIONS, validateState, migrateStateV1toV2, migrateStateFile,
+  STATE_VERSION, READABLE_STATE_VERSIONS, HISTORY_EXTERNAL_SINCE, isHistoryExternal,
+  validateState, migrateStateV1toV2, migrateStateDocument, migrateStateFile, parseTargetVersion,
+  toStateV4, splitEvidence, buildEvidenceCoverage, mergeEvidenceCoverage, sealWorkItem, recordEvidence, appendEvidence,
+  HISTORY_ENTRIES_KEPT, compactHistory,
   createEvidence, computeInputTreeHash, workItemIdOf, evidenceFreshness,
   latestEvidenceForGate, activeExceptions, requiredGates, isUngatedForwardEdge, evaluateTransition, resolveStrict,
   applyTransition, resetGatesForNewWorkItem, statePathFor, readState, writeState, writeJsonAtomic, StateError,
 } from './state.mjs';
+
+export {
+  TRAILER_PREFIX, BLOCK_TRAILER, TRAILER_GREP, DEFAULT_MAX_TRAILER_BYTES,
+  encodeEvidenceTrailers, parseEvidenceTrailers, sealedEvidence, latestSealedForGate, coverageFromSealed,
+} from './gitmemo.mjs';
 
 export {
   RETRY_CLASSES as VERIFICATION_RETRY_CLASSES, RESULT_STATUSES, TRANSIENT_BACKOFF_MS,

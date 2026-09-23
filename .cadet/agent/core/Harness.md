@@ -97,6 +97,53 @@ would only re-raise an unchanged finding. Scope it to the story work-item ids it
 (`epic-N::story-M.md`), one entry per epic or per story; the coverage check matches on scope, so
 an exception for one story never excuses another.
 
+## 2c. Where evidence lives (state v4)
+
+Evidence has three homes, and the boundary between them is the work item.
+
+- **Live, in `state.json → gateEvidence`** — the **active work item's** records only. This is what
+  `state transition` reads. It includes records with no commit to cite: a `manual-confirmation`, a
+  `compileCheckConfirmed` fallback, and the mid-story green run all live here, because a gate must be
+  satisfiable on a tree that has not been committed yet.
+- **Sealed, in a commit's trailers** — written by `state seal` and read back with `state validate
+  --verify-sealed`. Each record's fields become `Cadet-*` trailers and **the commit id is the seal**:
+  trailers are part of the commit object, so editing one changes the SHA and the citation stops
+  resolving. This is why trailers are used rather than `git notes`, which are not pushed by default
+  and can be rewritten silently.
+- **Archived, in `.cadet/archive/evidence/<work-item>.jsonl`** — append-only, and the home of records
+  that left `state.json` but were never sealed (every pre-v4 record, which cites no commit).
+
+`state.json → evidenceCoverage` is a one-row-per-work-item index of everything that is no longer
+inline (`recordCount`, `gates`, first/last timestamps, `sealedCommit`). **It is what keeps the
+`done`-story coverage rule in §1 answerable without git**, so a compacted repository is never
+mistaken for one with missing evidence.
+
+Two rules follow, and both are load-bearing:
+
+- **Nothing leaves `state.json` without being written down first.** Compaction validates the slimmer
+  document, *then* appends the archive, *then* writes the backup, *then* renames. A crash between the
+  writes must leave records in both places — never neither.
+- **A record that cannot be bound must not satisfy a gate.** A sealed block that exceeded the output
+  bound is marked `partial` and is rejected, exactly as an unscoped or stale record is.
+
+**Cadet never commits** (C5). Sealing prepares a message file; run `git commit -F <path>` yourself.
+Sealing is a `validation`/closure-time act, once per work item — not something to do on every gate.
+
+### `changeHistory` entries are pointers, not prose
+
+The log is **bounded** (`HISTORY_ENTRIES_KEPT` entries inline; the overflow is appended to
+`.cadet/archive/history.jsonl` by `state compact`/`state migrate`), and it stays bounded only if
+entries stay small. An entry is a **reference**: the artifact path and the phase, so the next agent
+can find the record. It is never the record itself.
+
+- A handoff records `Handoff recorded at .cadet/handoffs/<file>.md` — not the summary. On the audited
+  project 116 handoff entries averaged 1.9 KB each and were 65% of a 343 KB log, every one
+  duplicating a file already on disk.
+- A phase transition records **nothing**: `lastTransition` and the sealing commit already say it.
+- Requirements/architecture/breakdown/debug record the artifact path, not the artifact.
+
+If an entry is longer than a line, the content belongs in an artifact and the entry should point at it.
+
 ## 3. Budgets
 
 Configured in `.cadet/harness.json`; defaults and hard safety ceilings are in
@@ -250,6 +297,7 @@ budget state is missing.
 | StoryBreakdown | design evidence | per-story verification commands + evidence outputs, AC ids + declared tests | per run | acceptance criteria unmapped or an AC declares no test |
 | TDD | red record, acceptance criterion | `testsPassed` red→green evidence | `maxRetriesPerStep` | no red record for a testable change |
 | Debugging | reproduce record | per-attempt spans, regression evidence | `maxTotalRetries` | deterministic failure retried blindly |
+| VisualEvidence | rendered frame + source under test | inspected-frame finding (`passed`/`failed`/`blocked`/`visionUnavailable`/`inconclusive`) bound to the source, not the image | per run | frame missing or unreadable. **An image-incapable model does not block**: record `visionUnavailable` and continue |
 | CodeReview | run ledger, gate evidence | review decision + findings | per run | gate evidence stale/missing |
 | Resume | active run, ledger | validated next legal transition | per run | illegal/stale transition requested |
 | MCPSetup | Unity CLI/MCP availability | round-trip + mutation-approval evidence | per run | mutation without confirmation |
@@ -274,8 +322,10 @@ matter to a skill, and neither depends on the caller remembering a flag:
 
 Run `cadet-agent harness capabilities --format json` to read the registry instead of inferring it.
 
-- `cadet-agent state validate` — validate state against the v2 schema. Read-only.
-- `cadet-agent state migrate` — atomically migrate v1 → v2. **On failure the tree is left exactly as found**, backup included: the backup is written only after the migrated document validates.
+- `cadet-agent state validate [--verify-sealed]` — validate state against the current schema. Read-only. `--verify-sealed` additionally reads evidence out of commit trailers (§2c); it is additive by design, so it can only clear an error a real sealed record backs and can never raise a new one, and a read that cannot reach git is reported as a warning rather than a silent pass.
+- `cadet-agent state migrate [--to <version>] [--keep <bound>]` — atomically migrate a v1 document forward, or (with `--to 4`) compact a v2/v3 document: promote gate exceptions, archive non-active evidence, and build the coverage index. **On failure the tree is left exactly as found**, backup included: the archive is written only after the migrated document validates, and the backup only after that.
+- `cadet-agent state compact --keep <bound>` — routine housekeeping on a v4 document: move closed work items' evidence into `.cadet/archive/` and refresh `evidenceCoverage`. `--keep` (`always`|`active`|work-item ids) is required when unattended, so an agent states *what* stays inline.
+- `cadet-agent state seal [--work-item <id>] [--commit-msg <path>]` — write the active work item's evidence as commit trailers, for `git commit -F`. **Cadet never commits** (C5): this prepares a message file and archives the records; the commit stays the user's action.
 - `cadet-agent state transition --to <phase> [--dry-run]` — enforce the transition matrix + evidence. **`--dry-run` reports the same verdict and writes nothing** — use it for every inspection; without the flag the transition is applied and `state.json` is written. A transition is legal only when it is a gated transition in the matrix or a declared ungated forward edge (bootstrap + planning progression); `closed` is terminal, so leaving it is rejected. A rejection lists every missing or stale gate.
 - `cadet-agent harness record` — append a sanitized span/evidence/decision event. Honours `--dry-run`. Append-only, so it carries no unattended bound: requiring a flag to record evidence would push agents to skip logging.
 - `cadet-agent harness confirm --gate <gate> --reason <t> --expires-at <iso> --environment <k=v,...> --scope <a,b> [--files a,b] [--commit <sha>]` — record `manual-confirmation` evidence, the first-class path for a gate automation cannot satisfy. Validates the strict-closure metadata *before* writing, rejects a gate in `disallowManualFor`, bounds the validity window, and binds the record to files exactly as `harness verify` does. Writes the ledger and then `state.json` atomically; prior passing evidence for the gate is marked `superseded`, never deleted. Use this instead of hand-editing `state.json` — the rules in §2a are checked at creation time, when the human still remembers what was verified.

@@ -1,6 +1,6 @@
 # Cadet-Agent Adapter Inventory
 
-> Generated: 2026-08-14 | Updated: 2026-09-16 | Framework version: 0.40.0
+> Generated: 2026-08-14 | Updated: 2026-09-23 | Framework version: 0.42.0
 
 This document tracks every IDE adapter file, its purpose, and its canonical dependency. The adapter contract is: **no IDE-specific file may duplicate canonical content from `.cadet/agent/core/`.** Each adapter must only contain frontmatter, file-reference instructions, and IDE-specific mechanics.
 
@@ -61,6 +61,7 @@ The permitted prose in an adapter is *connective pointer text* ("Read X, then fo
 | Claude Code | `.claude/skills/cadet-review/SKILL.md` | Phase skill | `.cadet/agent/core/skills/CodeReview.md` |
 | Claude Code | `.claude/skills/cadet-resume/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Resume.md` |
 | Claude Code | `.claude/skills/cadet-mcp-setup/SKILL.md` | Phase skill | `.cadet/agent/core/skills/MCPSetup.md` |
+| Claude Code | `.claude/skills/cadet-visual-evidence/SKILL.md` | Phase skill | `.cadet/agent/core/skills/VisualEvidence.md` |
 | Deep Code | `.agents/skills/cadet-agent/SKILL.md` | Base/global skill | `.cadet/agent/core/cadet-agent.md` |
 | Deep Code | `.agents/skills/cadet-agent-reviewer/SKILL.md` | Reviewer skill | `.cadet/agent/core/cadet-agent.md` + `.cadet/agent/core/skills/AgentReviewer.md` |
 | Deep Code | `.agents/skills/cadet-requirements/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Requirements.md` |
@@ -73,6 +74,7 @@ The permitted prose in an adapter is *connective pointer text* ("Read X, then fo
 | Deep Code | `.agents/skills/cadet-review/SKILL.md` | Phase skill | `.cadet/agent/core/skills/CodeReview.md` |
 | Deep Code | `.agents/skills/cadet-resume/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Resume.md` |
 | Deep Code | `.agents/skills/cadet-mcp-setup/SKILL.md` | Phase skill | `.cadet/agent/core/skills/MCPSetup.md` |
+| Deep Code | `.agents/skills/cadet-visual-evidence/SKILL.md` | Phase skill | `.cadet/agent/core/skills/VisualEvidence.md` |
 | Cross-client | `AGENTS.md` | Root agent-instruction pointer (create-only) | `.cadet/agent/core/cadet-agent.md` |
 
 > Deep Code adapters live under `.agents/skills/` (the cross-client Agent Skills root) rather than a Deep-Code-only `.deepcode/skills/` directory, so the same pointers are discoverable by any client that reads the `.agents/` convention. Deep Code scans `.deepcode/skills/` first, then `.agents/skills/`. See `docs/guidance/DeepCode.md`.
