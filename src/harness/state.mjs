@@ -7,9 +7,8 @@
  * evidence freshness before any phase transition.
  */
 
-import { readFileSync, writeFileSync, renameSync, copyFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
+import { readFileSync, writeFileSync, renameSync, copyFileSync, existsSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   PHASES, GATES, TRANSITIONS, EVIDENCE_STATUSES, DEFAULT_STRICT_CLOSURE,
   EXCEPTION_CATEGORIES, EXCEPTION_EXPIRY_DAYS, EXCEPTION_REQUIRES_REVIEW_NOTE,
@@ -802,9 +801,12 @@ export function migrateStateFile(statePath, { backup = true, to = null, keep = '
 
   const from = raw.version ?? raw.stateVersion;
   const backupPath = `${statePath}.v${from}.bak`;
-  const dir = dirname(statePath);
-  const tmpDir = mkdtempSync(join(tmpdir(), 'cadet-state-'));
-  const tmpPath = join(tmpDir, 'state.json');
+  // The temp file is a sibling of the target, never a file in the OS temp
+  // directory: `renameSync` is atomic only within one filesystem, and a project
+  // on a different volume than the temp dir (temp on C:, project on D:/E: — the
+  // common Windows layout) fails the rename outright with EXDEV. A sibling
+  // rename is same-volume by construction, so the swap cannot half-land.
+  const tmpPath = `${statePath}.tmp-${process.pid}-${Date.now()}`;
   try {
     writeFileSync(tmpPath, JSON.stringify(state, null, 2) + '\n', 'utf-8');
     // Validate BEFORE writing anything to the real tree. The backup is an
@@ -835,7 +837,7 @@ export function migrateStateFile(statePath, { backup = true, to = null, keep = '
     // A failed rename leaves the original in place.
     renameSync(tmpPath, statePath);
   } finally {
-    rmSync(tmpDir, { recursive: true, force: true });
+    rmSync(tmpPath, { force: true });
   }
   return { migrated: true, statePath, state, archived, archivedHistory, promoted, droppedHistory, backupPath };
 }

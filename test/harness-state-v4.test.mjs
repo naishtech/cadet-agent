@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -428,6 +428,39 @@ describe('state v4 — migration', () => {
 
       assert.equal(readFileSync(statePath, 'utf-8'), original, 'a failed archive must leave state.json alone');
       assert.equal(existsSync(`${statePath}.v2.bak`), false, 'and must not leave a backup behind');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('stages its temp file beside the target, not in the OS temp directory', () => {
+    // `renameSync` is atomic only within one filesystem. Staging in os.tmpdir()
+    // passes on a single-drive machine and fails with EXDEV the moment the
+    // project sits on a different volume than the temp dir — the common Windows
+    // layout of temp on C: and the project on D: or E:. Asserting the temp file
+    // is a sibling of state.json is what keeps that failure unreachable, and it
+    // cannot be asserted from the OS temp dir because libuv caches tmpdir.
+    const dir = mkdtempSync(join(tmpdir(), 'cadet-v4-sibling-'));
+    try {
+      mkdirSync(join(dir, '.cadet'), { recursive: true });
+      const statePath = join(dir, '.cadet', 'state.json');
+      writeFileSync(statePath, JSON.stringify(v2WithHistory(), null, 2));
+
+      let sawSiblingTemp = false;
+      migrateStateFile(statePath, {
+        to: 4,
+        beforeWrite: () => {
+          sawSiblingTemp = readdirSync(join(dir, '.cadet')).some((name) => name.startsWith('state.json.tmp-'));
+        },
+      });
+
+      assert.equal(sawSiblingTemp, true, 'the temp file must be a sibling of the target so the rename stays on one volume');
+      assert.equal(JSON.parse(readFileSync(statePath, 'utf-8')).version, 4);
+      assert.equal(
+        readdirSync(join(dir, '.cadet')).some((name) => name.includes('.tmp-')),
+        false,
+        'the temp file must not be left behind',
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
