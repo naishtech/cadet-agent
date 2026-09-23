@@ -13,7 +13,7 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
-## [0.42.0] — 2026-09-23
+## [0.43.0] — 2026-09-23
 
 ### Added
 
