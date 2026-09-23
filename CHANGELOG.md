@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.43.1] — 2026-09-23
+
 ### Fixed
 
 - **`state migrate` and `state compact` failed outright with `EXDEV` whenever the project sat on a different volume than the OS temp directory.** `migrateStateFile` staged its temporary file in `os.tmpdir()` and then renamed it onto the target, but `renameSync` is atomic only *within* one filesystem — so on the common Windows layout of a temp directory on `C:` and the project on `D:` or `E:`, the swap could not happen at all. The failure was worse than a no-op: the archive is written *before* the document that stops referencing it, so a failed run left `.cadet/archive/**` and a `.bak` behind while `state.json` stayed unmigrated. The temp file is now a sibling of `state.json`, which is same-volume by construction. Only `migrate`/`compact` were affected — `writeJsonAtomic`, used by `state transition`, `harness confirm`, and `harness verify`, already staged a sibling. A regression test asserts the temp file is a sibling of the target, verified non-vacuous against the old code.
