@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.42.0] — 2026-09-23
+
 ### Added
 
 - **Gate evidence history no longer lives in `state.json` (contract v5, state schema v4).** A real consumer repository had grown its state document to **2,082,151 bytes**, of which `gateEvidence` was 72% (832 records) and `changeHistory` 16% (340 entries) — while the actual session cursor was **0.2%**. Of the 832 evidence records, **9 were live**; 738 were `superseded` and 85 `failed`, and nothing in the framework ever pruned either array (`harness cleanup` covers `.cadet/runs/` only).
