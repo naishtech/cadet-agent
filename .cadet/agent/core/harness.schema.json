@@ -204,6 +204,14 @@
         "freshnessPolicy": { "oneOf": [{ "$ref": "#/$defs/freshnessPolicy" }, { "type": "null" }] },
         "supersededBy": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
         "source": { "type": "string", "enum": ["automated", "manual-confirmation", "provider"] },
+        "sealedCommit": {
+          "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }],
+          "description": "v5 read-time only. The commit whose trailers carried this record, stamped by `sealedEvidence`. Never written by hand: the commit id is the seal, so a record cannot name the commit it is stored in without being self-referential."
+        },
+        "partial": {
+          "type": "boolean",
+          "description": "v5 read-time only. The trailer block was truncated to fit the output bound, so `relevantFiles` is incomplete. A partial record must NOT satisfy a gate: it no longer binds the evidence to the files it claims."
+        },
         "reason": {
           "type": "string",
           "description": "v3: why automation was unavailable. Required on a manual-confirmation under strictClosure (contract v3 §3)."
@@ -381,6 +389,70 @@
         },
         "spikes": { "type": "object" },
         "changeHistory": { "type": "array" }
+      }
+    },
+    "stateV4": {
+      "type": "object",
+      "description": "v4 state: evidence history left the document (contract v5). `gateEvidence` is scoped to the active work item, `evidenceCoverage` indexes what moved to commits and `.cadet/archive/`, gate exceptions have their own field, and `changeHistory` is retired. Full shape: .cadet/agent/core/state.schema.json.",
+      "required": ["version", "session", "epics"],
+      "properties": {
+        "version": { "type": "integer", "const": 4 },
+        "stateVersion": { "type": "integer", "const": 4 },
+        "session": { "type": "object" },
+        "epics": { "type": "object" },
+        "gates": { "type": "object" },
+        "gateEvidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } },
+        "evidenceCoverage": {
+          "type": "object",
+          "description": "Per-work-item summary of evidence that is no longer inline. Keeps the 'a done story owns evidence' check answerable without git.",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["recordCount"],
+            "properties": {
+              "workItemId": { "type": "string" },
+              "recordCount": { "type": "integer", "minimum": 0 },
+              "gates": { "type": "array", "items": { "$ref": "#/$defs/gate" } },
+              "firstAt": { "type": ["string", "null"], "format": "date-time" },
+              "lastAt": { "type": ["string", "null"], "format": "date-time" },
+              "sealedCommit": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] }
+            }
+          }
+        },
+        "gateExceptions": {
+          "type": "array",
+          "description": "Gate exceptions, which are live state (scoped + expiring) rather than history.",
+          "items": { "type": "object" }
+        },
+        "activeRunId": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
+        "activeWorkItem": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "epicId": { "type": ["string", "null"] },
+                "storyId": { "type": ["string", "null"] }
+              },
+              "additionalProperties": false
+            },
+            { "type": "null" }
+          ]
+        },
+        "lastTransition": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "from": { "$ref": "#/$defs/phase" },
+                "to": { "$ref": "#/$defs/phase" },
+                "at": { "type": "string", "format": "date-time" },
+                "evidenceIds": { "type": "array", "items": { "$ref": "#/$defs/uuid" } }
+              },
+              "required": ["from", "to", "at"]
+            },
+            { "type": "null" }
+          ]
+        },
+        "spikes": { "type": "object" }
       }
     }
   }

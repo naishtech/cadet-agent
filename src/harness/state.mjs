@@ -15,14 +15,35 @@ import {
   EXCEPTION_CATEGORIES, EXCEPTION_EXPIRY_DAYS, EXCEPTION_REQUIRES_REVIEW_NOTE,
 } from './policy.mjs';
 import { hashTree, hashFile, hashCriteria, timestamp, isUuid } from './util.mjs';
+import { encodeEvidenceTrailers } from './gitmemo.mjs';
 
 export { PHASES, GATES, TRANSITIONS, EVIDENCE_STATUSES };
 export { EXCEPTION_CATEGORIES, EXCEPTION_EXPIRY_DAYS };
 
-export const STATE_VERSION = 3;
+export const STATE_VERSION = 4;
 
-/** Highest state version this module can read. v1/v2 remain readable. */
-export const READABLE_STATE_VERSIONS = Object.freeze([1, 2, 3]);
+/** Highest state version this module can read. v1/v2/v3 remain readable. */
+export const READABLE_STATE_VERSIONS = Object.freeze([1, 2, 3, 4]);
+
+/**
+ * Version at which evidence history stopped living in `state.json` (contract v5).
+ *
+ * A v4 document keeps only the active work item's evidence inline: gate
+ * exceptions live in their own field, `changeHistory` is no longer appended to,
+ * and everything historical moves to commit trailers plus `.cadet/archive/`.
+ *
+ * The test is `>=` rather than `===` on purpose. A future version bump inherits
+ * "history is external" instead of silently reverting to the unbounded growth
+ * this version exists to remove — the failure mode being avoided is a version
+ * check that quietly stops applying.
+ */
+export const HISTORY_EXTERNAL_SINCE = 4;
+
+/** Is this document a version that keeps history out of `state.json`? */
+export function isHistoryExternal(state) {
+  const version = state?.version ?? state?.stateVersion;
+  return typeof version === 'number' && version >= HISTORY_EXTERNAL_SINCE;
+}
 
 class StateError extends Error {
   constructor(message, detail = {}) {
@@ -71,7 +92,7 @@ export function validateState(state, context = {}) {
 
   const version = state.version ?? state.stateVersion;
   if (!READABLE_STATE_VERSIONS.includes(version)) {
-    errors.push({ path: 'version', message: `unsupported state version ${JSON.stringify(version)} (expected 1, 2 or 3)` });
+    errors.push({ path: 'version', message: `unsupported state version ${JSON.stringify(version)} (expected 1, 2, 3 or 4)` });
   }
 
   if (!isPlainObject(state.session)) {
@@ -116,7 +137,7 @@ export function validateState(state, context = {}) {
     }
   }
 
-  if (version === 2 || version === 3) {
+  if (version >= 2 && version <= STATE_VERSION) {
     if (state.gateEvidence !== undefined && !Array.isArray(state.gateEvidence)) {
       errors.push({ path: 'gateEvidence', message: 'gateEvidence must be an array' });
     }
@@ -126,13 +147,57 @@ export function validateState(state, context = {}) {
       });
     }
     // Gate exceptions are categorised under strict closure (contract v3 §4).
-    if (strict && Array.isArray(state.changeHistory)) {
+    //
+    // v4 gives them their own field, because they are *live state* — scoped to a
+    // work item and bounded by `expiresAt`, and read by `activeExceptions` — and
+    // filing live state in a history array is how the array grew without bound.
+    // v1-v3 documents keep them in `changeHistory`, so both sources are read and
+    // each is reported under the path it actually lives at.
+    if (Array.isArray(state.changeHistory)) {
       state.changeHistory.forEach((entry, i) => {
         if (entry?.type !== 'gate-exception') return;
+        if (!strict) return;
         for (const e of validateGateException(entry, strict)) {
           errors.push({ path: `changeHistory[${i}].${e.path}`, message: e.message });
         }
       });
+    }
+    if (state.gateExceptions !== undefined && !Array.isArray(state.gateExceptions)) {
+      errors.push({ path: 'gateExceptions', message: 'gateExceptions must be an array' });
+    }
+    if (Array.isArray(state.gateExceptions)) {
+      state.gateExceptions.forEach((entry, i) => {
+        if (!isPlainObject(entry)) {
+          errors.push({ path: `gateExceptions[${i}]`, message: 'gate exception must be an object' });
+          return;
+        }
+        if (!strict) return;
+        for (const e of validateGateException(entry, strict)) {
+          errors.push({ path: `gateExceptions[${i}].${e.path}`, message: e.message });
+        }
+      });
+    }
+    // The coverage index (contract v5). It is what keeps the "a done story owns
+    // evidence" check answerable once the records themselves have moved to
+    // commits and `.cadet/archive/`, so a malformed index is an error: an index
+    // that silently reads as empty would report every completed story as
+    // unevidenced, and an index that reads as complete would hide real gaps.
+    if (state.evidenceCoverage !== undefined && !isPlainObject(state.evidenceCoverage)) {
+      errors.push({ path: 'evidenceCoverage', message: 'evidenceCoverage must be an object keyed by work item id' });
+    }
+    if (isPlainObject(state.evidenceCoverage)) {
+      for (const [workItemId, row] of Object.entries(state.evidenceCoverage)) {
+        if (!isPlainObject(row)) {
+          errors.push({ path: `evidenceCoverage.${workItemId}`, message: 'coverage row must be an object' });
+          continue;
+        }
+        if (!Number.isInteger(row.recordCount) || row.recordCount < 0) {
+          errors.push({ path: `evidenceCoverage.${workItemId}.recordCount`, message: 'recordCount must be a non-negative integer' });
+        }
+        if (row.gates !== undefined && !Array.isArray(row.gates)) {
+          errors.push({ path: `evidenceCoverage.${workItemId}.gates`, message: 'gates must be an array' });
+        }
+      }
     }
     // A claimed-true gate must be backed by evidence. This is rejected at
     // validation time (not only at transition time) so `state validate` cannot
@@ -240,6 +305,17 @@ export function validateState(state, context = {}) {
           .map((e) => (isPlainObject(e) ? e.workItemId : null))
           .filter((id) => typeof id === 'string' && id.length > 0),
       );
+      // A v4 document archives a closed work item's records, so the inline array
+      // is no longer the only evidence of coverage. The index is what remains,
+      // and reading it here is what stops compaction from looking like loss:
+      // without this, compacting a repository would report every already-done
+      // story as unevidenced, and the fix for unbounded growth would be a false
+      // accusation of missing evidence.
+      if (isPlainObject(state.evidenceCoverage)) {
+        for (const id of Object.keys(state.evidenceCoverage)) {
+          if (typeof id === 'string' && id.length > 0) evidenced.add(id);
+        }
+      }
       // A scoped exception is the FIRST-CLASS escape for a permanent historical
       // gap. `activeExceptions` is keyed on the ACTIVE work item, which is the
       // current story — the wrong scope here, where we walk every completed story
@@ -247,13 +323,15 @@ export function validateState(state, context = {}) {
       // Only a valid, categorised exception counts: an unknown category is not a
       // loophole, it is a typo, and `validateGateException` rejects it separately.
       const excepted = new Set();
-      if (Array.isArray(state.changeHistory)) {
-        for (const entry of state.changeHistory) {
-          if (!isPlainObject(entry) || entry.type !== 'gate-exception') continue;
-          if (!EXCEPTION_CATEGORIES.includes(entry.category)) continue;
-          const scope = Array.isArray(entry.scope) ? entry.scope : (entry.scope ? [entry.scope] : []);
-          for (const s of scope) excepted.add(String(s));
-        }
+      const exceptionSources = [
+        ...(Array.isArray(state.changeHistory) ? state.changeHistory : []),
+        ...(Array.isArray(state.gateExceptions) ? state.gateExceptions : []),
+      ];
+      for (const entry of exceptionSources) {
+        if (!isPlainObject(entry) || entry.type !== 'gate-exception') continue;
+        if (!EXCEPTION_CATEGORIES.includes(entry.category)) continue;
+        const scope = Array.isArray(entry.scope) ? entry.scope : (entry.scope ? [entry.scope] : []);
+        for (const s of scope) excepted.add(String(s));
       }
       for (const [epicId, epic] of Object.entries(state.epics)) {
         if (!isPlainObject(epic) || !isPlainObject(epic.stories)) continue;
@@ -524,16 +602,20 @@ function validateGateException(entry, strict) {
 // ── Migration ───────────────────────────────────────────────────────────────
 
 /**
- * Migrate a v1 state document to v2 in memory. Unknown top-level fields are
- * preserved. Does not touch the filesystem.
+ * Migrate a v1 state document to the current version in memory. Unknown
+ * top-level fields are preserved. Does not touch the filesystem.
+ *
+ * A v2/v3/v4 document is returned *unchanged*. That is deliberate and is pinned
+ * by tests: a read must not silently rewrite a document to a new version, because
+ * the version stamp decides which semantics apply and a bump would otherwise
+ * change how existing evidence is judged. Moving a v2/v3 document to v4 is an
+ * explicit act — `state migrate --to 4` — not a side effect of reading it.
  */
 export function migrateStateV1toV2(v1) {
   if (!isPlainObject(v1)) throw new StateError('cannot migrate a non-object state');
-  if (v1.version === 2 || v1.stateVersion === 2) {
-    return { state: { ...v1, version: 2, stateVersion: 2, gateEvidence: v1.gateEvidence || [] }, changed: false };
-  }
-  if (v1.version === 3 || v1.stateVersion === 3) {
-    return { state: { ...v1, version: 3, stateVersion: 3, gateEvidence: v1.gateEvidence || [] }, changed: false };
+  const declared = v1.version ?? v1.stateVersion;
+  if (typeof declared === 'number' && declared >= 2 && READABLE_STATE_VERSIONS.includes(declared)) {
+    return { state: { ...v1, gateEvidence: v1.gateEvidence || [] }, changed: false };
   }
   const gates = isPlainObject(v1.gates) ? { ...v1.gates } : {};
   for (const gate of GATES) {
@@ -546,9 +628,12 @@ export function migrateStateV1toV2(v1) {
       preserved[key] = value;
     }
   }
-  // v1 migrates straight to the current version (v3). The intermediate v2
-  // shape is identical for these fields; only the version stamp differs, so a
-  // single-step migration avoids a transient on-disk v2 document.
+  // v1 migrates straight to the current version. The intermediate shapes are
+  // identical for these fields; only the version stamp differs, so a single-step
+  // migration avoids a transient on-disk document at a version nobody asked for.
+  // `toStateV4` then applies the current shape, which for a v1 document means
+  // promoting any gate exceptions out of `changeHistory` (v1 had no evidence
+  // array to compact) and installing an empty coverage index.
   const migrated = {
     ...preserved,
     version: STATE_VERSION,
@@ -563,27 +648,146 @@ export function migrateStateV1toV2(v1) {
     spikes: v1.spikes || {},
     changeHistory: Array.isArray(v1.changeHistory) ? [...v1.changeHistory] : [],
   };
-  return { state: migrated, changed: true };
+  const { state } = toStateV4(migrated);
+  return { state, changed: true };
 }
 
-function activeWorkItemFromState(state) {
-  const epics = state.epics;
-  if (!isPlainObject(epics)) return null;
-  for (const [epicId, epic] of Object.entries(epics)) {
-    if (!isPlainObject(epic) || !isPlainObject(epic.stories)) continue;
-    for (const [storyId, status] of Object.entries(epic.stories)) {
-      if (status === 'in-progress') return { epicId, storyId };
-    }
+/**
+ * How many `changeHistory` entries stay inline after compaction.
+ *
+ * `changeHistory` is *not* retired in v4, and this constant is why. Eight skills
+ * instruct the agent to record an artifact path there ("record the requirements
+ * document path in `changeHistory`"), and `Resume` cross-checks its last entry
+ * against commit history. Removing the field would make those instructions wrong
+ * and take away a facility with no replacement. What was actually unbounded was
+ * not the field — it was its *contents*: on the audited repository 65% of the log
+ * was 116 handoff entries averaging 1.9 KB of prose each, every one of them
+ * duplicating a file already written to `.cadet/handoffs/`, plus 162 one-line
+ * transition records already covered by `lastTransition`.
+ */
+export const HISTORY_ENTRIES_KEPT = 25;
+
+/**
+ * Split a change log into the tail that stays inline and the overflow to archive.
+ *
+ * Keeps the most recent entries, because that is what `Resume` reads and what a
+ * handoff cross-checks against. The overflow is returned rather than discarded so
+ * the caller can persist it: an audit trail may move, but it must not evaporate.
+ */
+export function compactHistory(entries, { keepRecent = HISTORY_ENTRIES_KEPT } = {}) {
+  const list = Array.isArray(entries) ? entries : [];
+  if (list.length <= keepRecent) return { kept: list, archived: [] };
+  return {
+    kept: list.slice(list.length - keepRecent),
+    archived: list.slice(0, list.length - keepRecent),
+  };
+}
+
+/**
+ * Reshape a document into v4 (contract v5): keep only the active work item's
+ * evidence inline, move the rest to `archived` for the caller to persist, promote
+ * gate exceptions into their own field, bound the change log, and install the
+ * coverage index.
+ *
+ * Pure — it returns the records to archive rather than writing them, so the
+ * caller owns the archive location and this stays testable without a filesystem.
+ */
+export function toStateV4(state, { keep = 'active', keepHistory = HISTORY_ENTRIES_KEPT } = {}) {
+  const { live, archived, coverage } = splitEvidence(state, { keep });
+
+  const promoted = [];
+  const remainingHistory = [];
+  for (const entry of Array.isArray(state.changeHistory) ? state.changeHistory : []) {
+    // Exceptions are live state, so they are kept — a legacy one still in
+    // changeHistory is promoted rather than dropped, since dropping it would
+    // silently withdraw an exception that a gate currently depends on.
+    if (entry?.type === 'gate-exception') promoted.push({ ...entry });
+    else remainingHistory.push(entry);
   }
-  return null;
+  const { kept: history, archived: archivedHistory } = compactHistory(remainingHistory, { keepRecent: keepHistory });
+
+  const next = {
+    ...state,
+    version: STATE_VERSION,
+    stateVersion: STATE_VERSION,
+    gateEvidence: live,
+    evidenceCoverage: coverage,
+    gateExceptions: [
+      ...promoted,
+      ...(Array.isArray(state.gateExceptions) ? state.gateExceptions : []),
+    ],
+    changeHistory: history,
+  };
+
+  return {
+    state: next,
+    archived,
+    archivedHistory,
+    live: live.length,
+    promoted: promoted.length,
+    droppedHistory: archivedHistory.length,
+  };
+}
+
+/**
+ * Parse a `--to` value: accepts `4`, `"4"`, and `"v4"`. Returns `null` when
+ * absent, and `NaN` when present but unusable so the caller can reject loudly
+ * instead of silently migrating to a default.
+ */
+export function parseTargetVersion(to) {
+  if (to === null || to === undefined || to === '') return null;
+  const text = String(to).trim().replace(/^v/i, '');
+  if (!/^\d+$/.test(text)) return NaN;
+  const n = Number(text);
+  return READABLE_STATE_VERSIONS.includes(n) ? n : NaN;
+}
+
+/**
+ * Apply a migration to a document in memory, at the requested target.
+ *
+ * The rule is "never downgrade, never guess": a v1 document always migrates
+ * forward (that is the documented v1 path), a document only changes when the
+ * caller explicitly asked for a higher version, and a request at or below the
+ * current version is a no-op rather than an error, so a retried migration is safe.
+ */
+export function migrateStateDocument(raw, { to = null, keep = 'active', keepHistory = HISTORY_ENTRIES_KEPT } = {}) {
+  const target = parseTargetVersion(to);
+  if (Number.isNaN(target)) {
+    throw new StateError(`invalid --to version ${JSON.stringify(to)}; expected one of ${READABLE_STATE_VERSIONS.join(', ')}`);
+  }
+  const from = raw?.version ?? raw?.stateVersion;
+  if (from === 1) {
+    const { state, changed } = migrateStateV1toV2(raw);
+    return { state, changed, archived: [], archivedHistory: [], promoted: 0, droppedHistory: 0 };
+  }
+  if (typeof from !== 'number' || !READABLE_STATE_VERSIONS.includes(from)) {
+    throw new StateError(`cannot migrate unsupported state version ${JSON.stringify(from)}`);
+  }
+  if (target !== null && from < target) {
+    const r = toStateV4(raw, { keep, keepHistory });
+    return {
+      state: r.state,
+      changed: true,
+      archived: r.archived,
+      archivedHistory: r.archivedHistory,
+      promoted: r.promoted,
+      droppedHistory: r.droppedHistory,
+    };
+  }
+  return { state: raw, changed: false, archived: [], archivedHistory: [], promoted: 0, droppedHistory: 0 };
 }
 
 /**
  * Migrate a state file on disk atomically: write a temporary file, optionally
  * back up the original, then rename into place. A failed migration leaves the
  * original untouched.
+ *
+ * `archived` records are returned rather than written here: the caller decides
+ * where the append-only archive lives, and keeping this function's failure
+ * contract simple ("nothing is written") is what the `atomicFailure` guarantee in
+ * the command registry depends on.
  */
-export function migrateStateFile(statePath, { backup = true } = {}) {
+export function migrateStateFile(statePath, { backup = true, to = null, keep = 'active', keepHistory = HISTORY_ENTRIES_KEPT, beforeWrite = null } = {}) {
   if (!existsSync(statePath)) {
     throw new StateError(`state file not found: ${statePath}`);
   }
@@ -593,9 +797,11 @@ export function migrateStateFile(statePath, { backup = true } = {}) {
   } catch (err) {
     throw new StateError(`cannot migrate malformed state: ${err.message}`);
   }
-  const { state, changed } = migrateStateV1toV2(raw);
-  if (!changed) return { migrated: false, statePath, state };
+  const { state, changed, archived, archivedHistory, promoted, droppedHistory } = migrateStateDocument(raw, { to, keep, keepHistory });
+  if (!changed) return { migrated: false, statePath, state, archived: [], archivedHistory: [], promoted: 0, droppedHistory: 0 };
 
+  const from = raw.version ?? raw.stateVersion;
+  const backupPath = `${statePath}.v${from}.bak`;
   const dir = dirname(statePath);
   const tmpDir = mkdtempSync(join(tmpdir(), 'cadet-state-'));
   const tmpPath = join(tmpDir, 'state.json');
@@ -613,15 +819,59 @@ export function migrateStateFile(statePath, { backup = true } = {}) {
     if (!check.valid) {
       throw new StateError(`migrated state failed validation: ${check.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
     }
+    // Persist the archive BEFORE the document that no longer references it.
+    //
+    // This ordering is the whole safety argument for compaction. The records
+    // filtered out of `gateEvidence` exist nowhere else, so writing the slimmer
+    // document first and the archive second would lose them outright if the
+    // process died in between. Written first, a crash leaves records present in
+    // *both* places — recoverable and detectable, which is the direction a
+    // failure should point. A throw here happens before the backup is copied and
+    // before the rename, so `atomicFailure` still holds: the tree is untouched.
+    if (beforeWrite) beforeWrite({ archived, archivedHistory, state, from });
     if (backup) {
-      copyFileSync(statePath, `${statePath}.v1.bak`);
+      copyFileSync(statePath, backupPath);
     }
     // A failed rename leaves the original in place.
     renameSync(tmpPath, statePath);
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });
   }
-  return { migrated: true, statePath, state };
+  return { migrated: true, statePath, state, archived, archivedHistory, promoted, droppedHistory, backupPath };
+}
+
+/**
+ * The trailer lines that seal a work item's evidence into a commit, plus the
+ * records they carry (contract v5).
+ *
+ * Selection is by work item, never by status: `sealWorkItem` is the counterpart of
+ * `splitEvidence` and must produce exactly the records that compaction left
+ * inline, or the archive and the commit would disagree about what was sealed.
+ */
+export function sealWorkItem(state, { workItemId = null, maxBytes = undefined } = {}) {
+  const id = workItemId || (state?.activeWorkItem ? workItemIdOf(state) : null);
+  const records = (Array.isArray(state?.gateEvidence) ? state.gateEvidence : [])
+    .filter((r) => !id || r?.workItemId === id);
+  const lines = [];
+  const partial = [];
+  for (const record of records) {
+    const encoded = encodeEvidenceTrailers(record, maxBytes === undefined ? {} : { maxBytes });
+    lines.push(...encoded.lines, '');
+    if (encoded.partial) partial.push(record.evidenceId || '(no id)');
+  }
+  return { workItemId: id, records, lines, partial };
+}
+
+function activeWorkItemFromState(state) {
+  const epics = state.epics;
+  if (!isPlainObject(epics)) return null;
+  for (const [epicId, epic] of Object.entries(epics)) {
+    if (!isPlainObject(epic) || !isPlainObject(epic.stories)) continue;
+    for (const [storyId, status] of Object.entries(epic.stories)) {
+      if (status === 'in-progress') return { epicId, storyId };
+    }
+  }
+  return null;
 }
 
 // ── Evidence ────────────────────────────────────────────────────────────────
@@ -768,12 +1018,68 @@ export function latestEvidenceForGate(state, gate) {
   return matching.reduce((a, b) => (new Date(a.createdAt) >= new Date(b.createdAt) ? a : b));
 }
 
-/** Active gate exceptions keyed by gate, honoring scope and expiry. */
+/**
+ * Append an evidence record without touching gates or superseding anything.
+ *
+ * The primitive every evidence writer shares. It exists so the coverage index has
+ * exactly one place to be maintained: an index that only some append paths updated
+ * would report coverage for whichever gates happened to travel through the
+ * maintained path, which is worse than no index because it looks authoritative.
+ */
+export function appendEvidence(state, evidence) {
+  const next = {
+    ...state,
+    gateEvidence: [...(Array.isArray(state?.gateEvidence) ? state.gateEvidence : []), evidence],
+  };
+  if (isHistoryExternal(state)) {
+    next.evidenceCoverage = mergeEvidenceCoverage(
+      isPlainObject(state?.evidenceCoverage) ? state.evidenceCoverage : {},
+      [evidence],
+    );
+  }
+  return next;
+}
+
+/**
+ * Append an evidence record to a document and flip its gate.
+ *
+ * Supersedes prior passing evidence for the same gate rather than overwriting it,
+ * because evidence is immutable: a correction is a new record that names the one it
+ * replaces. Built on `appendEvidence` so the index and the array stay in step.
+ *
+ * Centralised so `harness confirm`, `harness verify`, `harness verify-acs` and the
+ * tests cannot drift.
+ */
+export function recordEvidence(state, evidence) {
+  const gate = evidence?.gate;
+  const superseding = { ...state };
+  if (gate) {
+    superseding.gateEvidence = (Array.isArray(state?.gateEvidence) ? state.gateEvidence : [])
+      .map((e) => (e?.gate === gate && (e.status === 'passed' || e.status === 'manual-confirmation')
+        ? { ...e, status: 'superseded', supersededBy: evidence.evidenceId }
+        : e));
+  }
+  const next = appendEvidence(superseding, evidence);
+  if (gate) next.gates = { ...(state.gates || {}), [gate]: true };
+  return next;
+}
+
+/**
+ * Active gate exceptions keyed by gate, honoring scope and expiry.
+ *
+ * Reads both homes for an exception: `changeHistory` (v1-v3, where a `type`
+ * discriminator picks it out of the log) and `gateExceptions` (v4, a dedicated
+ * field where the discriminator would be redundant). Later entries win, so a
+ * v4 document that still carries legacy entries behaves as it did before.
+ */
 export function activeExceptions(state, { workItemId, now = new Date() } = {}) {
-  const history = Array.isArray(state?.changeHistory) ? state.changeHistory : [];
+  const candidates = [
+    ...(Array.isArray(state?.changeHistory) ? state.changeHistory.filter((e) => e?.type === 'gate-exception') : []),
+    ...(Array.isArray(state?.gateExceptions) ? state.gateExceptions : []),
+  ];
   const active = {};
-  for (const entry of history) {
-    if (entry?.type !== 'gate-exception') continue;
+  for (const entry of candidates) {
+    if (!isPlainObject(entry)) continue;
     if (workItemId && entry.scope && !String(entry.scope).includes(workItemId)) continue;
     if (entry.expiresAt && new Date(entry.expiresAt).getTime() <= now.getTime()) continue;
     if (entry.gate) active[entry.gate] = entry;
@@ -1004,7 +1310,7 @@ export function applyTransition(state, toPhase, { evidenceIds = [], at = new Dat
       { evaluation }
     );
   }
-  return {
+  const next = {
     ...state,
     version: STATE_VERSION,
     stateVersion: STATE_VERSION,
@@ -1015,27 +1321,190 @@ export function applyTransition(state, toPhase, { evidenceIds = [], at = new Dat
       at: timestamp(at),
       evidenceIds,
     },
-    changeHistory: [
+  };
+  // v1-v3 documents record each transition as a prose line in `changeHistory`,
+  // which is how those versions were specified. A v4 document does not: the
+  // transition is already in `lastTransition`, and the commit that seals the work
+  // item carries the rest. Appending a line per transition was one of the two
+  // growth paths this version exists to close, along with the evidence array.
+  if (!isHistoryExternal(state)) {
+    next.changeHistory = [
       ...(Array.isArray(state.changeHistory) ? state.changeHistory : []),
       { date: timestamp(at), change: `Phase transition ${state.session.currentPhase} → ${toPhase}`, phase: toPhase },
-    ],
-  };
+    ];
+  }
+  return next;
+}
+
+/**
+ * Recompute coverage rows from a record set.
+ *
+ * Rows for work items present in `records` are *replaced*, rows for items absent
+ * are preserved. That split matters: compaction is by work item, so an item is
+ * either archived (absent here, preserved from the prior index) or inline
+ * (present here, authoritative) — never both. Recomputing rather than adding is
+ * what makes this idempotent, so running it twice over the same document does not
+ * report a story as doubly covered.
+ */
+export function buildEvidenceCoverage(records, existing = {}) {
+  const coverage = { ...existing };
+  const fresh = new Map();
+  for (const record of Array.isArray(records) ? records : []) {
+    const id = record?.workItemId;
+    if (typeof id !== 'string' || id.length === 0) continue;
+    if (!fresh.has(id)) {
+      fresh.set(id, { workItemId: id, recordCount: 0, gates: [], firstAt: null, lastAt: null, sealedCommit: null });
+    }
+    const row = fresh.get(id);
+    row.recordCount += 1;
+    if (record.gate && !row.gates.includes(record.gate)) row.gates.push(record.gate);
+    const at = record.createdAt ? Date.parse(record.createdAt) : NaN;
+    if (Number.isFinite(at)) {
+      if (!row.firstAt || at < Date.parse(row.firstAt)) row.firstAt = record.createdAt;
+      if (!row.lastAt || at >= Date.parse(row.lastAt)) row.lastAt = record.createdAt;
+    }
+  }
+  for (const [id, row] of fresh) {
+    coverage[id] = {
+      ...row,
+      gates: row.gates.slice().sort(),
+      // A seal recorded earlier survives a recompute; it is a fact about git
+      // history, not something derivable from the records in hand.
+      sealedCommit: coverage[id]?.sealedCommit ?? null,
+    };
+  }
+  return coverage;
+}
+
+/**
+ * Fold newly-recorded evidence into an existing index.
+ *
+ * Incremental by design, and deliberately distinct from `buildEvidenceCoverage`:
+ * the records here are additions the index has never seen, so their counts must
+ * be added to what is already known, not substituted for it. Conflating the two
+ * operations is how a rebuilt index silently doubles every count.
+ */
+export function mergeEvidenceCoverage(existing, records) {
+  const coverage = { ...(existing || {}) };
+  for (const record of Array.isArray(records) ? records : []) {
+    if (!record || typeof record !== 'object') continue;
+    const id = record.workItemId;
+    if (typeof id !== 'string' || id.length === 0) continue;
+    const row = coverage[id] || { workItemId: id, recordCount: 0, gates: [], firstAt: null, lastAt: null, sealedCommit: null };
+    row.recordCount = (row.recordCount || 0) + 1;
+    const gates = Array.isArray(row.gates) ? row.gates : [];
+    if (record.gate && !gates.includes(record.gate)) gates.push(record.gate);
+    row.gates = gates.slice().sort();
+    const at = record.createdAt ? Date.parse(record.createdAt) : NaN;
+    if (Number.isFinite(at)) {
+      if (!row.firstAt || at < Date.parse(row.firstAt)) row.firstAt = record.createdAt;
+      if (!row.lastAt || at >= Date.parse(row.lastAt)) row.lastAt = record.createdAt;
+    }
+    coverage[id] = row;
+  }
+  return coverage;
+}
+
+/**
+ * Resolve a `keep` selector into a predicate over an evidence record.
+ *
+ * `active` (the default) keeps the active work item's records. That choice is not
+ * merely conservative — it is provably safe for any document that was valid before
+ * compaction: `validateState` already rejects a claimed-true gate whose supporting
+ * record belongs to a *different* work item, so every gate a valid document
+ * depends on is already backed by exactly the records this keeps. A stricter
+ * selector (say, "newest passing record per gate") would be smaller and would
+ * silently break the red-before-green rule, which needs the prior failing record
+ * for the same work item and gate to still exist.
+ */
+function keepSelector(keep, state) {
+  if (keep === 'always') return () => true;
+  if (Array.isArray(keep)) {
+    const wanted = new Set(keep.map((id) => String(id)));
+    return (record) => wanted.has(String(record?.workItemId));
+  }
+  if (keep === null || keep === undefined || keep === 'active') {
+    const activeId = state?.activeWorkItem ? workItemIdOf(state) : null;
+    // With no active work item there is nothing to scope to. Keeping everything
+    // would silently defeat the purpose, so nothing is kept — and a document in
+    // that state with a claimed-true gate was already invalid, because the gate
+    // check needs an active work item to bind against.
+    return (record) => Boolean(activeId) && record?.workItemId === activeId;
+  }
+  throw new StateError(`unknown keep selector ${JSON.stringify(keep)}; expected "always", "active", or a list of work item ids`);
+}
+
+/**
+ * Split a document's evidence into the part that stays live and the part that
+ * becomes history (contract v5).
+ *
+ * "Live" is defined by a keep selector, defaulting to the active work item — see
+ * `keepSelector` for why that boundary is the safe one.
+ *
+ * Returns `{ live, archived, coverage }`. Pure: no I/O, so the caller decides
+ * where the archive is written.
+ */
+export function splitEvidence(state, { keep = 'active' } = {}) {
+  const records = Array.isArray(state?.gateEvidence) ? state.gateEvidence : [];
+  const keepRecord = keepSelector(keep, state);
+  const live = [];
+  const archived = [];
+  for (const record of records) {
+    if (keepRecord(record)) live.push(record);
+    else archived.push(record);
+  }
+  const prior = isPlainObject(state?.evidenceCoverage) ? state.evidenceCoverage : {};
+  const coverage = buildEvidenceCoverage(records, prior);
+  return { live, archived, coverage };
 }
 
 /** Reset all gates to false for a new work item (atomic in the returned copy). */
 export function resetGatesForNewWorkItem(state, { epicId = null, storyId = null, at = new Date() } = {}) {
   const gates = {};
   for (const gate of GATES) gates[gate] = false;
-  return {
+  const base = {
     ...state,
     gates,
+    // The previous work item's evidence never belongs to the new one, so it is
+    // cleared here in every version. What differs is whether anything is kept
+    // behind to remember that it existed.
     gateEvidence: [],
     activeWorkItem: { epicId, storyId },
-    changeHistory: [
-      ...(Array.isArray(state.changeHistory) ? state.changeHistory : []),
-      { date: timestamp(at), change: `Gate reset for new work item ${epicId || 'none'}::${storyId || 'none'}`, phase: state.session?.currentPhase },
-    ],
   };
+
+  if (isHistoryExternal(state)) {
+    // Fold the cleared records into the coverage index before they go.
+    //
+    // This is the whole point. `validateState` rejects a `done` story with no
+    // evidence — and the reason that check exists is that it was once possible to
+    // clear a story's gate state and have validation report the document clean,
+    // with the gap invisible. Clearing an array that nothing summarised is exactly
+    // how that happened, so the summary is written at the moment of clearing.
+    const { coverage } = splitEvidence(state);
+    base.evidenceCoverage = coverage;
+    // An expired exception is inert by definition — `activeExceptions` already
+    // ignores it — so dropping it cannot change a verdict. Keeping it would add a
+    // row per exception forever to the document whose entire purpose is to stay
+    // small.
+    base.gateExceptions = (Array.isArray(state.gateExceptions) ? state.gateExceptions : [])
+      .filter((entry) => !entry?.expiresAt || Date.parse(entry.expiresAt) > at.getTime());
+    // A reset is still worth one line: `lastTransition` does not record it, and
+    // `Resume` reads the log's tail. It is bounded by the number of stories and
+    // carries no prose, so it costs nothing — the unbounded growth this version
+    // removes came from per-transition records and pasted handoff summaries, not
+    // from a one-line story boundary.
+    base.changeHistory = [
+      ...(Array.isArray(state.changeHistory) ? state.changeHistory : []),
+      { date: timestamp(at), change: `Gates reset for new work item ${epicId || 'none'}::${storyId || 'none'}`, phase: state.session?.currentPhase },
+    ];
+    return base;
+  }
+
+  base.changeHistory = [
+    ...(Array.isArray(state.changeHistory) ? state.changeHistory : []),
+    { date: timestamp(at), change: `Gate reset for new work item ${epicId || 'none'}::${storyId || 'none'}`, phase: state.session?.currentPhase },
+  ];
+  return base;
 }
 
 // ── File helpers ────────────────────────────────────────────────────────────

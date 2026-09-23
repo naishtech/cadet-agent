@@ -483,9 +483,12 @@ describe('strict closure — policy validation', () => {
 
 // ── §1 C6 revised: v2 → v3 migration ────────────────────────────────────────
 
-describe('strict closure — v3 state version', () => {
-  it('reports v3 as the current state version', () => {
-    assert.equal(STATE_VERSION, 3);
+describe('strict closure — state version', () => {
+  it('reports the current state version', () => {
+    // Bumped to 4 by contract v5 (git-backed gate evidence). The literal is the
+    // point of this test: it pins the version stamp so a change to it is always a
+    // deliberate, reviewed act rather than a side effect of another edit.
+    assert.equal(STATE_VERSION, 4);
   });
 
   it('still accepts a v2 document', () => {

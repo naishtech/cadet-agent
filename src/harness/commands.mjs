@@ -37,12 +37,14 @@ export const COMMANDS = {
 
   'state validate': {
     mutates: false,
-    summary: 'Validate .cadet/state.json against the schema.',
+    summary: 'Validate .cadet/state.json against the current schema.',
+    // `--verify-sealed` reads commit trailers. It is a read: verifying a seal
+    // must never repair one, so the flag cannot write.
   },
   'state migrate': {
     mutates: true,
-    summary: 'Atomically migrate v1 state to the current version.',
-    writes: ['.cadet/state.json', '.cadet/state.json.v1.bak'],
+    summary: 'Atomically migrate state to the current version (backup on write).',
+    writes: ['.cadet/state.json', '.cadet/state.json.v*.bak', '.cadet/archive/**'],
     unattended: false,
     // A failed migration must leave the tree exactly as it found it: no backup,
     // no partial write. The backup is an artifact of a *successful* migration,
@@ -51,6 +53,24 @@ export const COMMANDS = {
     // the tree exactly as it found it"), which fails if the backup is copied
     // before validation — verified by reintroducing the original ordering.
     atomicFailure: true,
+  },
+  'state seal': {
+    mutates: true,
+    summary: 'Write a work item\'s evidence as commit trailers, for `git commit -F`.',
+    // Cadet does not commit (contract C5). Sealing prepares a message file and
+    // archives the records; the commit itself stays a user action.
+    writes: ['.cadet/archive/**', '*.commit-msg'],
+    unattended: true,
+  },
+  'state compact': {
+    mutates: true,
+    summary: 'Move closed work items\' evidence out of state.json into .cadet/archive/.',
+    writes: ['.cadet/state.json', '.cadet/archive/**'],
+    // Irreversible in the sense that matters: records leave the document that
+    // every gate check reads. An unattended agent must say what to keep, so the
+    // bound is content-bearing rather than a bare confirmation.
+    unattended: false,
+    requiresForUnattended: ['--keep'],
   },
   'state transition': {
     mutates: true,
@@ -184,12 +204,17 @@ export function checkUnattendedRequirements(key, opts) {
     if (flag === '--older-than-ms') {
       return !Number.isFinite(opts.olderThanMs);
     }
+    if (flag === '--keep') {
+      // `always`, `active`, or a comma-separated work-item list. An empty value
+      // is not a bound, so it must fail the same way a missing flag does.
+      return !(typeof opts.keep === 'string' && opts.keep.trim() !== '');
+    }
     return true;
   });
   if (missing.length === 0) return { ok: true };
   return {
     ok: false,
     missing,
-    reason: `"${key}" deletes records irreversibly, so it requires ${missing.join(', ')} when run unattended.`,
+    reason: `"${key}" removes records that gate checks read, so it requires ${missing.join(', ')} when run unattended.`,
   };
 }

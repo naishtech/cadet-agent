@@ -112,7 +112,7 @@ This is the core discipline of a handoff. An incoming agent inherits your mistak
 
 ## Phase 4 — Register and Summarize
 
-1. Append a `handoff` entry to `.cadet/state.json → changeHistory` naming the handoff file path and the current phase. Do not otherwise modify state: no gate changes, no phase transition.
+1. Append a `handoff` entry to `.cadet/state.json → changeHistory` **naming the handoff file path and the current phase — a reference, not a copy of the summary.** The record is `{ date, change: "Handoff recorded at .cadet/handoffs/<file>.md", phase, workItem }`. Do **not** paste the summary, decisions, or blockers into `changeHistory`: the file is where that belongs, and duplicating it is what made one project's state document 2 MB, with 65% of its change log being 116 pasted handoff summaries that each duplicated a file already on disk. A `changeHistory` entry is a pointer so the next agent can find the record; it is never the record. Do not otherwise modify state: no gate changes, no phase transition.
 2. If the handoff file cannot be written, say so explicitly and print the full summary in chat instead — never report a handoff as recorded when it is not.
 3. Print the summary in chat, including the handoff file path, so the user can paste the path into the new chat.
 4. If earlier handoffs already exist, note how many and name the most recent one. Because names sort chronologically, the latest is the last entry in a plain `ls` — state that plainly rather than making the user work out which file is current.
