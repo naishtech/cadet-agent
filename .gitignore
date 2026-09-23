@@ -11,3 +11,6 @@ node_modules/
 
 # Harness run ledgers and artifacts (project-local telemetry; preserved by sync, not committed)
 .cadet/runs/
+
+# Command Code session state and handoff records (local to the developer machine)
+.commandcode/
