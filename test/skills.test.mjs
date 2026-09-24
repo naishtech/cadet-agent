@@ -305,6 +305,36 @@ describe('Skill harness contract', () => {
     assert.ok(/visionUnavailable/.test(content), 'VisualEvidence must define the visionUnavailable outcome');
   });
 
+  it('VisualEvidence treats motion as a first-class artifact', () => {
+    const content = readFileSync(join(skillsDir, 'VisualEvidence.md'), 'utf-8');
+    // A claim about change over time is not reachable from a still, so the skill
+    // must offer a temporal artifact rather than only a frame.
+    assert.ok(/motion/i.test(content), 'VisualEvidence must cover motion');
+    assert.ok(
+      /frame sequence|clip/i.test(content),
+      'VisualEvidence must name a temporal artifact (a clip or a timed frame sequence)',
+    );
+    // The outcome rule. Without it, a claim whose value is a visible behaviour can
+    // be recorded complete off a still that was never watched — the false green
+    // this support exists to close.
+    assert.ok(
+      /temporal claim cannot pass on a still/i.test(content),
+      'VisualEvidence must state that a temporal claim cannot pass on a still frame',
+    );
+
+    // The artifact template must be able to record a motion finding, not only a still.
+    const template = readFileSync(join(coreDir, 'templates', 'VisualEvidenceTemplate.md'), 'utf-8');
+    assert.ok(/evidenceKind/.test(template), 'the finding template must record the evidence kind (still or motion)');
+    assert.ok(/motion/i.test(template), 'the finding template must carry motion fields (window, interval, duration)');
+  });
+
+  it('Spike requires a motion artifact for a behaviour question', () => {
+    const content = readFileSync(join(skillsDir, 'Spike.md'), 'utf-8');
+    // A spike whose value is a visible behaviour must not be closed off a still.
+    assert.ok(/motion/i.test(content), 'Spike must name the motion artifact for a behaviour question');
+    assert.ok(/frame sequence|clip/i.test(content), 'Spike must require a clip or timed frame sequence for a behaviour');
+  });
+
   it('Resume validates the active run, stale evidence, and legal transition', () => {
     const content = readFileSync(join(skillsDir, 'Resume.md'), 'utf-8');
     assert.ok(/harness report/i.test(content), 'Resume must load the run report');
