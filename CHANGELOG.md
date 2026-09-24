@@ -13,6 +13,17 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Added
+
+- **Motion is now a first-class artifact in the `VisualEvidence` skill** (`.cadet/agent/core/skills/VisualEvidence.md`) and its template. The skill already stated that "a single frame cannot show motion", but then offered **no artifact, no capture rung, and no outcome rule** for a claim that is inherently temporal — so a project inventing its own capture path was the expected behaviour, and a spike whose value was a visible behaviour could be recorded complete having never been seen.
+  - **Why it mattered.** The motivating failure was a consumer project where a spike was closed claiming a visible behaviour had been verified, from a still frame that could not show it. A still showing the end state is exactly what a claim that *nothing happened* also produces, so the artifact the skill required could not distinguish the claim from its negation.
+  - **Static vs temporal is decided before capture.** The question is classified as static (*what is on screen* → a frame) or temporal (*what happens over time* → a clip or timed frame sequence, spanning a declared observation window). The classification decides the artifact, and it is fixed before looking so the finding cannot be back-fitted to whatever was captured.
+  - **The capture ladder has a motion rung.** Alongside the existing frame ladder, the skill specifies the motion ladder: reuse a recorder or an interval capture loop if one exists; otherwise recommend building one (a clip, or numbered frames at a fixed interval) *or* a manual screen recording; otherwise drive the user to record the whole window and report the path. The manual-capture instructions gain the OS recorder steps (Game Bar / OBS / `Cmd + Shift + 5`) and a `.cadet/evidence/motion-*.mp4` naming.
+  - **An outcome rule closes the false green.** A temporal claim can no longer pass on a still: it is `inconclusive` at best, and a static sub-claim passing as `passed` must never be read as the value having advanced. A temporal claim passes only on a motion artifact, or on a user-attested `manual-confirmation` that states what changed and over what interval — "it moved" is a description, not evidence.
+  - **The template carries it.** `VisualEvidenceTemplate.md` gains an evidence-kind field and motion rows (observation window, duration, interval or frame rate, window captured), and its provenance and capture-route options now include clips, timed frame sequences, and user-attested observation.
+  - **Dispatch wiring.** `Harness.md` §11 gains the motion artifact and the still-cannot-pass rule; `cadet-agent.md`'s Visual Evidence row names motion; and the three dispatch pointers (`Spike.md`, `CodeReview.md`, `Debugging.md`) now say a behaviour question needs a motion artifact — the Spike pointer explicitly, because a behaviour spike is the case that was silently passing.
+- **Test coverage** in `test/skills.test.mjs`: the skill must cover motion, name a temporal artifact, and state that a temporal claim cannot pass on a still; the finding template must record the evidence kind and motion fields; and `Spike.md` must require a motion artifact for a behaviour question.
+
 ## [0.43.1] — 2026-09-23
 
 ### Fixed
