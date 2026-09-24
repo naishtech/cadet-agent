@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.44.0] — 2026-09-24
+
 ### Added
 
 - **Motion is now a first-class artifact in the `VisualEvidence` skill** (`.cadet/agent/core/skills/VisualEvidence.md`) and its template. The skill already stated that "a single frame cannot show motion", but then offered **no artifact, no capture rung, and no outcome rule** for a claim that is inherently temporal — so a project inventing its own capture path was the expected behaviour, and a spike whose value was a visible behaviour could be recorded complete having never been seen.
