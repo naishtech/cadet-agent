@@ -8,13 +8,18 @@
  */
 
 import { readFileSync, writeFileSync, renameSync, copyFileSync, existsSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, isAbsolute, join } from 'node:path';
 import {
   PHASES, GATES, TRANSITIONS, EVIDENCE_STATUSES, DEFAULT_STRICT_CLOSURE,
   EXCEPTION_CATEGORIES, EXCEPTION_EXPIRY_DAYS, EXCEPTION_REQUIRES_REVIEW_NOTE,
+  REACHABILITY_GATE, REACHABILITY_TRANSITION_FROM,
 } from './policy.mjs';
 import { hashTree, hashFile, hashCriteria, timestamp, isUuid } from './util.mjs';
 import { encodeEvidenceTrailers } from './gitmemo.mjs';
+import {
+  parseReachabilityDeclaration, validateReachabilityDeclaration, collectWorkItems,
+  findDeferralCycles, readSiblingDeclarations,
+} from './reachability.mjs';
 
 export { PHASES, GATES, TRANSITIONS, EVIDENCE_STATUSES };
 export { EXCEPTION_CATEGORIES, EXCEPTION_EXPIRY_DAYS };
@@ -1092,9 +1097,25 @@ export function activeExceptions(state, { workItemId, now = new Date() } = {}) {
 // ── Transitions ─────────────────────────────────────────────────────────────
 
 /** Required gates for a transition target, or null when the target is not gated. */
-export function requiredGates(toPhase) {
+export function requiredGates(toPhase, { reachability = false } = {}) {
   for (const [from, spec] of Object.entries(TRANSITIONS)) {
-    if (spec.to === toPhase) return { from, gates: spec.gates, revalidate: spec.revalidate || [] };
+    if (spec.to === toPhase) {
+      const gates = [...spec.gates];
+      // The reachability gate is appended ONLY to the review -> validation
+      // transition, and only when the repository has opted in
+      // (`reachability.enabled`). Two reasons for both halves of that:
+      //
+      //   - PLACEMENT: reachability is a claim about a delivered, reviewed story,
+      //     so it is checked at the same point as the review gates rather than at
+      //     implementation, where the wiring may legitimately not exist yet.
+      //   - OPT-IN: an entering-`review` requirement would block every in-flight
+      //     story in every existing consumer on a framework update. With the
+      //     default OFF the list is exactly what the matrix declares, so a
+      //     single-argument call — and every existing caller and test — sees
+      //     unchanged behaviour. See REACHABILITY_GATE.
+      if (reachability && from === REACHABILITY_TRANSITION_FROM) gates.push(REACHABILITY_GATE);
+      return { from, gates, revalidate: spec.revalidate || [] };
+    }
   }
   return null;
 }
@@ -1206,6 +1227,60 @@ function checkGate({ gate, state, gates, exceptions, now, workItemId, fromPhase,
 }
 
 /**
+ * Re-derive the opted-in reachability declaration against the CURRENT state at
+ * `validation -> closed` (contract v6 §4, closure re-examination). A deferral
+ * is a claim about the future, so closure re-reads the story's declaration and
+ * re-validates it the same way `harness verify-reachability` does: a deferral
+ * whose target is now `done`, one whose target has vanished, or a cycle that
+ * has since formed all refuse closure. The evidence record is used only to
+ * LOCATE the story file — its hashes and phase stamp are deliberately not
+ * re-checked, because the record is legitimately created during `review` and
+ * the phase/recency freshness machinery would wrongly reject it here.
+ */
+function recheckReachabilityAtClosure({ state, rootDir }) {
+  const missingGates = [];
+  const staleEvidence = [];
+  const refuse = (reasons) => {
+    missingGates.push(REACHABILITY_GATE);
+    staleEvidence.push({ gate: REACHABILITY_GATE, reasons });
+    return { missingGates, staleEvidence };
+  };
+
+  const record = latestEvidenceForGate(state, REACHABILITY_GATE);
+  if (!record) {
+    return refuse(['no reachability evidence record for the opted-in gate']);
+  }
+  const relevant = Array.isArray(record.relevantFiles) ? record.relevantFiles : [];
+  const storyRef = relevant[0];
+  if (!storyRef) {
+    return refuse(['the reachability evidence record names no story file']);
+  }
+  // Records written since the path-binding fix hold a repo-relative path; older
+  // ones may hold an absolute path, which is used as-is.
+  const storyPath = isAbsolute(storyRef) ? storyRef : join(rootDir, storyRef);
+
+  let declaration;
+  try {
+    declaration = parseReachabilityDeclaration(storyPath);
+  } catch (err) {
+    return refuse([`cannot read the declared story "${storyRef}": ${err.message}`]);
+  }
+
+  const workItems = collectWorkItems(state);
+  const selfName = basename(storyRef.replace(/\\/g, '/'));
+  const validation = validateReachabilityDeclaration(declaration, { workItems, self: selfName });
+  const cycles = findDeferralCycles(readSiblingDeclarations(storyPath, { workItems }));
+
+  const reasons = [];
+  if (validation.ok !== true) reasons.push(validation.message);
+  for (const cycle of cycles) {
+    reasons.push(`reachability deferral cycle: ${cycle.join(' -> ')} — nothing in this loop can ever be witnessed`);
+  }
+  if (reasons.length > 0) return refuse(reasons);
+  return { missingGates, staleEvidence };
+}
+
+/**
  * Evaluate whether a transition is legal and evidence-backed.
  * Returns a machine-readable result:
  * `{ allowed, toPhase, missingGates, staleEvidence, errors, revalidated }`.
@@ -1231,7 +1306,9 @@ export function evaluateTransition(state, toPhase, context = {}) {
     return { allowed: false, fromPhase, toPhase, missingGates, staleEvidence, errors, revalidated: [] };
   }
 
-  const spec = requiredGates(toPhase);
+  // The reachability gate joins the requirement only when the repository has
+  // opted in, so a project that has not sees the pre-existing gate list exactly.
+  const spec = requiredGates(toPhase, { reachability: context.policy?.reachability?.enabled === true });
   if (!spec) {
     // Ungated transitions are legal ONLY along the declared forward edges
     // (bootstrap + planning progression). A target that is neither gated nor a
@@ -1280,6 +1357,21 @@ export function evaluateTransition(state, toPhase, context = {}) {
       missingGates.push(...r.missingGates);
       staleEvidence.push(...r.staleEvidence);
     }
+
+    // Contract v6 §4: an opted-in reachability declaration is ALSO re-examined
+    // at `validation -> closed`. This is deliberately NOT routed through the
+    // freshness machinery the other revalidated gates use — the record is
+    // legitimately created during `review`, so phase- and recency-staleness
+    // would wrongly reject it — so the conditional append lives here rather
+    // than in the TRANSITIONS table (which stays exactly as C4 declares it).
+    if (toPhase === 'closed' && context.policy?.reachability?.enabled === true) {
+      revalidated.push(REACHABILITY_GATE);
+      if (!exceptions[REACHABILITY_GATE]) {
+        const r = recheckReachabilityAtClosure({ state, rootDir });
+        missingGates.push(...r.missingGates);
+        staleEvidence.push(...r.staleEvidence);
+      }
+    }
   }
 
   return {
@@ -1299,12 +1391,16 @@ export function evaluateTransition(state, toPhase, context = {}) {
  * Resets the target transition's gates is NOT done here — gates reset when a new
  * work item starts (see `resetGatesForNewWorkItem`).
  */
-export function applyTransition(state, toPhase, { evidenceIds = [], at = new Date(), inputTreeHash = undefined, criteriaHash = undefined, rootDir = undefined, strictClosure = undefined } = {}) {
+export function applyTransition(state, toPhase, { evidenceIds = [], at = new Date(), inputTreeHash = undefined, criteriaHash = undefined, rootDir = undefined, strictClosure = undefined, policy = undefined } = {}) {
   const context = { now: at };
   if (inputTreeHash !== undefined) context.inputTreeHash = inputTreeHash;
   if (criteriaHash !== undefined) context.criteriaHash = criteriaHash;
   if (rootDir !== undefined) context.rootDir = rootDir;
   if (strictClosure !== undefined) context.strictClosure = strictClosure;
+  // The resolved policy, so conditional gates (contract v6 `reachability`) are
+  // enforced by the internal re-evaluation too — not just by the caller's own
+  // pre-check. A library caller that omits it gets the pre-v6 gate list.
+  if (policy !== undefined) context.policy = policy;
   const evaluation = evaluateTransition(state, toPhase, context);
   if (!evaluation.allowed) {
     throw new StateError(

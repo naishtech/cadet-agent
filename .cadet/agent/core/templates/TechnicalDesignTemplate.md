@@ -41,7 +41,7 @@ Version: <slot id="version"/> · Last Updated: <slot id="lastUpdated"/> · Autho
 </slot>
 
 ## Rollout and Migration
-- Rollout Plan: <slot id="rolloutPlan"/>
+- Rollout Plan: <slot id="rolloutPlan" note="Slices in order, each ending at a DEMONSTRABLE loop. Name the witness checkpoint per slice — what a user or operator does to see it — not only the components it adds. A rollout whose composition/wiring step is LAST is the shape this requirement exists to reject: it spends every earlier slice with nothing reachable. State the reason if the ordering genuinely cannot show anything earlier."/>
 - Migration Steps: <slot id="migrationSteps"/>
 - Fallback or Rollback Plan: <slot id="fallbackPlan"/>
 

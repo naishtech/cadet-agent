@@ -195,6 +195,7 @@ Every attempt gets a span and evidence record. A retry never overwrites a failed
 | `compileCheckConfirmed` | `unity build <project> --target StandaloneWindows64 -o <tmp> --format json` or a configured compile command | exit 0 | nonzero |
 | `unityAnalyzerClean` | `unity run <project> --command <analyzer-cmd> --format json` | exit 0 + zero `UNT*` | nonzero or any `UNT*` |
 | `acceptanceCriteriaValidated` | `cadet-agent harness verify-acs --story <path>` | every declared AC test appears in the run's inventory | a declared test is absent, an AC declares none, or the inventory is unknown |
+| `reachabilityAddressed` | `cadet-agent harness verify-reachability --story <path>` | the story's reachability is witnessed, or deferred to a work item that exists and is not done | the declaration is missing or malformed, a deferral names a phantom or already-done work item, deferrals form a cycle, or the configured `reachability.command` exits nonzero |
 
 - If Unity CLI is unavailable, `compileCheckConfirmed` may be satisfied by a user
   `manual-confirmation` record (project path, editor version, timestamp, scope).
@@ -220,6 +221,19 @@ Every attempt gets a span and evidence record. A retry never overwrites a failed
 - **Red-before-green is enforced, not just documented.** A `testsPassed` green result is rejected
   unless a prior failed (red) record exists for the same work item and gate — either in state or from
   an earlier attempt in the same loop. A `no_test_required` work item is exempt.
+- **Reachability is opt-in, and the switch is not the guarantee.** `reachabilityAddressed` joins
+  `review -> validation` only when `.cadet/harness.json` sets `reachability.enabled: true`; with the
+  default off, the gate list is exactly what the matrix declares, so adopting a framework version
+  never blocks an in-flight story on a new declaration. When it is on, a story must declare either
+  `Reachability: witnessed — <how>` or `Reachability: deferred to <work item> — <why>`. **A deferral
+  is re-examined once its target is `done`**: it then fails, because the work item that was going to
+  make the story reachable has landed — at verify time, and again at `validation -> closed` under
+  strict closure, so an expired deferral cannot ride through to a closed story. Under strict closure
+  the gate may not be satisfied by manual confirmation (it is in the default `disallowManualFor`);
+  the declaration check runs even with no probe configured, so a manual assertion adds nothing. A
+  `witnessed` declaration is a claim, not a proof — the proof
+  is the repository's own `reachability.command`, whose exit code is the verdict. With no command
+  configured the check says so rather than implying a guarantee it did not establish.
 - **Hard budgets block.** Exceeding a hard limit (context tokens, output tokens, tool calls, wall-clock,
   cost) stops the operation and can never produce a passing gate. Command output is counted against
   the output-token budget (estimated from its byte length). When a configured cost budget exists
@@ -295,10 +309,10 @@ budget state is missing.
 | Architecture | requirements evidence | context manifest, ADR links, verification plan | per run | requirements not finalized |
 | Spike | unverified assumption | bounded spike evidence artifact | `maxToolCalls`, `maxWallClockMs` | spike budget exhausted |
 | StoryBreakdown | design evidence | per-story verification commands + evidence outputs, AC ids + declared tests | per run | acceptance criteria unmapped or an AC declares no test |
-| TDD | red record, acceptance criterion | `testsPassed` red→green evidence | `maxRetriesPerStep` | no red record for a testable change |
+| TDD | red record, acceptance criterion | `testsPassed` red→green evidence; the story's reachability declaration | `maxRetriesPerStep` | no red record for a testable change; a story with no reachability declaration and no owned deferral, when `reachability.enabled` |
 | Debugging | reproduce record | per-attempt spans, regression evidence | `maxTotalRetries` | deterministic failure retried blindly |
 | VisualEvidence | rendered frame (static claim) or clip/timed frame sequence (temporal claim) + source under test | inspected-artifact finding (`passed`/`failed`/`blocked`/`visionUnavailable`/`inconclusive`) bound to the source, not the artifact; a temporal claim passes only on a motion artifact, never a still | per run | artifact missing or unreadable. **An image-incapable model does not block**: record `visionUnavailable` and continue |
-| CodeReview | run ledger, gate evidence | review decision + findings | per run | gate evidence stale/missing |
+| CodeReview | run ledger, gate evidence, the story's reachability declaration | review decision + findings, including the reachability finding — an UNOWNED gap is blocking, an owned deferral is filed | per run | gate evidence stale/missing |
 | Resume | active run, ledger | validated next legal transition | per run | illegal/stale transition requested |
 | MCPSetup | Unity CLI/MCP availability | round-trip + mutation-approval evidence | per run | mutation without confirmation |
 | AgentReviewer | full ledger + state | audit decision | per run | evidence-backed gates missing |
@@ -332,6 +346,7 @@ Run `cadet-agent harness capabilities --format json` to read the registry instea
 - `cadet-agent harness verify --gate <gate> [--files a,b] [--commit <sha>]` — run a bounded, classified verification loop. Evidence is bound to the relevant files given by `--files` (or the working tree's changed files). A `testsPassed` green result requires a prior red record. On success it records the new evidence in `state.json → gateEvidence` and flips the gate; prior passing evidence for that gate is marked `superseded`. The full attempt history is written to the run ledger. A **failing** verification still persists its ledger: that is the red record, and suppressing it would break TDD evidence.
 - `cadet-agent harness verify-acs --story <path> [--report <path>] [--write-coverage]` — mechanically verify that every test a story declares for an acceptance criterion actually ran. The story is the single source of truth for the AC→test mapping; the inventory is extracted from a test report (TAP, JUnit XML, or Unity JSON), auto-detected by content. Under `strictClosure.enabled`, any declared test absent from the inventory, any AC that declares no test, or an unknown/empty inventory means `acceptanceCriteriaValidated` is **not** set and the command exits 1, listing every gap with its AC id. With strict closure off it reports and exits 0 without touching `state.json`. `--write-coverage` additionally writes a derived `*.coverage.json` artifact.
 - `cadet-agent harness matrix-check --matrix <path> [--report <path> | --inventory <path>]` — reconcile a TDD matrix's **delivered** test-name claims against a compiled inventory. A matrix row is authored during architecture, before implementation, so a name can be an intention that changes or never happens while nothing re-checks the row; this is the mechanical check for that. Read-only — it never writes state, so it runs at authoring time as well as in a gate. Two directions are kept deliberately separate: a name in a `DELIVERED` row absent from the inventory is a **defect** (exit 1), while a name in an undelivered row is an **intention** and is never reported. Collapsing the two produces false failures, and a false failure is how a real check gets switched off. Undelivered intentions that *have* landed are reported informationally, so a stale row is visible rather than silent. Without `--report` or `--inventory` nothing can be proven, so the command exits 1 rather than reporting success.
+- `cadet-agent harness verify-reachability --story <path>` — mechanically check that a story's declared reachability is honoured. A missing or malformed declaration, a deferral naming a work item that does not exist, a deferral whose target is already `done`, and a cycle of deferrals within the story's own epic are all **refused**, with every gap listed. When the repository configures `reachability.command`, that command runs and its exit code is the verdict. Enforcement is opt-in: with `reachability.enabled` false (the default) the command reports and writes nothing, and the gate is not part of `review -> validation`. On success it records `reachabilityAddressed` and exits 0.
 - `cadet-agent harness report` — summarize budget consumption and failures (no secrets). Read-only.
 - `cadet-agent harness cleanup --older-than-ms <n>` — apply the retention policy to `.cadet/runs/`. **Deletes run records irreversibly, so `--older-than-ms` is required**: an unattended agent must state the age bound it is deleting by. Without it the command refuses and deletes nothing, so a caller that does not know what the command does cannot destroy evidence by accident. `--dry-run` reports what would be deleted without deleting it.
 - `cadet-agent harness capabilities` — report available CLI/Unity/MCP/hook/token/cost telemetry, plus the command registry (`commands[]`) with each command's `mutates`, `writes`, and unattended requirements. Read-only.

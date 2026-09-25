@@ -141,7 +141,7 @@ flowchart TD
     BREAKDOWN --> IMPL
 
     IMPL -->|"story complete"| REVIEW
-    REVIEW -->|"gate: codeReviewCompleted ✅<br/>gate: securityReviewPassed ✅"| VALIDATE
+    REVIEW -->|"gate: codeReviewCompleted ✅<br/>gate: securityReviewPassed ✅<br/>gate: reachabilityAddressed ✅ (opt-in)"| VALIDATE
     VALIDATE -->|"gate: designArtifactSyncConfirmed ✅"| NEXT_STORY
     NEXT_STORY -->|"yes"| IMPL
     NEXT_STORY -->|"no"| CLOSED
@@ -165,7 +165,7 @@ Hard gates are enforced at every phase transition. The agent reads `.cadet/state
 | Transition | Required Gates |
 |---|---|
 | implementation → review | `testsPassed`, `compileCheckConfirmed`, `unityAnalyzerClean`, `storyTrackingUpdated` |
-| review → validation | `codeReviewCompleted`, `securityReviewPassed`, `acceptanceCriteriaValidated` |
+| review → validation | `codeReviewCompleted`, `securityReviewPassed`, `acceptanceCriteriaValidated`, and `reachabilityAddressed` when `reachability.enabled` is set |
 | validation → closed | `designArtifactSyncConfirmed` |
 
 **`closed` is end-of-epic, not per-story.** `validation → closed` is taken only when no stories remain (`NEXT_STORY → no → CLOSED` above). When an epic still has stories, the next story re-enters from `validation → implementation` (`NEXT_STORY → yes → IMPL`). Do not close a story individually: `closed` is terminal, and there is no transition out of it.

@@ -11,6 +11,8 @@ You are executing the Cadet **Architecture** skill. This skill is the primary in
 
 Before proceeding, read `.cadet/state.json`. **No active state:** if `.cadet/state.json` is absent and no `.cadet/agent/project-plans/` exists, this is the framework source repo — story/gate work is not applicable; switch to the contribution workflow (`CONTRIBUTING.md`). Requirements must be finalized (`currentPhase` is `requirementsComplete` or later). If requirements are not approved, stop and invoke the Requirements skill first.
 
+**Reachability plan (do this before the design is written).** The rollout must name, per slice, the **witness checkpoint** — what a user or operator does to see that slice working — and not only the components it adds. A rollout whose composition or wiring step is LAST is the shape this requirement exists to reject: it spends every earlier slice with nothing reachable, and no gate notices, because every one of them can be green. If a slice genuinely cannot show anything, say so and name the slice that first can. For a change that touches a running application, "the composition root registers it" is part of the deliverable, not a later chore.
+
 Read `.cadet/agent/core/Harness.md`. Record the context assumptions, expected verification methods, tool selection, and relevant budget constraints the design implies.
 </instructions>
 

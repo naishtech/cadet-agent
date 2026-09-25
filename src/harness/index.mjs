@@ -10,6 +10,7 @@ export {
   DEFAULT_BUDGETS, HARD_CEILINGS, DEFAULT_ARCHIVE_LIMITS, DEFAULT_OUTPUT_POLICY,
   DEFAULT_RETENTION, DEFAULT_ESTIMATION, DEFAULT_HOOK_POLICY, DEFAULT_STRICT_CLOSURE,
   EXCEPTION_CATEGORIES, EXCEPTION_EXPIRY_DAYS, EXCEPTION_REQUIRES_REVIEW_NOTE, AGENT_OWNED_GATES,
+  DEFAULT_REACHABILITY, REACHABILITY_GATE,
   validatePolicy, defaultPolicy, loadPolicy, budgetForScope, policyPath, PolicyError,
 } from './policy.mjs';
 
@@ -81,6 +82,14 @@ export {
 export {
   collectDeclaredTestNames, reconcileTestNames, inventoryFromCSharpSources,
 } from './matrix-check.mjs';
+
+export {
+  REACHABILITY_KINDS, DEFAULT_MAX_STORY_BYTES, DEFAULT_MAX_SIBLING_STORIES,
+  normalizeWorkItemRef, collectWorkItems,
+  parseReachabilityDeclaration, parseReachabilityDeclarationText,
+  validateReachabilityDeclaration, findDeferralCycles, readSiblingDeclarations,
+  describeReachabilityGaps,
+} from './reachability.mjs';
 
 export {
   COMMANDS, mutatingCommands, readOnlyCommands, resolveCommand,

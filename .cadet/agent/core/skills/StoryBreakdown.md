@@ -34,17 +34,18 @@ Decompose large work into small, independently implementable stories grouped und
 
 <process>
 1. For each epic, create a directory named after the epic (e.g., `epic-1-player-movement/`).
-2. Inside the directory, create `epic.md` from `<document index="1"/>` — fill every `<slot/>`, strip all XML wrappers, write pure Markdown.
+2. Inside the directory, create `epic.md` from `<document index="1"/>` — fill every `<slot/>`, strip all XML wrappers, write pure Markdown. That includes the **Witness checkpoint**: name the story that first makes this epic's work reachable and how a user or operator witnesses it; if nothing is reachable inside the epic, say so and name the work item that first is. An epic whose work only becomes reachable at its LAST story must say so explicitly, with the reason, because that ordering is how an epic spends many stories with nothing to show.
 3. For each epic, decompose into small, independently implementable stories.
 4. Each story must be completable in a single session and produce a working, testable increment.
-5. A story should address exactly one user-observable behavior or integration point.
+5. A story should address exactly one user-observable behavior or integration point. **This is the target, and a `Reachability: deferred to <work item>` declaration is the recorded exception to it**: a story that cannot yet be user-observable must say so, name the owner, and say why. That distinction is the whole point of the declaration — it makes "not yet observable" a decision with an owner instead of an oversight — and the deferral expires when its owner finishes, so the exception cannot be inherited.
 6. If a story still feels large, split it further until each story is small enough for a focused code review.
 7. **Harness contract per story:** each story must declare —
    - the acceptance-criterion ID(s) it satisfies;
    - for every acceptance criterion, the **exact test identifier(s)** that prove it (the declared tests). A criterion that names no test is not ready: `cadet-agent harness verify-acs` checks this mapping later, and an unnamed test cannot be verified;
    - the verification command(s) and expected evidence output (report path/hash) for `testsPassed` and any Unity gates;
    - the retry policy (per-step and total) and what counts as a deterministic failure;
-   - the expected context tier and tool scope (files, tests, and whether live Unity/MCP is needed).
+   - the expected context tier and tool scope (files, tests, and whether live Unity/MCP is needed);
+   - its **`Reachability:` declaration** — `witnessed — <how a user or operator reaches and sees it>`, or `deferred to <work item> — <why>`. It is required by the story template, and it is what `cadet-agent harness verify-reachability` checks. Name the deferral's owner honestly: a deferral expires when its target is `done`, so "deferred to <the story that adds the wiring>" is a plan, while "deferred to <a story that will also defer>" is a gap.
    A story that cannot name its verification command is not ready to implement.
 8. Create each story as `story-N-name.md` from `<document index="2"/>` — fill every `<slot/>`, strip all XML wrappers, write pure Markdown.
 9. After producing all epic and story files, ask the user if they want to commit them before beginning implementation.

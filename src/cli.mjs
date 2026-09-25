@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, copyFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { install, sync } from './install.mjs';
 import {
   validateState, migrateStateFile, readState, writeState, evaluateTransition, applyTransition,
@@ -8,6 +8,9 @@ import {
   runVerificationLoop, commandForGate, detectCapabilities, runsDir, gitChangedFiles, PolicyError, StateError,
   detectRepoRole, describeRepoRole, GATES, manualConfirmation,
   parseTestInventory, parseStoryCriteria, compareCoverage, describeCoverageGaps,
+  parseReachabilityDeclaration, validateReachabilityDeclaration, collectWorkItems,
+  findDeferralCycles, readSiblingDeclarations, normalizeWorkItemRef, describeReachabilityGaps,
+  REACHABILITY_GATE, runCommand,
   createEvidence, newId, computeInputTreeHash, hashCriteria,
   collectDeclaredTestNames, reconcileTestNames,
   resolveCommand, describeCommand, describeAllCommands, checkUnattendedRequirements, COMMANDS,
@@ -53,6 +56,7 @@ function showHelp() {
     cadet-agent harness confirm     Record manual-confirmation evidence (writes ledger + state)
     cadet-agent harness verify      Run a bounded, classified verification loop
     cadet-agent harness verify-acs  Verify declared AC↔test coverage against a test report
+    cadet-agent harness verify-reachability  Verify a story's declared reachability (opt-in)
     cadet-agent harness report      Summarize budget consumption and failures
     cadet-agent harness cleanup     Apply the retention policy to .cadet/runs/
     cadet-agent harness capabilities  Report available CLI/Unity/MCP/hook/token/cost telemetry
@@ -70,7 +74,7 @@ function showHelp() {
     --expires-at   ISO-8601 expiry bounding the confirmation (harness confirm)
     --environment  key=value,... describing what was verified (harness confirm)
     --scope        Comma-separated scope of the confirmation (harness confirm)
-    --story        Story markdown declaring the acceptance criteria (harness verify-acs)
+    --story        Story markdown declaring the acceptance criteria or reachability (harness verify-acs|verify-reachability)
     --report       Test report to derive the inventory from (harness verify-acs|matrix-check)
     --matrix       TDD matrix markdown to check (harness matrix-check)
     --inventory    Newline-separated test names, when no report is available (harness matrix-check)
@@ -552,7 +556,18 @@ async function cmdState(opts) {
     // ask "would this transition be allowed?" — running the command without the
     // flag applies the transition. A check that is documented as a dry run must
     // not have side effects, so the write below is gated on `!opts.dryRun`.
-    const evaluation = evaluateTransition(state, opts.to, { rootDir: opts.targetDir });
+    // `policy` is loaded here: `cmdState` does not otherwise need it, but the
+    // transition verdict does — the reachability gate joins the requirement only
+    // for a repository that has opted in (see requiredGates / REACHABILITY_GATE).
+    const transitionPolicy = loadPolicy(opts.targetDir);
+    // `strictClosure` is passed alongside the policy so strict closure (v3) is
+    // decided from the resolved repository policy on the CLI path too — the
+    // same verdict a library caller gets by passing the block explicitly.
+    const evaluation = evaluateTransition(state, opts.to, {
+      rootDir: opts.targetDir,
+      policy: transitionPolicy,
+      strictClosure: transitionPolicy.strictClosure,
+    });
     if (!evaluation.allowed) {
       const detail = {
         ok: false,
@@ -579,7 +594,13 @@ async function cmdState(opts) {
       );
       return;
     }
-    const next = applyTransition(state, opts.to, { rootDir: opts.targetDir });
+    // The same policy context the pre-check used, so the applied transition is
+    // judged by exactly the same rules that allowed it (reachability, strict closure).
+    const next = applyTransition(state, opts.to, {
+      rootDir: opts.targetDir,
+      policy: transitionPolicy,
+      strictClosure: transitionPolicy.strictClosure,
+    });
     writeState(opts.targetDir, next);
     emit(opts, `✅ Transitioned to ${opts.to}.`, { ok: true, allowed: true, dryRun: false, applied: true, to: opts.to });
     return;
@@ -665,7 +686,12 @@ async function cmdHarness(opts) {
     // A gate listed in disallowManualFor may never be satisfied by a human
     // assertion; point at the automated path instead of accepting the record.
     if (strict && Array.isArray(strict.disallowManualFor) && strict.disallowManualFor.includes(gate)) {
-      fail(opts, `manual-confirmation is not permitted for gate "${gate}" under strictClosure.disallowManualFor; run "cadet-agent harness verify --gate ${gate}" instead.`, () => 1, { ok: false, gate, code: 'manual-disallowed' });
+      // The reachability gate's automated path is its dedicated command, not
+      // `harness verify` — which is blocked for it as an agent-checkable gate.
+      const automatedPath = gate === REACHABILITY_GATE
+        ? '"cadet-agent harness verify-reachability --story <path>"'
+        : `"cadet-agent harness verify --gate ${gate}"`;
+      fail(opts, `manual-confirmation is not permitted for gate "${gate}" under strictClosure.disallowManualFor; run ${automatedPath} instead.`, () => 1, { ok: false, gate, code: 'manual-disallowed' });
     }
 
     // Bound the validity window: an expiry far in the future is how a manual
@@ -1104,6 +1130,158 @@ async function cmdHarness(opts) {
     return;
   }
 
+  if (sub === 'verify-reachability') {
+    // Mechanical reachability verification (contract v6 §2). A story declares how
+    // its deliverable becomes witnessable, or which work item will make it so;
+    // this checks that declaration against the work items that exist, and runs
+    // the repository's own probe when one is configured.
+    //
+    // WHY THE PROBE IS WHAT PROVES IT. Cadet cannot know how a given repository
+    // wires its pieces together, so a `witnessed` declaration is a statement and
+    // not a proof. The proof is the project's command, whose exit code is the
+    // verdict. Without one, the declaration level is all that is enforceable, and
+    // the output says so rather than implying more.
+    if (!opts.story) fail(opts, 'harness verify-reachability requires --story <path>');
+    // The story is resolved against the target repository, and the evidence
+    // binds to the REPO-RELATIVE path. An absolute path never resolves under
+    // the root when freshness is re-derived at transition time, so both hashes
+    // would be computed over a missing file and match — the staleness binding
+    // would be silently inert.
+    const storyPath = resolve(opts.targetDir, opts.story);
+    const storyRel = relative(opts.targetDir, storyPath).replace(/\\/g, '/') || basename(storyPath);
+    const { exists, state } = readState(opts.targetDir);
+    const enabled = policy.reachability?.enabled === true;
+    const probeCommand = policy.reachability?.command || null;
+    const workItemId = state ? workItemIdOf(state) : 'unscoped';
+    const phase = state?.session?.currentPhase || 'implementation';
+
+    let declaration;
+    try {
+      declaration = parseReachabilityDeclaration(storyPath);
+    } catch (err) {
+      fail(opts, `cannot read story "${opts.story}": ${err.message}`, () => 1, { ok: false, code: 'story-unreadable', story: opts.story });
+    }
+
+    const workItems = exists ? collectWorkItems(state) : null;
+    const validation = validateReachabilityDeclaration(declaration, { workItems, self: basename(storyPath) });
+
+    // The deferral graph over this story's own epic. A cycle is the gap no single
+    // declaration can reveal: every item in the loop points at another to explain
+    // why it is not witnessed. `workItems` supplies the epic-key aliases, so the
+    // long `epicKey::story.md` form and the bare file name resolve to one node
+    // regardless of where the story file physically sits.
+    const siblings = readSiblingDeclarations(storyPath, { workItems });
+    const graph = siblings.length > 0
+      ? siblings
+      : [{ id: basename(storyPath), aliases: [], declaration }];
+    const cycles = exists ? findDeferralCycles(graph) : [];
+
+    let probe = null;
+    if (enabled && probeCommand) {
+      const res = await runCommand(probeCommand, { cwd: opts.targetDir });
+      probe = {
+        command: probeCommand,
+        exitCode: res.exitCode,
+        ok: res.exitCode === 0,
+        durationMs: res.durationMs,
+        preview: String(res.preview || '').trim(),
+      };
+    }
+
+    const gaps = describeReachabilityGaps({ validation, cycles, story: opts.story });
+    const ok = validation.ok && cycles.length === 0 && (probe === null || probe.ok === true);
+
+    // NOT OPTED IN: report and write nothing. This is the compatibility rule that
+    // makes adopting the framework version a no-op for a repository that has not
+    // enabled the policy, and it mirrors how verify-acs behaves with
+    // strictClosure off. The finding still exits nonzero, because a caller who
+    // ran the command explicitly asked the question.
+    if (!enabled) {
+      if (opts.format === 'json') {
+        emit(opts, '', { ok, story: opts.story, declaration, reachability: validation, cycles, probe, gateSet: false, enabled: false });
+      } else if (ok) {
+        console.log(`✅ Reachability declared for ${opts.story}: ${validation.message}`);
+        console.log('   reachability.enabled is false — reported only, state.json unchanged.');
+      } else {
+        console.error(`⚠️  Reachability gaps in ${opts.story} (reachability.enabled is false — reported only):`);
+        for (const line of gaps) console.error(line);
+      }
+      if (!ok) process.exit(1);
+      return;
+    }
+
+    if (!ok) {
+      const detail = {
+        ok: false,
+        story: opts.story,
+        declaration,
+        reachability: validation,
+        cycles,
+        probe,
+        gateSet: false,
+        code: validation.ok !== true ? validation.code : (cycles.length > 0 ? 'deferral-cycle' : 'probe-failed'),
+      };
+      if (opts.format === 'json') emit(opts, '', detail);
+      else {
+        console.error(`❌ Cannot set ${REACHABILITY_GATE} for ${opts.story}:`);
+        for (const line of gaps) console.error(line);
+        if (probe && probe.ok !== true) {
+          console.error(`   the project probe "${probe.command}" exited ${probe.exitCode}: the declared reachability is not what the project can demonstrate.`);
+          if (probe.preview) console.error(`   probe output: ${probe.preview}`);
+        }
+      }
+      process.exit(1);
+    }
+
+    const at = new Date();
+    const evidence = createEvidence({
+      evidenceId: newId(),
+      workItemId,
+      acceptanceCriterionId: null,
+      phase,
+      gate: REACHABILITY_GATE,
+      status: 'passed',
+      command: `harness verify-reachability --story ${opts.story}`,
+      result: probe
+        ? `reachability addressed (${validation.code}); project probe exit ${probe.exitCode}`
+        : `reachability addressed (${validation.code}); no project probe configured`,
+      exitCode: 0,
+      inputTreeHash: computeInputTreeHash(opts.targetDir, [storyRel]),
+      criteriaHash: hashCriteria([
+        workItemId,
+        validation.code,
+        declaration.deferTo || declaration.witness || '',
+      ]),
+      relevantFiles: [storyRel],
+      createdAt: at,
+      expiresAt: null,
+      freshnessPolicy: { scope: 'story' },
+      source: 'automated',
+    });
+
+    // Ledger first, then state — the v3 ordering: fail toward "less proven".
+    const ledger = new RunLedger({ targetDir: opts.targetDir, policy, runId: state?.activeRunId || null, workItemId, phase });
+    ledger.addEvidence(evidence);
+    ledger.addDecision({ kind: 'stop', reason: `reachability addressed (${validation.code})`, scope: probe ? `probe exit ${probe.exitCode}` : 'declaration only' });
+    ledger.finalize({ status: 'ok' });
+    const ledgerPath = ledger.persist();
+
+    if (exists) {
+      const next = recordEvidence(state, evidence);
+      writeState(opts.targetDir, next);
+    }
+
+    if (opts.format === 'json') {
+      emit(opts, '', { ok: true, story: opts.story, reachability: validation, cycles, probe, evidenceId: evidence.evidenceId, gateSet: exists, runId: ledger.runId, path: ledgerPath });
+    } else {
+      console.log(`✅ ${REACHABILITY_GATE} for ${opts.story}: ${validation.message}`);
+      if (probe) console.log(`   Project probe "${probe.command}" exited 0 (${probe.durationMs} ms).`);
+      else console.log('   No reachability.command configured — the declaration is checked, the wiring is not proven.');
+      console.log(`   Ledger: ${ledgerPath}`);
+    }
+    return;
+  }
+
   if (sub === 'report') {
     const runs = listRuns(opts.targetDir);
     const target = opts.runId || runs[0]?.runId;
@@ -1212,7 +1390,7 @@ async function cmdHarness(opts) {
     return;
   }
 
-  fail(opts, `Unknown harness subcommand: ${sub || '(none)'}. Use record|confirm|verify|verify-acs|matrix-check|report|cleanup|capabilities.`);
+  fail(opts, `Unknown harness subcommand: ${sub || '(none)'}. Use record|confirm|verify|verify-acs|verify-reachability|matrix-check|report|cleanup|capabilities.`);
 }
 
 export async function run(argv) {

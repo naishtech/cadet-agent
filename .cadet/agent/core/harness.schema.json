@@ -38,7 +38,8 @@
         "unityAnalyzerClean",
         "acceptanceCriteriaValidated",
         "securityReviewPassed",
-        "designArtifactSyncConfirmed"
+        "designArtifactSyncConfirmed",
+        "reachabilityAddressed"
       ]
     },
     "evidenceStatus": {
@@ -128,6 +129,27 @@
         "analyzerCommand": { "type": ["string", "null"] },
         "compileCommand": { "type": ["string", "null"] },
         "testCommand": { "type": ["string", "null"] },
+        "reachability": {
+          "type": "object",
+          "description": "Contract v6 §2. Reachability enforcement. Absent or enabled:false is byte-identical pre-v6 behaviour — the reachability gate is not required and `verify-reachability` reports without writing. `command` is the repository's own reachability probe; when configured it runs as part of `harness verify-reachability` and its exit code is the verdict, because Cadet cannot know how a given repository wires its pieces together. Setting `command` while `enabled` is false is rejected as inert, and a blank or whitespace-only `command` is rejected outright (contract v6 §3).",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "command": {
+              "type": ["string", "null"],
+              "default": null,
+              "minLength": 1,
+              "pattern": "\\S",
+              "description": "Requires enabled:true — the resolver rejects a command while the policy is disabled, and rejects a blank or whitespace-only value."
+            }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "command": { "type": "string", "minLength": 1 } }, "required": ["command"] },
+              "then": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] }
+            }
+          ],
+          "additionalProperties": false
+        },
         "strictClosure": {
           "type": "object",
           "description": "Contract v3 strict closure. Absent or enabled:false is byte-identical v2 behaviour. Setting any other field while enabled is false is rejected as inert (contract v3 §2).",
@@ -150,7 +172,8 @@
             "disallowManualFor": {
               "type": "array",
               "items": { "$ref": "#/$defs/gate" },
-              "default": ["testsPassed"]
+              "default": ["testsPassed", "reachabilityAddressed"],
+              "description": "Gates that may never be satisfied by a manual confirmation. `testsPassed` because it is always mechanically checkable; `reachabilityAddressed` because the declaration check runs even with no probe configured (contract v6 §2)."
             }
           },
           "additionalProperties": false

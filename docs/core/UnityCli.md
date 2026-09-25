@@ -85,7 +85,7 @@ Note: `test`/`build`/`run` take the project as a **positional** argument (or `UN
 
 ## Gate → command → state contract
 
-Only three gates are automatable. The five process gates remain agent-owned.
+Three gates are automatable through the Unity CLI, and one more is automatable through Cadet itself. The five process gates remain agent-owned.
 
 | Gate (`state.json`) | Command | Success signal | Failure signal | State write |
 |---|---|---|---|---|
@@ -94,6 +94,8 @@ Only three gates are automatable. The five process gates remain agent-owned.
 | `unityAnalyzerClean` | `unity run <project> --command <analyzer-cmd> --format json` (project `[CliCommand]`) | exit `0` + zero `UNT*` in `data` | exit `6`/`1` or `UNT*` present | set `true` only when zero `UNT*` |
 
 Non-automated (agent-owned): `storyTrackingUpdated`, `codeReviewCompleted`, `securityReviewPassed`, `acceptanceCriteriaValidated`, `designArtifactSyncConfirmed`.
+
+Mechanised via Cadet rather than the editor: `reachabilityAddressed`, by `cadet-agent harness verify-reachability --story <path>`. It is **opt-in** — required only when `.cadet/harness.json` sets `reachability.enabled` — and it is only partly a proof: the story's DECLARATION is checked mechanically, and the wiring behind it is proven only when the repository configures its own `reachability.command` probe, whose exit code is then the verdict. With no probe configured, the record attests a checked declaration, not a reachable feature. Run it **in the `review` phase**, because a record is bound to the phase it was created in.
 
 Run-semantics (exit codes/signals on a real Editor run) and the project-defined `<analyzer-cmd>` are validated per-project at implementation time.
 

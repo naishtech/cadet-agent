@@ -15,6 +15,7 @@
    - **Testable logic (unit, integration, etc.):** ALWAYS propose test-first. Write tests before implementation. This is non-negotiable.
    - Large non-testable changes: Create requirements with Given/When/Then acceptance criteria, then implement + manual validation.
    - Small non-testable changes: Implement and request manual validation.
+   - **Reachability:** ask ONCE per run whether this project's work must be reachable — a path by which a user or operator can reach and observe each deliverable — and record the answer as `reachability.enabled` in `.cadet/harness.json` (plus that project's own `reachability.command` probe, if it has one). Ask it the way the tracking mode is asked: a choice that persists, not a per-story question. Saying yes is what makes `reachabilityAddressed` a required gate on `review -> validation`, and what commits every story to a `Reachability:` declaration; saying no leaves the check reporting-only.
 10. For large initiatives after requirements and technical design are finalized:
    - Evaluate technology choices using `.cadet/agent/core/Guidance/TechnologyDecisionFramework.md`: identify viable options, ask the user, record ADRs.
   - Use the planning path defined by the active policy when present.

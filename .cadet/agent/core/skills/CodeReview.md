@@ -15,6 +15,13 @@ You are executing the Cadet **Code Review** skill. This skill is the primary ins
 
 After review, set `codeReviewCompleted`, `securityReviewPassed`, and `acceptanceCriteriaValidated` to `true` before advancing to `validation`.
 
+**Reachability is reviewed, and severity is the point.** When the repository sets `reachability.enabled` in `.cadet/harness.json`, `reachabilityAddressed` is required before `validation`: run `cadet-agent harness verify-reachability --story <path>` and confirm the story's `Reachability:` declaration holds. Judge the finding by OWNERSHIP:
+
+- a deliverable that nothing can reach, with no recorded owner for wiring it, is a **BLOCKING finding** — this is the class that otherwise accumulates as Low/informational across an entire epic while every gate stays green;
+- an owned, recorded deferral (`Reachability: deferred to <work item> — <why>`) is **filed and does not block**, provided the named work item exists and is still unfinished. A deferral whose target is already `done` has expired and is therefore a blocking finding, not an excuse.
+
+An epic whose work only becomes reachable at its last story is a review finding in its own right: name it, and say whether the owner has accepted that ordering.
+
 Read `.cadet/agent/core/Harness.md`. Review the run ledger, gate evidence freshness, and budget status as first-class inputs.
 </instructions>
 
@@ -85,7 +92,7 @@ Identify defects, regressions, security concerns, and process drift before chang
 ## Completion
 
 After review:
-- Set `gates.codeReviewCompleted`, `gates.securityReviewPassed`, and `gates.acceptanceCriteriaValidated` to `true` in `.cadet/state.json` only with supporting evidence (agent-owned review decisions recorded as evidence or `changeHistory` entries).
+- Set `gates.codeReviewCompleted`, `gates.securityReviewPassed`, and `gates.acceptanceCriteriaValidated` to `true` in `.cadet/state.json` only with supporting evidence (agent-owned review decisions recorded as evidence or `changeHistory` entries). When `reachability.enabled` is set, also satisfy `gates.reachabilityAddressed` by running `cadet-agent harness verify-reachability --story <path>` **in this phase** — the record is bound to the phase it is created in, so one made during implementation is rejected as stale here.
 - Set `currentPhase` to `validation` only when all review → validation gates are satisfied.
 - In markdown tracking mode, update the story and epic files to reflect completion.
 </completion>

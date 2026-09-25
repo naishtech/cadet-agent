@@ -91,9 +91,39 @@ describe('hook — decision logic', () => {
   });
 });
 
+// Resolve a bash that can actually run the guard script. A bare `bash` on the
+// Windows PATH is frequently the WSL stub, which exits 1 without executing the
+// script (no distribution installed), so every candidate is validated with a
+// trivial command before use. Precedence: an explicit override, then the
+// standard Git for Windows install locations, then `bash` from PATH (which is
+// the real bash on POSIX CI).
+function resolveBash() {
+  const candidates = [];
+  if (process.env.CADET_TEST_BASH) candidates.push(process.env.CADET_TEST_BASH);
+  if (process.platform === 'win32') {
+    const bases = [
+      'C:\\Program Files\\Git',
+      'C:\\Program Files (x86)\\Git',
+      process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'Programs', 'Git') : null,
+    ].filter(Boolean);
+    for (const base of bases) {
+      candidates.push(join(base, 'bin', 'bash.exe'), join(base, 'usr', 'bin', 'bash.exe'));
+    }
+  }
+  candidates.push('bash');
+  for (const candidate of candidates) {
+    const probe = spawnSync(candidate, ['-c', 'printf ok'], { encoding: 'utf-8', windowsHide: true });
+    if (probe.status === 0 && (probe.stdout || '').trim() === 'ok') return candidate;
+  }
+  return null;
+}
+
+const bash = resolveBash();
+const maybeIt = bash ? it : it.skip;
+
 describe('hook — git-guard.sh script', () => {
   function runGuard(input, { cwd = repoRoot, env = {} } = {}) {
-    return spawnSync('bash', [shellGuard], {
+    return spawnSync(bash, [shellGuard], {
       input,
       encoding: 'utf-8',
       cwd,
@@ -102,46 +132,48 @@ describe('hook — git-guard.sh script', () => {
     });
   }
 
-  it('emits ask for git commit', () => {
+  // With no usable bash on the machine, every test below is skipped via
+  // maybeIt — set CADET_TEST_BASH to point the suite at one.
+  maybeIt('emits ask for git commit', () => {
     const res = runGuard(payload('run_in_terminal', 'git commit -m "x"'));
     assert.equal(res.status, 0);
     const out = JSON.parse(res.stdout);
     assert.equal(out.hookSpecificOutput.permissionDecision, 'ask');
   });
 
-  it('emits ask for git push', () => {
+  maybeIt('emits ask for git push', () => {
     const res = runGuard(payload('bash', 'git push origin main'));
     assert.equal(res.status, 0);
     assert.equal(JSON.parse(res.stdout).hookSpecificOutput.permissionDecision, 'ask');
   });
 
-  it('emits deny for malformed JSON', () => {
+  maybeIt('emits deny for malformed JSON', () => {
     const res = runGuard('{ not json');
     assert.equal(res.status, 0);
     const out = JSON.parse(res.stdout);
     assert.equal(out.hookSpecificOutput.permissionDecision, 'deny');
   });
 
-  it('emits nothing for a read-only git command', () => {
+  maybeIt('emits nothing for a read-only git command', () => {
     const res = runGuard(payload('bash', 'git status'));
     assert.equal(res.status, 0);
     assert.equal(res.stdout.trim(), '');
   });
 
-  it('emits nothing for a non-relevant tool', () => {
+  maybeIt('emits nothing for a non-relevant tool', () => {
     const res = runGuard(payload('read_file', 'git commit'));
     assert.equal(res.status, 0);
     assert.equal(res.stdout.trim(), '');
   });
 
-  it('honors fail-open via the environment variable and logs to stderr', () => {
+  maybeIt('honors fail-open via the environment variable and logs to stderr', () => {
     const res = runGuard('{ not json', { env: { CADET_GIT_GUARD_MODE: 'fail-open' } });
     assert.equal(res.status, 0);
     assert.equal(res.stdout.trim(), '');
     assert.match(res.stderr, /fail-open/);
   });
 
-  it('blocks an obfuscated git commit', () => {
+  maybeIt('blocks an obfuscated git commit', () => {
     const res = runGuard(payload('bash', 'git   -c  user.name=x   commit -m y'));
     assert.equal(res.status, 0);
     assert.equal(JSON.parse(res.stdout).hookSpecificOutput.permissionDecision, 'ask');
