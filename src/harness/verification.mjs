@@ -7,13 +7,14 @@
  * Contract: docs/core/HarnessContract.md §4 (retry classifier), §5 (commands), §6 (loop).
  */
 
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createEvidence, computeInputTreeHash } from './state.mjs';
 import { hashCriteria, sha256Bytes, timestamp, newId } from './util.mjs';
 import { BudgetTracker, budgetExhaustedResult, evaluateHardStop } from './budget.mjs';
 import { redactString } from './redaction.mjs';
+import { whichAll } from './routing.mjs';
 
 export const RETRY_CLASSES = Object.freeze(['deterministic', 'transient', 'repair', 'unknown']);
 export const RESULT_STATUSES = Object.freeze(['passed', 'failed', 'flaky', 'blocked', 'timed-out']);
@@ -51,6 +52,151 @@ const DETERMINISTIC_SIGNATURES = Object.freeze([
 ]);
 
 const TRANSIENT_SIGNATURES = DEFAULT_FLAKY_SIGNATURES;
+
+/**
+ * A command that never launched produced no test result, so it can never be a red.
+ *
+ * These are shell- and launcher-level signatures for "the program was not found",
+ * as distinct from "the program ran and reported failure". They matter most on
+ * Windows, where `shell: true` hands the command string to `cmd.exe`: a bare `bash`
+ * resolves through Windows PATH to the Windows Subsystem for Linux stub, which
+ * fails without ever exec'ing a shell. The command looks like it ran and failed;
+ * nothing ran at all.
+ */
+export const LAUNCH_FAILURE_SIGNATURES = Object.freeze([
+  // cmd.exe: the shell could not find the program on PATH.
+  'is not recognized as an internal or external command',
+  // POSIX shells: the shell could not find the program.
+  'command not found',
+  // The WSL launcher could not exec the distribution's shell.
+  'execvpe(',
+  'has no installed distributions',
+  'wsl (',
+]);
+
+/** POSIX shell conventions: 126 = found but not executable, 127 = command not found. */
+export const LAUNCH_FAILURE_EXIT_CODES = Object.freeze([126, 127]);
+
+/**
+ * Decide whether a result means the command never actually ran. Returns
+ * `{ launchFailed, reason }`; `reason` is a concrete diagnostic, never generic.
+ *
+ * The bias is deliberate: a launch failure must be *blocked*, never *failed*,
+ * because `failed` is the record that satisfies red-before-green. When in doubt
+ * the safe direction is "no test result", not "the tests failed".
+ */
+export function detectLaunchFailure({ exitCode = null, timedOut = false, stdout = '', stderr = '', errorMessage = '' } = {}) {
+  // A timed-out process did launch; it is not a launch failure.
+  if (timedOut) return { launchFailed: false, reason: null };
+
+  // A spawn-level error means the process was never created at all.
+  if (errorMessage) {
+    return { launchFailed: true, reason: `the process was never created (${errorMessage})` };
+  }
+
+  const haystack = `${stderr}\n${stdout}`.toLowerCase();
+  const signature = LAUNCH_FAILURE_SIGNATURES.find((s) => haystack.includes(s));
+  if (signature) {
+    return { launchFailed: true, reason: `the shell reported "${signature}"` };
+  }
+
+  if (LAUNCH_FAILURE_EXIT_CODES.includes(exitCode)) {
+    return {
+      launchFailed: true,
+      reason: `exit ${exitCode} is the shell convention for an interpreter that could not be found or executed`,
+    };
+  }
+
+  return { launchFailed: false, reason: null };
+}
+
+/**
+ * POSIX interpreters whose bare name is ambiguous under `cmd.exe`: Windows ships a
+ * `bash.exe` stub that resolves but cannot run without a WSL distribution.
+ */
+export const POSIX_INTERPRETERS = Object.freeze(['bash', 'sh', 'dash', 'zsh', 'ksh']);
+
+/** The command's first token, unwrapped from quotes. */
+export function commandInterpreter(command) {
+  if (typeof command !== 'string') return null;
+  const trimmed = command.trim();
+  if (!trimmed) return null;
+  const m = trimmed.match(/^(?:"([^"]+)"|'([^']+)'|(\S+))/);
+  return m ? (m[1] ?? m[2] ?? m[3]) : null;
+}
+
+/** Whether a resolved path is one of the Windows shims for `bash`/`wsl`. */
+export function isWslShim(path) {
+  if (typeof path !== 'string' || !path) return false;
+  const p = path.replace(/\//g, '\\').toLowerCase();
+  if (/(^|\\)system32\\bash\.exe$/.test(p)) return true;
+  if (/(^|\\)system32\\wsl\.exe$/.test(p)) return true;
+  return /(^|\\)windowsapps\\/.test(p);
+}
+
+function probeRunnable(path) {
+  // `--version` is not universal (dash's `sh` rejects it), so fall back to a
+  // trivial execution: the question is only whether this binary can run at all.
+  for (const args of [['--version'], ['-c', 'exit 0']]) {
+    try {
+      const res = spawnSync(path, args, { encoding: 'utf-8', windowsHide: true, shell: false, timeout: 10000 });
+      if (res.status === 0) return true;
+    } catch { /* try the next probe */ }
+  }
+  return false;
+}
+
+function defaultCandidates(name) {
+  return whichAll(name);
+}
+
+/**
+ * Resolve the command's interpreter before running it. Only a command led by a POSIX
+ * interpreter is checked, and only on Windows, so a `cmd` builtin or an ordinary
+ * executable is never second-guessed. The command string is not rewritten — the
+ * declaration stays the auditable record.
+ *
+ * `candidates` and `probe` are injectable so the decision is testable without
+ * depending on the host's PATH.
+ */
+export function resolveCommandInterpreter(command, {
+  platform = process.platform,
+  candidates = null,
+  probe = probeRunnable,
+} = {}) {
+  const interpreter = commandInterpreter(command);
+  const raw = interpreter ? interpreter.split(/[\\/]/).pop().toLowerCase() : null;
+  // `bash.exe` is the same ambiguity as `bash`, and `where` reports the suffixed form.
+  const base = raw ? raw.replace(/\.exe$/, '') : null;
+
+  if (!base || !POSIX_INTERPRETERS.includes(base)) {
+    return { required: false, ok: true, interpreter, usable: [], shims: [], reason: null };
+  }
+  if (platform !== 'win32') {
+    return { required: true, ok: true, interpreter, usable: [], shims: [], reason: null };
+  }
+
+  const found = (candidates ?? defaultCandidates)(base);
+  const shims = found.filter(isWslShim);
+  const usable = found.filter((p) => !isWslShim(p) && probe(p));
+  if (usable.length) {
+    return { required: true, ok: true, interpreter, usable, shims, reason: null };
+  }
+
+  let detail;
+  if (found.length === 0) {
+    detail = 'no installed copy on PATH';
+  } else if (shims.length === found.length) {
+    detail = `only the Windows Subsystem for Linux stub (${shims.join(', ')})`;
+  } else {
+    detail = 'the copy on PATH is not runnable';
+  }
+
+  return {
+    required: true, ok: false, interpreter, usable, shims,
+    reason: `'${base}' cannot be run: ${detail}. Install Git for Windows (which provides a real bash) or declare a command that does not need a POSIX interpreter.`,
+  };
+}
 
 /**
  * Classify a command result. The classifier is the single source of truth for
@@ -103,7 +249,7 @@ export function classifyRepair({ failedEvidenceId, changedFiles = [] } = {}) {
  * Run a command and capture bounded output. Never buffers unbounded output:
  * output beyond `maxInlineBytes` is written to an artifact.
  *
- * Returns `{ exitCode, signal, timedOut, stdout, stderr, durationMs, outputBytes, artifactPath, artifactHash, preview }`.
+ * Returns `{ exitCode, signal, timedOut, stdout, stderr, durationMs, outputBytes, artifactPath, artifactHash, preview, launchFailed, launchFailureReason }`.
  */
 export function runCommand(command, {
   cwd = process.cwd(),
@@ -125,6 +271,7 @@ export function runCommand(command, {
         exitCode: null, signal: null, timedOut: false, stdout: '', stderr: '',
         durationMs: Date.now() - startedAt, outputBytes: 0, artifactPath: null,
         artifactHash: null, preview: '', errorMessage: err.message,
+        launchFailed: true, launchFailureReason: `the process was never created (${err.message})`,
       });
       return;
     }
@@ -177,9 +324,11 @@ export function runCommand(command, {
         }
       }
       const preview = redactString((stdout + stderr).slice(0, previewBytes));
+      const failure = detectLaunchFailure({ exitCode, timedOut, stdout, stderr, errorMessage });
       resolve({
         exitCode, signal, timedOut, stdout, stderr, durationMs, outputBytes,
         artifactPath, artifactHash, preview, errorMessage,
+        launchFailed: failure.launchFailed, launchFailureReason: failure.reason,
       });
     };
 
@@ -265,6 +414,7 @@ export async function runVerificationLoop({
   flakySignatures = DEFAULT_FLAKY_SIGNATURES,
   priorEvidence = [],
   requireRedFirst = null,
+  resolveInterpreterImpl = resolveCommandInterpreter,
   now = () => new Date(),
 } = {}) {
   const tracker = budgets || new BudgetTracker(policy);
@@ -272,6 +422,47 @@ export async function runVerificationLoop({
   const inputTreeHash = computeInputTreeHash(rootDir, relevantFiles);
   const criteriaHash = hashCriteria(criteria);
   const perStepLimit = maxAttemptsOverride ?? (policy?.budgets?.maxRetriesPerStep?.hard ?? 2) + 1;
+
+  // Refuse a command whose interpreter cannot run, before executing anything. The
+  // declared command is not rewritten — the point is that a run which never starts
+  // must not leave behind a record that could later be read as a red.
+  const interpreter = resolveInterpreterImpl(command, {});
+  if (interpreter?.required && !interpreter.ok) {
+    const detail = `command never launched: ${interpreter.reason}`;
+    const evidence = createEvidence({
+      evidenceId: newId(),
+      workItemId,
+      acceptanceCriterionId,
+      phase,
+      gate,
+      status: 'blocked',
+      command,
+      result: detail,
+      exitCode: null,
+      inputTreeHash,
+      criteriaHash,
+      relevantFiles,
+      commit,
+      createdAt: now(),
+      source: 'automated',
+    });
+    attempts.push({
+      attempt: 1,
+      spanId: newId(),
+      tool,
+      command,
+      exitCode: null,
+      durationMs: 0,
+      outputBytes: 0,
+      artifactPath: null,
+      artifactHash: null,
+      status: 'blocked',
+      retryClass: 'deterministic',
+      retryReason: 'interpreter not runnable',
+      evidence,
+    });
+    return finalize({ status: 'blocked', attempts, tracker, inputTreeHash, criteriaHash, stopReason: 'launch-failed', diagnostic: detail });
+  }
 
   // Red-before-green: a testable gate must not be satisfied by green evidence
   // unless a prior failed (red) record exists for the same work item and gate.
@@ -309,6 +500,12 @@ export async function runVerificationLoop({
     // configured budget (e.g. cost) could not be measured.
     if (hardStop.exhausted || hardStop.blocked) gatePassed = false;
 
+    // `runCommand` reports this directly; an injected runner may not, so fall back
+    // to the same detection over its result. A timed-out process did launch.
+    const launch = result.launchFailed === true
+      ? { launchFailed: true, reason: result.launchFailureReason || 'the command did not launch' }
+      : detectLaunchFailure(result);
+
     const evidence = createEvidence({
       evidenceId: newId(),
       workItemId,
@@ -317,11 +514,13 @@ export async function runVerificationLoop({
       gate,
       status: hardStop.exhausted || hardStop.blocked
         ? 'blocked'
-        : (gatePassed ? 'passed' : (result.timedOut ? 'blocked' : 'failed')),
+        : (gatePassed ? 'passed' : (result.timedOut ? 'blocked' : (launch.launchFailed ? 'blocked' : 'failed'))),
       command,
       result: hardStop.exhausted
         ? `budget-exhausted: ${hardStop.reason}`
-        : (hardStop.blocked ? `budget-blocked: ${hardStop.reason}` : describeResult(result)),
+        : (hardStop.blocked
+          ? `budget-blocked: ${hardStop.reason}`
+          : (launch.launchFailed ? `launch-failed: ${launch.reason}` : describeResult(result))),
       exitCode: result.exitCode,
       artifactPath: result.artifactPath,
       artifactHash: result.artifactHash,
@@ -343,13 +542,28 @@ export async function runVerificationLoop({
       outputBytes: result.outputBytes,
       artifactPath: result.artifactPath,
       artifactHash: result.artifactHash,
-      status: result.timedOut ? 'timed-out' : (gatePassed ? 'passed' : 'failed'),
+      status: result.timedOut ? 'timed-out' : (gatePassed ? 'passed' : (launch.launchFailed ? 'blocked' : 'failed')),
       retryClass: classification.retryClass,
       retryReason: classification.reason,
       evidence,
     });
 
     lastResult = result;
+
+    // A command that never launched is not a red, and is not retried: a missing or
+    // unrunnable interpreter does not appear on a second attempt. It must never reach
+    // the retry machinery or the red-before-green check, so it stops here as blocked.
+    if (launch.launchFailed) {
+      return finalize({
+        status: 'blocked',
+        attempts,
+        tracker,
+        inputTreeHash,
+        criteriaHash,
+        stopReason: 'launch-failed',
+        diagnostic: `command never launched: ${command} — ${launch.reason}`,
+      });
+    }
 
     if (hardStop.exhausted || hardStop.blocked) {
       return finalize({

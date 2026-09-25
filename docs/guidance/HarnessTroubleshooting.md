@@ -40,6 +40,20 @@ Do **not** hand-edit `gateEvidence` or flip a gate to `true`. The CLI rejects a 
 2. Then implement and re-run; the green result is now accepted.
 3. If the work item is genuinely not testable, set `session.workflowPath` to `no_test_required`; that exempts the work item.
 
+## Command never launched
+
+**Symptom:** `harness verify` stops with `stopReason: launch-failed`, or an attempt is recorded `blocked` where you expected a red. On Windows the common shape is a bare interpreter in the command — e.g. `bash tools/test.sh` — where `cmd.exe` resolves `bash` to the Windows Subsystem for Linux stub, which exits non-zero without running anything.
+
+**Cause:** the shell could not find or execute the command: a missing interpreter, a WSL stub with no installed distribution, a `cmd.exe` resolution failure, or a shell's exit 126/127 command-not-found convention. This is deliberately **not** a red — nothing ran, so there is no test result to fail — and a `blocked` record cannot satisfy red-before-green, so it can never license a green.
+
+**Fix:**
+
+1. Read the diagnostic: it names the rejected path and why (e.g. `only the Windows Subsystem for Linux stub (C:\Windows\System32\bash.exe)`).
+2. Install a real interpreter — on Windows, Git for Windows provides `bash` — and make sure it precedes the stub on `PATH`. Alternatively declare a command that does not need a POSIX interpreter.
+3. Re-run. A launch failure is never retried automatically, because a missing interpreter does not appear on a second attempt.
+
+On Windows, a command led by `bash`, `sh`, `dash`, `zsh`, or `ksh` is resolved before execution, so an interpreter that can only be satisfied by the WSL stub is refused before anything runs. The declared command is never rewritten, so what the evidence records is exactly what you declared.
+
 ## Budget exhaustion
 
 **Symptom:** a command exits with `code: budget-exhausted` / `status: exhausted`, or the report shows a budget at 100%.

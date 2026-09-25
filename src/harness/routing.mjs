@@ -55,19 +55,27 @@ function defaultRunner(cmd, args) {
   return spawnSync(cmd, args, { encoding: 'utf-8', windowsHide: true, shell: false });
 }
 
-function which(cmd, { env, runner }) {
+/**
+ * Every PATH match for `cmd`, in resolution order, or an empty array when it does
+ * not resolve. `where` is used on Windows and `which` elsewhere, with `shell: false`
+ * so a probe can never itself be reinterpreted by a shell.
+ */
+export function whichAll(cmd, { runner = defaultRunner } = {}) {
   const probe = process.platform === 'win32' ? 'where' : 'which';
   const res = runner(probe, [cmd]);
-  if (res && res.status === 0 && res.stdout) {
-    const path = String(res.stdout).split(/\r?\n/).map((s) => s.trim()).filter(Boolean)[0];
-    let version = null;
-    try {
-      const v = runner(cmd, ['--version']);
-      if (v && v.status === 0 && v.stdout) version = String(v.stdout).trim().split(/\r?\n/)[0];
-    } catch { /* version is optional */ }
-    return { available: true, path, version };
-  }
-  return { available: false };
+  if (!res || res.status !== 0 || !res.stdout) return [];
+  return String(res.stdout).split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+}
+
+function which(cmd, { env, runner }) {
+  const [path] = whichAll(cmd, { runner });
+  if (!path) return { available: false };
+  let version = null;
+  try {
+    const v = runner(cmd, ['--version']);
+    if (v && v.status === 0 && v.stdout) version = String(v.stdout).trim().split(/\r?\n/)[0];
+  } catch { /* version is optional */ }
+  return { available: true, path, version };
 }
 
 /**
