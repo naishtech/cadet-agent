@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.45.0] — 2026-09-25
+
 ### Added
 
 - **Reachability is now a gate: delivered work must be reachable, or declare who will make it so (contract v6).** Every gate asked whether work was *correct*, *compiled*, *analysed*, *tracked* and *reviewed*. None asked whether a user or operator could actually get to it — so a project could pass every gate for sixteen stories in a row with almost nothing anyone could run, and each individual story looked green while it happened. The failure has a name in practice — **"tested but not reachable"** — and it had recurred across several epics of an audited consumer project: a loop with its FSM and conservation suite but nothing joining it to a scene; a production gate with both paths tested and no composition root; a visual registry that resolved correctly with no host to bind one; a UI action with its sink seam and no scene passing a sink; a death effect no view could observe because the entity was removed on the same tick. Each was found by a human reviewer noticing, each was filed Low or informational, and each was deferred to a later story — which is how the pattern compounds.
