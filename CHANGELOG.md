@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.46.0] — 2026-09-25
+
 ### Fixed
 
 - **A command that never launched is no longer recorded as a red, closing a way to satisfy `testsPassed` without running a test.** `runCommand` spawns gate commands with `shell: true`, so on Windows the string is handed to `cmd.exe`, where a bare `bash` resolves by PATH — frequently to the Windows Subsystem for Linux stub at `C:\Windows\System32\bash.exe`, which exits non-zero without exec'ing a shell. The attempt was recorded `failed`, and `failed` is exactly the record `testsPassed` demands before it accepts a green, so the gate could be satisfied by a run in which nothing executed. Reproduced on Windows before the fix: `bash run-tests.sh` exited 127 in ~96 ms with `bash: run-tests.sh: No such file or directory`, and feeding that record to the loop as `priorEvidence` made a green `testsPassed` return `passed`.
