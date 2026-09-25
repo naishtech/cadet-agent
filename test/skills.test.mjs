@@ -186,7 +186,7 @@ describe('state.schema.json', () => {
     const strict = harnessSchema.$defs.policy.properties.strictClosure;
     assert.ok(strict, 'harness.schema.json must define policy.strictClosure');
     assert.equal(strict.properties.enabled.default, false, 'strictClosure must default to off (opt-in)');
-    assert.deepEqual(strict.properties.disallowManualFor.default, ['testsPassed']);
+    assert.deepEqual(strict.properties.disallowManualFor.default, ['testsPassed', 'reachabilityAddressed']);
     // The manual-confirmation quality fields must be expressible.
     for (const field of ['reason', 'environment', 'scope']) {
       assert.ok(harnessSchema.$defs.evidence.properties[field], `evidence schema must define ${field}`);

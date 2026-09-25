@@ -62,23 +62,25 @@ Before transitioning from `implementation` to `review`, ALL of the following gat
 |------|-------------|----------------|
 | `testsPassed` | All tests for the current story pass | Run `unity test <project>` (CLI; exit `6` = fail) or confirm user-run tests — see `core/UnityCli.md`. |
 | `compileCheckConfirmed` | Unity project compiles without errors | Run `unity build`/`run`/`command eval` (CLI), or ask user to focus Unity and confirm 0 errors — see `core/UnityCli.md`. |
-
-> `testsPassed` and `compileCheckConfirmed` are **agent-executable** via the Unity CLI. Use CLI commands for these deterministic checks (exit codes), and MCP mode for inspection/reasoning — see `core/UnityCli.md`.
+| `unityAnalyzerClean` | Zero Unity analyzer diagnostics in the changed files | Run the analyzer command declared in `.cadet/harness.json` — see `core/UnityCli.md`. |
 | `storyTrackingUpdated` | Story markdown marked complete, epic progress updated | Update story file to `[x] done`, update epic tracker. |
 
-**Transition rule:** If ANY of these three gates is `false`, do NOT advance to `review`. Fix the failing gate first.
+> `testsPassed`, `compileCheckConfirmed` and `unityAnalyzerClean` are **agent-executable** via the Unity CLI. Use CLI commands for these deterministic checks (exit codes), and MCP mode for inspection/reasoning — see `core/UnityCli.md`.
+
+**Transition rule:** If ANY of these four gates is `false`, do NOT advance to `review`. Fix the failing gate first.
 
 ### Review → Validation Transition Gates
 
-Before transitioning from `review` to `validation`, ALL of the following gates must be explicitly satisfied:
+Before transitioning from `review` to `validation`, the following gates must be satisfied — the last only when the repository opts into reachability:
 
 | Gate | Requirement | How to Satisfy |
 |------|-------------|----------------|
 | `codeReviewCompleted` | Full 17-step review per [CodeReview](skills/CodeReview.md) completed | Execute all 17 review steps. File prioritized findings. |
 | `securityReviewPassed` | No secrets, unsafe patterns, or security concerns | Explicitly check for credentials, tokens, keys, unsafe patterns. |
 | `acceptanceCriteriaValidated` | Each Given/When/Then criterion validated | Walk through each AC, confirm it passes or document deviation. |
+| `reachabilityAddressed` | The story's declared reachability is honoured: it is witnessed, or deferred to a work item that exists and is not already done | Run `cadet-agent harness verify-reachability --story <path>` **in this phase**. **Required only when** `.cadet/harness.json` sets `reachability.enabled`; an owned, unexpired deferral satisfies it, so infrastructure work is not blocked. |
 
-**Transition rule:** If ANY of these three gates is `false`, do NOT advance to `validation`. Complete the review first.
+**Transition rule:** If ANY required gate is `false`, do NOT advance to `validation`. Complete the review first.
 
 ### Validation → Closed Transition Gates
 
@@ -145,6 +147,7 @@ All gates apply. The review gate (`codeReviewCompleted`) is mandatory after EACH
 | `acceptanceCriteriaValidated` | If ACs were defined |
 | `storyTrackingUpdated` | If story tracking is used |
 | `designArtifactSyncConfirmed` | If design artifacts exist |
+| `reachabilityAddressed` | If `reachability.enabled` is true (an owned deferral satisfies it) |
 
 ### No-Test-Required Changes
 
@@ -154,6 +157,7 @@ All gates apply. The review gate (`codeReviewCompleted`) is mandatory after EACH
 | `codeReviewCompleted` | Yes (scoped review) |
 | `securityReviewPassed` | Yes |
 | Manual validation confirmed by user | Yes (replaces `testsPassed`) |
+| `reachabilityAddressed` | If `reachability.enabled` is true — a doc or config change normally declares `witnessed` and needs no deferral |
 
 ---
 

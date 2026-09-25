@@ -3,6 +3,7 @@
 Parent Epic: <slot id="parentEpic" fmt="../epic.md"/>
 Status: <slot id="status" opt="Planned|In Progress|Done">Planned</slot>
 Estimate: <slot id="estimate" opt="Small|Medium" note="completable in a single session"/>
+Reachability: <slot id="reachability" note="REQUIRED, and one of exactly two forms: 'witnessed — <what a user or operator does and what they see>', or 'deferred to <work-item id> — <why it cannot be witnessed yet>'. Silence is not reachability. A deferral is honoured only while its target is unfinished, so it expires when that work item is done: either note it here as witnessed or fix the wiring. Infrastructure that produces nothing reachable yet declares a deferral; that is what the form is for, and it must name an owner. Verified by `cadet-agent harness verify-reachability` when the repository sets `reachability.enabled`."/>
 
 ## Acceptance Criteria
 <slot id="ac" repeat="true">

@@ -37,7 +37,50 @@ export const GATES = Object.freeze([
   'acceptanceCriteriaValidated',
   'securityReviewPassed',
   'designArtifactSyncConfirmed',
+  // APPENDED, never reordered: C3 forbids renaming a gate, and every recorded
+  // name must keep its meaning. This one is additionally OPT-IN — see
+  // REACHABILITY_GATE and DEFAULT_REACHABILITY below.
+  'reachabilityAddressed',
 ]);
+
+/**
+ * The gate that is required only when a repository enables the reachability
+ * policy.
+ *
+ * WHY IT IS CONDITIONAL RATHER THAN SIMPLY REQUIRED. Every existing consumer has
+ * stories written before the declaration existed, so making this mandatory at
+ * the matrix level would block every in-flight story on a framework update — the
+ * one thing a compatibility-preserving change must not do. The precedent is
+ * `strictClosure` and `allowEmptyFreshness`: a new guarantee ships behind a
+ * switch whose OFF state is byte-identical to the previous behaviour.
+ *
+ * WHAT TURNS IT ON: `reachability.enabled` in `.cadet/harness.json`. When it is
+ * on, `review -> validation` requires this gate; when it is off (the default)
+ * the gate list is exactly what it was before this gate existed.
+ */
+export const REACHABILITY_GATE = 'reachabilityAddressed';
+
+/**
+ * The transition (`from` phase) the reachability gate attaches to: entering
+ * `validation`, i.e. `review -> validation`. Named rather than inlined because
+ * the placement is a decision, and a later edit that silently moved it to
+ * implementation would ask for the wiring before the story has been reviewed.
+ */
+export const REACHABILITY_TRANSITION_FROM = 'review';
+
+/**
+ * Default reachability policy (contract v6 §2).
+ *
+ * `enabled: false` is deliberate and load-bearing: it is what makes adopting
+ * this framework version a no-op for a repository that has not opted in.
+ * `command: null` means no project-owned probe is configured, in which case the
+ * declaration is checked and the CLI states plainly that the wiring itself was
+ * not proven — rather than implying a guarantee it did not establish.
+ */
+export const DEFAULT_REACHABILITY = Object.freeze({
+  enabled: false,
+  command: null,
+});
 
 /**
  * Legal phase transitions (compatibility invariant C4, revised in contract v3).
@@ -215,7 +258,13 @@ export const DEFAULT_STRICT_CLOSURE = Object.freeze({
     // rejected as future-dated.
     clockSkewToleranceMs: 60 * 1000,
   }),
-  disallowManualFor: Object.freeze(['testsPassed']),
+  // `reachabilityAddressed` is in the default set because, whenever the
+  // repository has opted in, the gate is mechanically checkable by
+  // `harness verify-reachability` — the declaration check runs even with no
+  // probe configured — so a manual assertion can add nothing and can skip the
+  // declaration entirely (contract v6 §2). With strictClosure off the refusal
+  // does not apply, matching how `testsPassed` is treated.
+  disallowManualFor: Object.freeze(['testsPassed', 'reachabilityAddressed']),
 });
 
 const STRICT_CLOSURE_KEYS = new Set([
@@ -398,6 +447,49 @@ function resolveStrictClosure(raw) {
 }
 
 /**
+ * Resolve and validate the `reachability` policy block (contract v6 §2).
+ *
+ * Rejected rather than tolerated:
+ *   - a `command` set while `enabled` is false, because the probe would never
+ *     run. An inert setting is worse than an absent one: it reads as a guard
+ *     that exists.
+ *   - an empty-string command, which is not a probe.
+ *   - any unknown key, so a typo fails loudly instead of silently defaulting.
+ */
+function resolveReachability(raw) {
+  if (raw === undefined) return { ...DEFAULT_REACHABILITY };
+  if (!isPlainObject(raw)) throw new PolicyError('"reachability" must be an object.');
+
+  for (const key of Object.keys(raw)) {
+    if (key !== 'enabled' && key !== 'command') {
+      throw new PolicyError(`Unknown "reachability" key "${key}".`);
+    }
+  }
+  if (raw.enabled !== undefined && typeof raw.enabled !== 'boolean') {
+    throw new PolicyError('"reachability.enabled" must be a boolean.');
+  }
+  if (raw.command !== undefined && raw.command !== null && typeof raw.command !== 'string') {
+    throw new PolicyError('"reachability.command" must be a string or null.');
+  }
+  // A command key that is present but blank is a probe that would never run —
+  // rejected, rather than silently normalized to null and forgotten.
+  if (typeof raw.command === 'string' && raw.command.trim() === '') {
+    throw new PolicyError('"reachability.command" is empty; omit it, or give the probe command to run.');
+  }
+
+  const out = {
+    enabled: raw.enabled === true,
+    command: typeof raw.command === 'string' ? raw.command.trim() : null,
+  };
+
+  if (out.enabled !== true && out.command !== null) {
+    throw new PolicyError('"reachability.command" is set but "reachability.enabled" is false; the probe would never run. Enable reachability or remove the command.');
+  }
+
+  return out;
+}
+
+/**
  * Parse and validate a repository harness policy document.
  * Unknown top-level keys are rejected so misconfiguration fails loudly.
  */
@@ -410,6 +502,7 @@ export function validatePolicy(raw, defaults = DEFAULT_BUDGETS) {
     'budgets', 'archive', 'output', 'retention', 'estimation', 'hook',
     'allowBudgetCeilingOverride', 'scopes', 'model', 'analyzerCommand',
     'compileCommand', 'testCommand', 'allowEmptyFreshness', 'strictClosure',
+    'reachability',
   ]);
   for (const key of Object.keys(raw)) {
     if (!allowed.has(key)) {
@@ -476,6 +569,7 @@ export function validatePolicy(raw, defaults = DEFAULT_BUDGETS) {
 
   const allowCeilingOverride = raw.allowBudgetCeilingOverride === true;
   const strictClosure = resolveStrictClosure(raw.strictClosure);
+  const reachability = resolveReachability(raw.reachability);
 
   const resolved = {
     budgets,
@@ -487,6 +581,7 @@ export function validatePolicy(raw, defaults = DEFAULT_BUDGETS) {
     allowBudgetCeilingOverride: allowCeilingOverride,
     allowEmptyFreshness: raw.allowEmptyFreshness === true,
     strictClosure,
+    reachability,
     scopes: raw.scopes || { perRun: {}, perStory: {} },
     model: raw.model || null,
     analyzerCommand: raw.analyzerCommand || null,

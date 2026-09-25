@@ -181,6 +181,11 @@
           "type": "boolean",
           "default": false,
           "description": "Requirements, technical design, project plan, and epics are mutually consistent"
+        },
+        "reachabilityAddressed": {
+          "type": "boolean",
+          "default": false,
+          "description": "The story's declared reachability is honoured: witnessed, or deferred to a work item that exists and is not already done. Required on review→validation only when .cadet/harness.json sets reachability.enabled; verified with `cadet-agent harness verify-reachability`. Contract v6 §2."
         }
       }
     },

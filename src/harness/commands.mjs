@@ -110,6 +110,15 @@ export const COMMANDS = {
     writes: ['.cadet/runs/**', '.cadet/state.json', '*.coverage.json'],
     unattended: true,
   },
+  'harness verify-reachability': {
+    mutates: true,
+    summary: 'Verify a story\'s declared reachability, and run the project probe when configured.',
+    // Same posture as verify-acs: it records evidence for its gate, so it writes
+    // the ledger and state. It writes no artifact of its own — the declaration
+    // lives in the story and the project probe owns its own output.
+    writes: ['.cadet/runs/**', '.cadet/state.json'],
+    unattended: true,
+  },
   'harness report': {
     mutates: false,
     summary: 'Summarize budget consumption and failures.',

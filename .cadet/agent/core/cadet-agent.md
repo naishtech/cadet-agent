@@ -15,6 +15,7 @@ These rules apply to all work, regardless of learner tier, operating mode, or wo
 - Reproduce defects before fixing them, then keep regression tests.
 - One requirement or test objective per diff.
 - Work is scoped to stories, not epics. Epics are grouping containers — break each into small, independently implementable stories before any code.
+- **Delivered work must be reachable.** Every story declares how its deliverable becomes reachable — a path by which a user or operator can reach and observe it — or an explicit deferral naming the work item that will make it so. Silence is not reachability, and an unowned deferral is not a plan: a `deferred to <work item>` declaration expires when that work item is `done`. Reachability is checked mechanically by `cadet-agent harness verify-reachability`, gated by `reachability.enabled` in `.cadet/harness.json` (off by default, so enabling it is a deliberate act). See `skills/TDD.md`, `skills/CodeReview.md` and `skills/StoryBreakdown.md`.
 - When a story hits a blocker that cannot be resolved within the current design (e.g., a missing interface, an incompatible integration, a flawed architectural assumption), do not force the implementation. Pause the story, document the blocker, and trace it upstream: update the technical design, propagate changes to epics and stories (adding, removing, or modifying stories as needed), then resume with the revised story. Apply the decommission rule if the design change makes existing code obsolete.
 - When a refactor or major design change replaces or removes existing functionality (e.g., switching APIs, replacing a subsystem, retiring a pattern), identify any obsolete code, interfaces, integrations, or assets that should be decommissioned. Ask the user whether cleanup and decommissioning should be included in the plan before proceeding with implementation.
 - Interface-first and mock-first patterns are required for service-style architecture and testing seams.
@@ -173,6 +174,15 @@ These files define specific operational workflows. Read them on session start or
     <gate id="codeReviewCompleted">Full review executed per CodeReview skill, findings filed.</gate>
     <gate id="securityReviewPassed">No secrets, unsafe patterns, or security concerns.</gate>
     <gate id="acceptanceCriteriaValidated">Each Given/When/Then criterion validated.</gate>
+    <gate id="reachabilityAddressed">
+      The story's declared reachability is honoured: it is either witnessed, or deferred to a work
+      item that exists and is not already done. REQUIRED ONLY WHEN the repository opts in via
+      `reachability.enabled` in `.cadet/harness.json`; with the default off this gate is not part of
+      the transition. An unowned or expired deferral fails it (an owned one satisfies it), so
+      infrastructure work is not blocked. Verify with `cadet-agent harness verify-reachability
+      --story <path>`; when the repository configures `reachability.command`, that probe's exit code
+      is the verdict, because Cadet cannot know how a given repository wires its pieces together.
+    </gate>
   </transition>
   <transition from="validation" to="closed">
     <gate id="designArtifactSyncConfirmed">Requirements, design, plan, epics mutually consistent.</gate>
@@ -197,6 +207,7 @@ If a gate cannot be satisfied: STOP immediately. Report which gate failed and wh
 
 - Ask the user to focus the Unity window for recompilation after code changes.
 - Use prefab-based implementation slices where practical for testable runtime objects.
+- **A runtime system that nothing registers is not reachable.** This is Unity's instance of the reachability rule: a new `ISimSystem`, view, or component must be registered or instantiated by the composition root that actually runs (the scene or host), or its story must declare `Reachability: deferred to <work item>` naming the story that will wire it. Testing it headlessly is necessary and not sufficient — "it has tests" is not reachability, and a feature nothing can reach is indistinguishable in the suite from one that works.
 - Route all user-facing strings through the project localization pipeline. Avoid hardcoded UI text.
 - Localization helpers must support graceful fallback when packages or keys are missing.
 - When adding localization keys, synchronize all locale message files and respect serialization-safe enum key ordering.

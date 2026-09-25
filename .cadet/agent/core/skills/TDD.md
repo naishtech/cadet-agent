@@ -47,6 +47,7 @@ Apply mandatory test-driven development so behavior is validated before and afte
 8. **Verify declared tests actually ran:** run `cadet-agent harness verify-acs --story <path>`. A declared test that does not appear in the test report is a renamed or unwritten test; fix the story or write the test. Do not mark coverage complete on the strength of the declaration alone.
 9. Report test outcomes clearly, including the evidence IDs that back each criterion.
 10. If Unity code changed, ask the user to focus the Unity window and trigger recompilation; record a `manual-confirmation` for `compileCheckConfirmed` unless Unity CLI is available.
+11. **Declare reachability here; verify it in the review phase.** Write the story's `Reachability:` line now — `witnessed — <how a user or operator reaches and sees it>`, or `deferred to <work item> — <why>`. Do **not** run `cadet-agent harness verify-reachability` while `currentPhase` is `implementation`: `reachabilityAddressed` is a REVIEW-phase gate, and a record is bound to the phase it was created in, so one created here is rejected as stale when the review→validation transition is checked. The `CodeReview` skill runs it in the review phase, where it belongs. A deliverable nothing can reach is not a delivered increment, however green the suite is, and a deferral whose target has already finished has expired.
 
 ## Retry and stop rules
 

@@ -89,7 +89,7 @@ Each instruction extracted from source files is traced to its disposition in `ca
 
 ## Source: Skills/CodeReview.md
 
-| Instruction (from 17-step process) | Disposition |
+| Instruction (from the review process, and the v6 reachability duty) | Disposition |
 |---|---|
 | "Review for functional correctness against acceptance criteria" | ✅ cadet-agent.md CodeReview skill |
 | "Verify test coverage and red/green evidence" | ✅ cadet-agent.md CodeReview skill |
@@ -100,6 +100,7 @@ Each instruction extracted from source files is traced to its disposition in `ca
 | "Provide prioritized findings with remediation steps" | ✅ cadet-agent.md CodeReview skill |
 | "Recommend multi-model review" | ✅ cadet-agent.md CodeReview skill |
 | "Review distinguishes guidance recommendations from mandatory standards" | ✅ cadet-agent.md L17 |
+| "Confirm the story's declared reachability is honoured: an UNOWNED gap is blocking, an owned unexpired deferral is filed and does not block (contract v6)" | ✅ cadet-agent.md CodeReview skill + docs/core/HarnessContract-v6.md |
 
 ## Source: GitFirstRule.md
 

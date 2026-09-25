@@ -24,10 +24,15 @@ describe('policy — defaults', () => {
   });
 
   it('exposes the frozen gate names', () => {
+    // APPEND-ONLY, and the test is what keeps it that way: the invariant (C3)
+    // forbids renaming a gate, and every recorded name must keep its meaning.
+    // `reachabilityAddressed` is appended and additionally OPT-IN — it joins a
+    // transition's requirement only when `reachability.enabled` is true, which is
+    // asserted in harness-reachability.test.mjs.
     assert.deepEqual([...GATES], [
       'codeReviewCompleted', 'testsPassed', 'storyTrackingUpdated', 'compileCheckConfirmed',
       'unityAnalyzerClean', 'acceptanceCriteriaValidated', 'securityReviewPassed',
-      'designArtifactSyncConfirmed',
+      'designArtifactSyncConfirmed', 'reachabilityAddressed',
     ]);
   });
 

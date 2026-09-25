@@ -159,13 +159,14 @@ After completing an epic (or story for small/no-test changes) and before moving 
 - Do not proceed to the next epic or PR merge until critical/high-risk findings are resolved.
 - After completing the review, **recommend the user optionally review the output in a separate chat instance with a different AI model.** A fresh context window avoids bias from the conversation history, and a different model provides an independent second opinion. This is especially valuable for technical designs, architecture decisions, and security-sensitive changes.
 
-**Hard Gates (Step 3.5):** Before transitioning from `review` to `validation`, the following gates in `.cadet/state.json` must ALL be `true`:
+**Hard Gates (Step 3.5):** Before transitioning from `review` to `validation`, the following gates in `.cadet/state.json` must be `true` (the last only when the repository opts into reachability):
 
 - `codeReviewCompleted` — full 17-step review executed and findings filed.
 - `securityReviewPassed` — no secrets, unsafe patterns, or security concerns.
 - `acceptanceCriteriaValidated` — each Given/When/Then criterion validated.
+- `reachabilityAddressed` — the story's declared reachability is honoured (witnessed, or deferred to a work item that exists and is not already done). **Only when** `.cadet/harness.json` sets `reachability.enabled`; run `cadet-agent harness verify-reachability --story <path>` in this phase, because a record is bound to the phase it was created in.
 
-Set each gate to `true` in `.cadet/state.json` as it is satisfied. Only advance to `validation` when ALL three are `true`.
+Set each required gate to `true` in `.cadet/state.json` as it is satisfied. Only advance to `validation` when ALL required gates are `true`.
 
 ## Step 4
 Validate the completed work against the workflow path criteria before closing.

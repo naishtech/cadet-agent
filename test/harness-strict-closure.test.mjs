@@ -476,7 +476,7 @@ describe('strict closure — policy validation', () => {
     const p = validatePolicy({ strictClosure: { enabled: true } });
     assert.equal(p.strictClosure.revalidateOnClosure, true);
     assert.equal(p.strictClosure.requireFreshRevalidation, true);
-    assert.deepEqual(p.strictClosure.disallowManualFor, ['testsPassed']);
+    assert.deepEqual(p.strictClosure.disallowManualFor, ['testsPassed', 'reachabilityAddressed']);
     assert.equal(p.strictClosure.manualConfirmation.requireReason, true);
   });
 });
