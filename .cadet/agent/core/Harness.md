@@ -187,11 +187,15 @@ One classifier, in `src/harness/verification.mjs`. Skills provide policy, never 
 
 Every attempt gets a span and evidence record. A retry never overwrites a failed attempt.
 
+A command that never launched is not one of these classes: it is recorded `blocked` (stopReason
+`launch-failed`) and is never retried, because a missing interpreter does not appear on a second
+attempt. See §5.
+
 ## 5. Verification contracts
 
 | Gate | Command | Success | Failure |
 |---|---|---|---|
-| `testsPassed` | `npm test` (this repo) / `unity test <project> --format json` | exit 0 + report | nonzero; parse the report (path + hash are evidence) |
+| `testsPassed` | `npm test` (this repo) / `unity test <project> --format json` | exit 0 + report | nonzero; parse the report (path + hash are evidence). A command that never **launched** is `blocked`, not a red — see below |
 | `compileCheckConfirmed` | `unity build <project> --target StandaloneWindows64 -o <tmp> --format json` or a configured compile command | exit 0 | nonzero |
 | `unityAnalyzerClean` | `unity run <project> --command <analyzer-cmd> --format json` | exit 0 + zero `UNT*` | nonzero or any `UNT*` |
 | `acceptanceCriteriaValidated` | `cadet-agent harness verify-acs --story <path>` | every declared AC test appears in the run's inventory | a declared test is absent, an AC declares none, or the inventory is unknown |
@@ -221,6 +225,17 @@ Every attempt gets a span and evidence record. A retry never overwrites a failed
 - **Red-before-green is enforced, not just documented.** A `testsPassed` green result is rejected
   unless a prior failed (red) record exists for the same work item and gate — either in state or from
   an earlier attempt in the same loop. A `no_test_required` work item is exempt.
+- **A command that never launched is not a red.** Red-before-green is only meaningful if the red came
+  from a test that actually ran. When the shell cannot find or execute the command — a spawn error, a
+  `cmd.exe` that cannot resolve the program, a WSL stub with no installed distribution, or a shell's
+  exit 126/127 convention — the attempt is recorded `blocked` with stopReason `launch-failed`, **never**
+  `failed`, and it is not retried: a missing interpreter does not appear on a second attempt. A
+  `blocked` record cannot satisfy red-before-green, so no green can be licensed by a run in which
+  nothing executed. Before executing, a command led by a POSIX interpreter (`bash`, `sh`, `dash`,
+  `zsh`, `ksh`) is resolved on Windows: if every candidate on PATH is a WSL stub, the gate is blocked
+  before anything runs and the rejected path is named. The declared command is never rewritten — the
+  declaration stays the auditable record. Install Git for Windows (a real `bash`) or declare a command
+  that does not need a POSIX interpreter.
 - **Reachability is opt-in, and the switch is not the guarantee.** `reachabilityAddressed` joins
   `review -> validation` only when `.cadet/harness.json` sets `reachability.enabled: true`; with the
   default off, the gate list is exactly what the matrix declares, so adopting a framework version

@@ -104,6 +104,12 @@ run or an explicit user-approved budget override recorded in the ledger.
   blocked (`freshness-unavailable`) unless `allowEmptyFreshness: true` is set explicitly.
 - Red-before-green is enforced: a `testsPassed` green result requires a prior failed record for the
   same work item and gate, unless the work item is `no_test_required`.
+- A command that never launched cannot satisfy red-before-green. A launch failure — a spawn error, a
+  `cmd.exe` "not recognized" resolution failure, a WSL stub with no installed distribution, or a
+  shell's exit 126/127 command-not-found convention — is recorded `blocked` with stopReason
+  `launch-failed`, never `failed`, and is not retried. A command led by a POSIX interpreter
+  (`bash`, `sh`, `dash`, `zsh`, `ksh`) is resolved before execution on Windows; when every PATH
+  candidate is a WSL stub the gate is blocked before anything runs.
 - Artifacts are redacted before they are written; the artifact hash covers the persisted redacted bytes.
   Redaction has no bypass option.
 - `state validate` rejects a v2 document whose `gates.<name>` is `true` without a supporting
@@ -121,6 +127,11 @@ run or an explicit user-approved budget override recorded in the ledger.
 | `unknown` | anything unrecognized | no automatic retry; escalate, raw error only in bounded/redacted artifact |
 
 Each attempt gets a span and evidence record. A retry never overwrites a failed attempt.
+
+A command that never launched is a separate outcome from these classes, not a fifth one: it is
+recorded `blocked` (stopReason `launch-failed`) rather than `failed`, so it is never eligible as a
+red and is never retried. Detection, and the pre-execution interpreter resolution that refuses a
+WSL-stub-only `bash` on Windows, live in `verification.mjs` alongside the classifier.
 
 ## 6. Canonical Unity verification contracts
 
