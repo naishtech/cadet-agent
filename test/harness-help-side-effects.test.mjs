@@ -161,7 +161,7 @@ describe('a flag never silently consumes the next flag as its value', () => {
   // directory and then write a ledger into a directory named `--format/` — a
   // stray write in an arbitrary place, reported as success. A missing option
   // value must be a loud usage error.
-  const FLAGS = ['--target', '--format', '--gate', '--to', '--reason', '--type', '--run', '--phase'];
+  const FLAGS = ['--target', '--format', '--gate', '--to', '--reason', '--type', '--run', '--phase', '--expect-phase'];
 
   for (const flag of FLAGS) {
     it(`${flag} with no value is rejected`, () => {

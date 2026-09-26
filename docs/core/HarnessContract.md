@@ -16,6 +16,27 @@
 > is absent from the run's test inventory. Also opt-in via `strictClosure.enabled`. The full
 > v4 rationale, extraction rules, coverage artifact, and CLI contract are in
 > [HarnessContract-v4.md](HarnessContract-v4.md).
+>
+> **Post-v6 corrections (2026-09-26).** Three changes from a consumer audit, each a correction
+> to a mechanical check rather than a new capability:
+> **(1)** `harness verify-acs` no longer binds the generated test report into its `inputTreeHash`
+> / `relevantFiles`. A report is an *output* of the run, so a repository whose test script
+> rewrites a fixed report path staled the AC record the moment it re-ran the tests — the evidence
+> was invalidated by the very command that produced its inventory. The record now binds the story
+> (repo-relative) and the declared test names (`criteriaHash`); the report is kept as
+> `artifactPath` for audit only.
+> **(2)** strict-closure revalidation is no longer phase-scoped. A revalidated gate is judged on
+> its `inputTreeHash`, `criteriaHash`, and expiry, not on the phase that recorded it; a
+> transition's own `gates` keep the phase scope. The phase stamp therefore never forces a gate
+> to be re-recorded, which is what the old behaviour did — it rejected every record written in
+> an earlier phase even when nothing had changed. `requireFreshRevalidation` (default on) is a
+> **separate** rule on the same set and is unaffected: it independently requires a record newer
+> than the last transition, so it remains the one deliberate control for "re-run the gate at
+> this transition". Both halves are field-verified: with the knob on, all seven revalidated
+> gates are refused for recency; with it off, only a gate whose input tree actually changed is
+> refused.
+> **(3)** `--expect-phase <phase>` on the four gate-recording commands refuses to write evidence
+> when the current phase is not the expected one.
 
 This file is the Phase 0 deliverable: the implementation contract, the compatibility
 invariants, and the contract test matrix. Any change to the items below is a breaking
@@ -30,7 +51,7 @@ These are frozen as requirements. Later phases may add fields but must not chang
 | C1 | Phase names stay exactly: `context-resolution`, `requirements`, `requirementsComplete`, `architecture`, `architectureComplete`, `spikes`, `story-breakdown`, `implementation`, `review`, `validation`, `closed`. | `harness-state.test.mjs` |
 | C2 | Skill dispatch order is unchanged (Requirements → Architecture → Spike → StoryBreakdown → TDD → Debugging → CodeReview → Resume → MCPSetup; AgentReviewer is audit-only). | `skills.test.mjs`, `adapters.test.mjs` |
 | C3 | Gate names stay exactly: `codeReviewCompleted`, `testsPassed`, `storyTrackingUpdated`, `compileCheckConfirmed`, `unityAnalyzerClean`, `acceptanceCriteriaValidated`, `securityReviewPassed`, `designArtifactSyncConfirmed`. **APPEND-ONLY, and one append has happened**: `reachabilityAddressed` was added by contract v6 (v6 §2). An append is not a change to this invariant — no existing name moved or changed meaning — but this list is the authoritative one, so it is updated in the same change that appends, never later. Every recorded gate name from every earlier version must keep resolving. | `skills.test.mjs`, `harness-state.test.mjs`, `harness-policy.test.mjs` |
-| C4 | The transition table targets are unchanged: `implementation→review`, `review→validation`, `validation→closed`, and the per-transition `gates` lists are unchanged. Contract v3 adds a `revalidate` set per transition, applied **only** when `strictClosure.enabled` is true (v3 §1). **Conditional append (v6)**: when `reachability.enabled` is true, `review→validation` additionally requires `reachabilityAddressed` — appended at evaluation time (`requiredGates`), not in the table, so with the switch off the lists are exactly as declared; and under strict closure the declaration is re-examined at `validation→closed` (v6 §4). | `harness-state.test.mjs` |
+| C4 | The transition table targets are unchanged: `implementation→review`, `review→validation`, `validation→closed`, and the per-transition `gates` lists are unchanged. Contract v3 adds a `revalidate` set per transition, applied **only** when `strictClosure.enabled` is true (v3 §1). **Conditional append (v6)**: when `reachability.enabled` is true, `review→validation` additionally requires `reachabilityAddressed` — appended at evaluation time (`requiredGates`), not in the table, so with the switch off the lists are exactly as declared; and under strict closure the declaration is re-examined at `validation→closed` (v6 §4). A `revalidate` gate is **phase-independent** (post-v6 correction): it is judged on its `inputTreeHash`, `criteriaHash`, and expiry, not on the phase that recorded it, while a transition's own `gates` remain phase-scoped. `requireFreshRevalidation` still applies to the `revalidate` set independently. | `harness-state.test.mjs`, `harness-strict-closure.test.mjs` |
 | C5 | User approval requirements are unchanged: no automatic commit/push/merge, no automatic approval, live-editor mutation requires explicit confirmation. | `git-guard` tests, `Harness.md` |
 | C6 | Existing v1/v2 `state.json` files either validate unchanged after migration or receive a documented, atomic migration that leaves the original untouched on failure. A v2 document stays readable and is **not** retroactively invalidated by the v3 bump; v1 migrates straight to the current version. | `harness-state.test.mjs`, `harness-cli.test.mjs` |
 | C7 | Adapters remain thin pointers; no adapter restates canonical content. | `adapters.test.mjs` |
@@ -58,8 +79,16 @@ These are frozen as requirements. Later phases may add fields but must not chang
 - Default freshness scope: current story + current phase. A change to a relevant file,
   acceptance criterion, active work item, or verification command invalidates evidence.
   A new phase invalidates evidence unless the record explicitly permits that phase.
+  **Exception (revalidation):** a gate in a transition's `revalidate` set is not phase-scoped —
+  it is judged on its `inputTreeHash`, `criteriaHash`, and expiry, because revalidation asks
+  whether the gate is still true, not which phase recorded it. A transition's own `gates` remain
+  phase-scoped. `requireFreshRevalidation` is a separate rule over the same set: it additionally
+  requires a record newer than the last transition, and it is the only rule that can force an
+  unchanged gate to be re-recorded.
 - `inputTreeHash` = SHA-256 over sorted `(relative path, file hash)` pairs of relevant files,
-  excluding generated run artifacts.
+  excluding generated run artifacts. A generated test report is never a relevant file:
+  `harness verify-acs` keeps it as `artifactPath` for audit, so re-running the tests cannot stale
+  the AC record.
 - State documents and run ledgers are written atomically (temp file + rename); an interrupted
   write cannot truncate the target.
 - Gate exceptions are scoped to one work item + one transition, expire at transition
@@ -101,7 +130,9 @@ run or an explicit user-approved budget override recorded in the ledger.
   from its byte length.
 - The verification evidence `inputTreeHash` is computed from the relevant files (`--files`, or the
   working tree's changed files). If Git cannot be queried and no `--files` are given, verification is
-  blocked (`freshness-unavailable`) unless `allowEmptyFreshness: true` is set explicitly.
+  blocked (`freshness-unavailable`) unless `allowEmptyFreshness: true` is set explicitly. For
+  `harness verify-acs` the relevant files are the story alone, recorded repo-relative; the test
+  report it read is not among them (see §2).
 - Red-before-green is enforced: a `testsPassed` green result requires a prior failed record for the
   same work item and gate, unless the work item is `no_test_required`.
 - A command that never launched cannot satisfy red-before-green. A launch failure — a spawn error, a
@@ -194,12 +225,14 @@ Redaction runs before ledger persistence and before report display.
 | Accounting | exact + estimated usage | unknown usage never satisfies budget | `harness-ledger.test.mjs` |
 | Repository role | marker/structural detection resolves the role | malformed marker falls through; marker is not managed/preserved | `harness-repo-role.test.mjs`, `repo-role-marker.test.mjs` |
 | AC↔test coverage | declared tests found in the inventory ⇒ gate set | missing/undeclared test, or unknown inventory, ⇒ gate not set; strict-off writes nothing | `harness-verify-acs.test.mjs` |
+| AC evidence binding | `verify-acs` binds the story and survives a rewritten report | editing the story invalidates the record; the report is not a relevant file | `harness-verify-acs.test.mjs` |
 | Dry-run transition (C13) | `--dry-run` reports allowed and leaves `state.json` byte-identical | `--dry-run` rejection writes nothing; `closed → implementation` rejected; bootstrap edges still allowed | `harness-transition-dryrun.test.mjs` |
 | Write declaration (C13) | every command declares `mutates`; read-only commands write nothing; `--dry-run` honoured for all mutating commands | a read-only command writes; a mutating command ignores `--dry-run`; a destructive command runs unattended without a bound; a failed `migrate` leaves a backup | `harness-command-registry.test.mjs`, `harness-help-side-effects.test.mjs` |
 | Change inventory | `harness changes` reports the changed files, statuses, counts, and links, and writes nothing | a missing git reports `available: false` with a reason, never an empty change set | `harness-changes.test.mjs`, `harness-command-registry.test.mjs` |
 | Artifact reconciliation | `harness reconcile` reports state↔disk and link inconsistencies, and writes nothing | a missing plans directory or an unreadable artifact yields `available: false` / verdict `unknown`, never a clean chain | `harness-reconcile.test.mjs`, `harness-command-registry.test.mjs` |
 | Strict closure off (v3) | v2 behaviour byte-identical with the flag absent | stale implementation gate does NOT block closure when off | `harness-strict-closure.test.mjs`, `harness-state.test.mjs` |
 | Closure revalidation (v3) | fresh revalidation satisfies `validation→closed` | gate valid at `implementation` but stale at closure is rejected | `harness-strict-closure.test.mjs` |
+| Revalidation phase scope | an earlier-phase record with an unchanged tree satisfies closure | a revalidated gate whose input tree moved is still rejected; a primary gate is still phase-scoped | `harness-strict-closure.test.mjs` |
 | Revalidation recency (v3) | record newer than the last transition accepted | unexpired but older record rejected | `harness-strict-closure.test.mjs` |
 | Manual-confirmation quality (v3) | full record (reason/expiresAt/environment/scope) accepted | each missing field rejected; all reported together | `harness-strict-closure.test.mjs` |
 | Null freshness bound (v3) | `freshnessPolicy.scope` present accepted | `expiresAt: null` + `freshnessPolicy: null` rejected under strict | `harness-strict-closure.test.mjs` |
@@ -209,3 +242,4 @@ Redaction runs before ledger persistence and before report display.
 | Taxonomy expiry (v3) | shortening a category's default accepted | extending it without `expiryExtendedReason` rejected | `harness-strict-closure.test.mjs` |
 | `harness confirm` (v3) | writes ledger + state, flips gate, supersedes prior evidence | disallowed gate / missing metadata / over-long validity each exit 1 and write nothing | `harness-confirm-cli.test.mjs` |
 | Schema/code lockstep (v3) | schemas declare strictClosure and the taxonomy | version enum is `[1,2,3]` and defaults stay opt-in | `skills.test.mjs` |
+| `--expect-phase` guard | the matching phase lets the command record | a mismatched or unknown phase refuses before any write, across all four gate-recording commands | `harness-expect-phase.test.mjs` |

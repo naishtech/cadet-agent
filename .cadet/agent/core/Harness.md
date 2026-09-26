@@ -50,17 +50,27 @@ A gate is `true` only when backed by **fresh, structured evidence**.
 - Default scope: the **current story and current phase**.
 - Evidence is invalidated by any change to a relevant file, an acceptance criterion, the
   active work item, or the verification command. A new phase invalidates evidence unless the
-  record explicitly allows that phase.
+  record explicitly allows that phase. One exception: a gate in a transition's **`revalidate`
+  set is not phase-scoped** — it is judged on its `inputTreeHash`, `criteriaHash`, and expiry,
+  because the question revalidation asks is whether the gate is still true, not which phase
+  recorded it. A transition's own `gates` stay phase-scoped. (`requireFreshRevalidation` is a
+  separate rule on the same set: it additionally demands a record newer than the last
+  transition, and only that rule can force a re-record of an unchanged gate.)
 - `inputTreeHash` = SHA-256 over sorted `(relative path, file hash)` pairs of relevant files,
   excluding generated run artifacts.
 - A gate exception is scoped to **one work item and one transition**, expires when that
   transition completes or at `expiresAt`, and never propagates to a new story.
 - **Strict closure** (`strictClosure.enabled`, opt-in, default off). When enabled, a transition
   also re-derives the gates already satisfied in earlier phases, so a gate cannot go stale
-  during a long `review`/`validation` and still be carried into closure. With
-  `requireFreshRevalidation`, the record must be newer than the last transition, not merely
-  unexpired. When disabled, behaviour is identical to v2. See
-  `docs/core/HarnessContract-v3.md` §1–§2.
+  during a long `review`/`validation` and still be carried into closure. Re-derivation is
+  deliberately **not phase-scoped**: it asks whether the gate is still true — its input tree,
+  criteria hash, and expiry — not which phase wrote the record down, so the phase stamp alone
+  never forces a gate to be re-recorded. **What still does is `requireFreshRevalidation`
+  (default on)**: it independently requires a record *newer than the last transition*, so a
+  repository that wants an unchanged tree to carry a gate across a transition sets it to
+  `false`. Verified on a real project — with it on, all seven revalidated gates are refused for
+  recency; with it off, only a genuinely changed input tree is refused. When strict closure is
+  disabled, behaviour is identical to v2. See `docs/core/HarnessContract-v3.md` §1–§2.
 
 ## 2a. Manual-confirmation quality
 
@@ -219,6 +229,12 @@ attempt. See §5.
   `testsPassed`. The check is mechanical: an unparseable report yields an *unknown* inventory,
   which proves nothing and cannot satisfy the gate. Editing a declared test name invalidates
   evidence bound to the old name, because AC ids and test names participate in `criteriaHash`.
+- **The AC record binds the story, not the report.** `harness verify-acs` binds its evidence to
+  the story — repo-relative, so the freshness re-derivation at transition time actually resolves
+  it — and to the declared test names via `criteriaHash`. The test report it read is kept as
+  `artifactPath` for audit and is deliberately **not** a relevant file: a generated report is
+  rewritten by the very command that produced it, so binding it would stale the record the moment
+  the tests were re-run. Same reason `.cadet/state.json` and `.cadet/runs/**` are excluded above.
 - **Freshness cannot be silently skipped.** If Git cannot be queried and no `--files` are given,
   verification is blocked (`freshness-unavailable`) rather than recorded against an empty input tree.
   A project may opt out explicitly with `allowEmptyFreshness: true` in `.cadet/harness.json`.
@@ -357,11 +373,18 @@ Run `cadet-agent harness capabilities --format json` to read the registry instea
 - `cadet-agent state seal [--work-item <id>] [--commit-msg <path>]` — write the active work item's evidence as commit trailers, for `git commit -F`. **Cadet never commits** (C5): this prepares a message file and archives the records; the commit stays the user's action.
 - `cadet-agent state transition --to <phase> [--dry-run]` — enforce the transition matrix + evidence. **`--dry-run` reports the same verdict and writes nothing** — use it for every inspection; without the flag the transition is applied and `state.json` is written. A transition is legal only when it is a gated transition in the matrix or a declared ungated forward edge (bootstrap + planning progression); `closed` is terminal, so leaving it is rejected. A rejection lists every missing or stale gate.
 - `cadet-agent harness record` — append a sanitized span/evidence/decision event. Honours `--dry-run`. Append-only, so it carries no unattended bound: requiring a flag to record evidence would push agents to skip logging.
-- `cadet-agent harness confirm --gate <gate> --reason <t> --expires-at <iso> --environment <k=v,...> --scope <a,b> [--files a,b] [--commit <sha>]` — record `manual-confirmation` evidence, the first-class path for a gate automation cannot satisfy. Validates the strict-closure metadata *before* writing, rejects a gate in `disallowManualFor`, bounds the validity window, and binds the record to files exactly as `harness verify` does. Writes the ledger and then `state.json` atomically; prior passing evidence for the gate is marked `superseded`, never deleted. Use this instead of hand-editing `state.json` — the rules in §2a are checked at creation time, when the human still remembers what was verified.
-- `cadet-agent harness verify --gate <gate> [--files a,b] [--commit <sha>]` — run a bounded, classified verification loop. Evidence is bound to the relevant files given by `--files` (or the working tree's changed files). A `testsPassed` green result requires a prior red record. On success it records the new evidence in `state.json → gateEvidence` and flips the gate; prior passing evidence for that gate is marked `superseded`. The full attempt history is written to the run ledger. A **failing** verification still persists its ledger: that is the red record, and suppressing it would break TDD evidence.
+- `cadet-agent harness confirm --gate <gate> --reason <t> --expires-at <iso> --environment <k=v,...> --scope <a,b> [--files a,b] [--commit <sha>] [--expect-phase <phase>]` — record `manual-confirmation` evidence, the first-class path for a gate automation cannot satisfy. Validates the strict-closure metadata *before* writing, rejects a gate in `disallowManualFor`, bounds the validity window, and binds the record to files exactly as `harness verify` does. Writes the ledger and then `state.json` atomically; prior passing evidence for the gate is marked `superseded`, never deleted. Use this instead of hand-editing `state.json` — the rules in §2a are checked at creation time, when the human still remembers what was verified.
+- `cadet-agent harness verify --gate <gate> [--files a,b] [--commit <sha>] [--expect-phase <phase>]` — run a bounded, classified verification loop. Evidence is bound to the relevant files given by `--files` (or the working tree's changed files). A `testsPassed` green result requires a prior red record. On success it records the new evidence in `state.json → gateEvidence` and flips the gate; prior passing evidence for that gate is marked `superseded`. The full attempt history is written to the run ledger. A **failing** verification still persists its ledger: that is the red record, and suppressing it would break TDD evidence.
 - `cadet-agent harness verify-acs --story <path> [--report <path>] [--write-coverage]` — mechanically verify that every test a story declares for an acceptance criterion actually ran. The story is the single source of truth for the AC→test mapping; the inventory is extracted from a test report (TAP, JUnit XML, or Unity JSON), auto-detected by content. Under `strictClosure.enabled`, any declared test absent from the inventory, any AC that declares no test, or an unknown/empty inventory means `acceptanceCriteriaValidated` is **not** set and the command exits 1, listing every gap with its AC id. With strict closure off it reports and exits 0 without touching `state.json`. `--write-coverage` additionally writes a derived `*.coverage.json` artifact.
 - `cadet-agent harness matrix-check --matrix <path> [--report <path> | --inventory <path>]` — reconcile a TDD matrix's **delivered** test-name claims against a compiled inventory. A matrix row is authored during architecture, before implementation, so a name can be an intention that changes or never happens while nothing re-checks the row; this is the mechanical check for that. Read-only — it never writes state, so it runs at authoring time as well as in a gate. Two directions are kept deliberately separate: a name in a `DELIVERED` row absent from the inventory is a **defect** (exit 1), while a name in an undelivered row is an **intention** and is never reported. Collapsing the two produces false failures, and a false failure is how a real check gets switched off. Undelivered intentions that *have* landed are reported informationally, so a stale row is visible rather than silent. Without `--report` or `--inventory` nothing can be proven, so the command exits 1 rather than reporting success.
 - `cadet-agent harness verify-reachability --story <path>` — mechanically check that a story's declared reachability is honoured. A missing or malformed declaration, a deferral naming a work item that does not exist, a deferral whose target is already `done`, and a cycle of deferrals within the story's own epic are all **refused**, with every gap listed. When the repository configures `reachability.command`, that command runs and its exit code is the verdict. Enforcement is opt-in: with `reachability.enabled` false (the default) the command reports and writes nothing, and the gate is not part of `review -> validation`. On success it records `reachabilityAddressed` and exits 0.
+- `--expect-phase <phase>` (accepted by every command that records gate evidence: `harness
+  verify`, `harness confirm`, `harness verify-acs`, `harness verify-reachability`) refuses to
+  record unless `state.json`'s current phase is exactly `<phase>`, and refuses a value naming no
+  known phase. It exists because a caller that chains commands with `;` and filters the output
+  can read the next command's success as a failed `state transition`'s, recording the following
+  gates into the phase it never left. Opt-in: omitting it changes nothing, and a mismatch writes
+  nothing at all — it cannot corrupt state, only stop the command.
 - `cadet-agent harness report` — summarize budget consumption and failures (no secrets). Read-only.
 - `cadet-agent harness cleanup --older-than-ms <n>` — apply the retention policy to `.cadet/runs/`. **Deletes run records irreversibly, so `--older-than-ms` is required**: an unattended agent must state the age bound it is deleting by. Without it the command refuses and deletes nothing, so a caller that does not know what the command does cannot destroy evidence by accident. `--dry-run` reports what would be deleted without deleting it.
 - `cadet-agent harness capabilities` — report available CLI/Unity/MCP/hook/token/cost telemetry, plus the command registry (`commands[]`) with each command's `mutates`, `writes`, and unattended requirements. Read-only.
