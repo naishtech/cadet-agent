@@ -17,7 +17,7 @@ import {
   collectDeclaredTestNames, reconcileTestNames,
   resolveCommand, describeCommand, describeAllCommands, checkUnattendedRequirements, COMMANDS,
   STATE_VERSION, sealedEvidence, recordEvidence, appendEvidence, sealWorkItem, toStateV4,
-  isHistoryExternal, HISTORY_ENTRIES_KEPT,
+  isHistoryExternal, HISTORY_ENTRIES_KEPT, resetGatesForNewWorkItem,
 } from './harness/index.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -50,6 +50,7 @@ function showHelp() {
     cadet-agent state migrate       Atomically migrate state to the current version (backup on write)
     cadet-agent state migrate --to 4   Compact: archive closed work items' evidence, build the index
     cadet-agent state compact --keep <bound>   Move closed work items' evidence into .cadet/archive/
+    cadet-agent state begin --epic <id> --story <file>   Start a work item: reset gates, archive the previous item's evidence
     cadet-agent state seal          Write the active work item's evidence as commit trailers
     cadet-agent state transition --to <phase>   Enforce the transition matrix + evidence
     cadet-agent state transition --to <phase> --dry-run   Check only; writes nothing
@@ -90,6 +91,8 @@ function showHelp() {
     --agents-md    keep|overwrite|merge for an existing AGENTS.md (init/sync)
     --older-than-ms  Age bound, in ms, for records cleanup may delete (harness cleanup; required)
     --keep         always|active|<work-item ids> for what stays in state.json (state compact; required)
+    --retain-all   state compact: keep every record of the kept work items; only cross-work-item records leave
+    --epic         Epic id of the work item being started (state begin)
     --commit-msg   Path to write the prepared commit message to (state seal)
     --verify-sealed  Also verify evidence sealed in commit trailers (state validate)
     --dry-run      Report what a mutating command would do and write nothing (all mutating commands)
@@ -170,6 +173,12 @@ function parseArgs(argv) {
       // working-tree scan (which could bind evidence to Cadet's own files).
       case '--files': opts.filesGiven = true; opts.files = value(a).split(',').map((s) => s.trim()).filter(Boolean); break;
       case '--story': opts.story = value(a); break;
+      // state begin: the epic the new work item belongs to.
+      case '--epic': opts.epicId = value(a); break;
+      // state compact: keep every record inline instead of applying the
+      // within-work-item retention rule. Made explicit at the call site, because
+      // otherwise a reader cannot tell a retained document from an unbounded one.
+      case '--retain-all': opts.retainAll = true; break;
       case '--report': opts.report = value(a); break;
       // AR-1: the revision a gate record attests, so a gate-related fix claim
       // can be traced to the commit that contains it.
@@ -531,7 +540,7 @@ async function cmdState(opts) {
       fail(opts, `state.json is v${state.version ?? state.stateVersion}; compaction requires v${STATE_VERSION}. Run "cadet-agent state migrate --to ${STATE_VERSION}" first.`, () => 1, { ok: false, code: 'compact-requires-v4' });
     }
     const keep = parseKeepBound(opts.keep);
-    const { state: next, archived, archivedHistory } = toStateV4(state, { keep });
+    const { state: next, archived, archivedHistory } = toStateV4(state, { keep, retainAll: opts.retainAll === true });
     const written = appendEvidenceArchive(opts.targetDir, archived);
     const history = appendHistoryArchive(opts.targetDir, archivedHistory);
     const changed = archived.length > 0 || archivedHistory.length > 0;
@@ -539,7 +548,7 @@ async function cmdState(opts) {
     emit(
       opts,
       changed
-        ? `✅ Compacted state.json: archived ${archived.length} evidence record(s), ${history.appended} change-log entr(ies); kept ${next.gateEvidence.length} record(s) and ${(next.changeHistory || []).length} entr(ies) inline.\n   Archive: ${join(opts.targetDir, '.cadet', 'archive')}`
+        ? `✅ Compacted state.json: archived ${archived.length} evidence record(s), ${history.appended} change-log entr(ies); kept ${next.gateEvidence.length} record(s) and ${(next.changeHistory || []).length} entr(ies) inline.${opts.retainAll ? '\n   --retain-all: every kept work item\'s records stay inline, so only cross-work-item records left.' : ''}\n   Archive: ${join(opts.targetDir, '.cadet', 'archive')}`
         : '✅ Nothing to compact: every evidence record and change-log entry is already kept inline.',
       {
         ok: true,
@@ -550,6 +559,62 @@ async function cmdState(opts) {
         skipped: written.skipped,
         archivePaths: [...written.files, ...(history.path ? [history.path] : [])],
         coverageRows: Object.keys(next.evidenceCoverage || {}).length,
+      },
+    );
+    return;
+  }
+
+  if (sub === 'begin') {
+    // The story boundary, as a command.
+    //
+    // It existed only as a sentence in `skills/Resume.md` — "set `activeWorkItem`,
+    // reset gates" — which an agent carried out by editing state.json by hand, and
+    // the sentence never mentions evidence. So the previous work item's records
+    // stayed inline for ever. On the audited repository that was 63 records and
+    // ~3,000 lines, none of which any gate could read: `evidenceFreshness` rejects
+    // a record whose `workItemId` is not the active one. `resetGatesForNewWorkItem`
+    // already did the job correctly — cleared the evidence, folded it into the
+    // coverage index first, dropped expired exceptions, wrote one boundary line —
+    // and had no caller. This is the door.
+    if (!opts.epicId) fail(opts, 'state begin requires --epic <epicId>');
+    if (!opts.story) fail(opts, 'state begin requires --story <storyFile>');
+    const { exists, state } = readState(opts.targetDir);
+    if (!exists) fail(opts, 'No .cadet/state.json found. Initialise state before starting a work item.', () => 2);
+
+    const fromId = state.activeWorkItem ? workItemIdOf(state) : null;
+    const toId = `${opts.epicId}::${opts.story}`;
+    if (fromId === toId) {
+      fail(opts, `the active work item is already "${toId}"; nothing to begin.`, () => 1, { ok: false, code: 'already-active', workItemId: toId });
+    }
+    // `closed` is terminal: Resume says new work starts from a fresh session
+    // (context-resolution) rather than by beginning a work item inside a plan that
+    // is already finished.
+    if (state.session?.currentPhase === 'closed') {
+      fail(opts, 'the session is closed — start new work from a fresh session (context-resolution) rather than beginning a work item inside a closed plan.', () => 1, { ok: false, code: 'session-closed' });
+    }
+
+    // Nothing leaves state.json without being written down first (contract v5 §1).
+    // The reset folds the outgoing records into the coverage index, which is a
+    // *summary* — so the records themselves are archived here, exactly as `compact`
+    // archives a closed work item's, and before the document is written.
+    const outgoing = Array.isArray(state.gateEvidence) ? state.gateEvidence : [];
+    const written = appendEvidenceArchive(opts.targetDir, outgoing);
+    const next = resetGatesForNewWorkItem(state, { epicId: opts.epicId, storyId: opts.story });
+    writeState(opts.targetDir, next);
+    emit(
+      opts,
+      `✅ Began ${toId}.\n   Gates reset; ${outgoing.length} evidence record(s) archived (${written.appended} appended, ${written.skipped} already archived).`
+      + (fromId ? `\n   Previous work item: ${fromId}` : '')
+      + `\n   Coverage rows: ${Object.keys(next.evidenceCoverage || {}).length}`,
+      {
+        ok: true,
+        from: fromId,
+        to: toId,
+        gatesReset: true,
+        archived: written.appended,
+        alreadyArchived: written.skipped,
+        coverageRows: Object.keys(next.evidenceCoverage || {}).length,
+        archivePaths: written.files,
       },
     );
     return;
@@ -656,7 +721,7 @@ async function cmdState(opts) {
     return;
   }
 
-  fail(opts, `Unknown state subcommand: ${sub || '(none)'}. Use validate|migrate|compact|seal|transition.`);
+  fail(opts, `Unknown state subcommand: ${sub || '(none)'}. Use validate|migrate|compact|begin|seal|transition.`);
 }
 
 /**

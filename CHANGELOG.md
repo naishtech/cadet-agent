@@ -13,6 +13,17 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Fixed
+
+- **`state.json` had no bound inside a single work item, and the story boundary never touched evidence.** Contract v5 scopes `gateEvidence` to the active work item, but nothing pruned *within* one — and the boundary itself was a hand-edit. `Resume` said "set `activeWorkItem`, reset gates", a sentence that never mentions evidence, while `resetGatesForNewWorkItem` — the function that clears it correctly — had no caller anywhere in `src/`. Nothing surfaced the result, because `state validate` only ever asked whether a claimed-true gate's *own* record was bound to the active item, never whether foreign records were sitting in the array. Measured on the audited repository: **7,986 lines**, of which `gateEvidence` was 6,495 (81%) holding **135 records — 115 `superseded`, 63 of them a closed work item's, 9 live**. Two fixes: `state compact` now applies a within-work-item retention rule as well as the cross-work-item one — it keeps the newest record per gate, every `passed`/`manual-confirmation` record, and every `failed` record (red-before-green reads the prior red), archives the rest to `.cadet/archive/`, and reports the counts, with `--retain-all` to opt out — and `state validate` now **warns** when `gateEvidence` holds records for another work item, or more than 60 records, naming the work items and pointing at the command.
+  - **Warnings, not errors, and deliberately so.** A foreign record is rejected by `evidenceFreshness` and cannot satisfy any gate, so this is hygiene rather than a safety violation; and an error would invalidate every existing document on upgrade for a condition no reader can repair in place. Only v4 documents are scoped this way — a v1–v3 document keeps every record inline by design.
+  - **Test coverage:** `test/harness-state-v4.test.mjs` gains the retained-set cases (newest-per-gate survives; `passed`/`manual-confirmation`/`failed` survive; a non-newest `superseded` record is archived; `--retain-all` keeps everything; red-before-green is still satisfiable after compaction) and the warning cases (foreign records warn and name the work items; an over-long array warns; a clean v4 document warns about neither; a v3 document is never scoped).
+
+### Added
+
+- **`state begin --epic <epicId> --story <storyFile>` — the story boundary, as a command.** Starting the next story was a sentence in `Resume` carried out by hand-editing `state.json`, which is why the previous story's evidence stayed inline for ever. `resetGatesForNewWorkItem` already did the job correctly — cleared the evidence, folded it into the coverage index first, dropped expired exceptions, wrote one boundary line — and was unreachable. It now has a door: `state begin` resets every gate, **archives the outgoing records before the document is written** (nothing leaves `state.json` without being written down first, the same ordering `compact` uses), folds them into `evidenceCoverage`, and refuses a target that is already the active work item or a session that is `closed`. The documented cause was updated with it: `Resume` now says to run `state begin`, and says explicitly not to set `activeWorkItem` by hand.
+  - **Test coverage:** `test/harness-state-begin.test.mjs` — gate reset, the outgoing records archived with the document written only afterwards, coverage folded, the already-active and `closed` refusals, and the registry declaring it mutating so C13's write guard covers it.
+
 ## [0.48.0] — 2026-09-26
 
 ### Fixed

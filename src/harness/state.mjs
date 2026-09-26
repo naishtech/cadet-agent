@@ -150,6 +150,50 @@ export function validateState(state, context = {}) {
         for (const e of validateEvidenceShape(ev, strict)) errors.push({ path: `gateEvidence[${i}].${e.path}`, message: e.message });
       });
     }
+    // Contract v5 C14 says a v4 document's `gateEvidence` holds the ACTIVE work
+    // item's records — and in practice it did not. The story boundary is a
+    // hand-edit (`skills/Resume.md`: "set `activeWorkItem`, reset gates"), that
+    // sentence says nothing about evidence, and `resetGatesForNewWorkItem` — the
+    // function that clears it correctly — has no caller. Nothing surfaced the
+    // result: the gate checks below only ever ask whether a claimed-true gate's
+    // OWN record is bound to the active item, never whether foreign records are
+    // sitting in the array. On the audited repository that was 63 records and
+    // ~3,000 lines of dead weight inside an 8,000-line document.
+    //
+    // Warnings, not errors. A foreign record is unreadable by every gate check
+    // (`evidenceFreshness` rejects the work-item mismatch), so this is hygiene
+    // rather than a safety violation; and an error would invalidate every document
+    // that predates the check, on upgrade, for a condition its reader cannot
+    // repair in place. Only v4 documents are scoped this way — a v1-v3 document
+    // keeps every record inline by design.
+    if (version === STATE_VERSION && Array.isArray(state.gateEvidence)) {
+      const active = isPlainObject(state.activeWorkItem) ? state.activeWorkItem : null;
+      const activeId = active ? `${active.epicId || 'none'}::${active.storyId || 'none'}` : null;
+      const foreign = new Map();
+      for (const record of state.gateEvidence) {
+        const id = record?.workItemId;
+        if (!id || id === activeId) continue;
+        foreign.set(id, (foreign.get(id) || 0) + 1);
+      }
+      if (foreign.size > 0) {
+        const total = [...foreign.values()].reduce((a, b) => a + b, 0);
+        const named = [...foreign.entries()].map(([id, n]) => `${id} (${n})`).join(', ');
+        warnings.push({
+          path: 'gateEvidence',
+          message: `gateEvidence holds ${total} record(s) for work item(s) that are not the active one: ${named}. `
+            + 'They cannot satisfy any gate and only grow the document. Run "cadet-agent state compact --keep active" to move them to .cadet/archive/.',
+        });
+      }
+      const maxLive = context.maxLiveEvidence ?? DEFAULT_MAX_LIVE_EVIDENCE;
+      if (Number.isFinite(maxLive) && state.gateEvidence.length > maxLive) {
+        warnings.push({
+          path: 'gateEvidence',
+          message: `gateEvidence holds ${state.gateEvidence.length} records inline (limit ${maxLive}). `
+            + 'Most of a record is its `relevantFiles` list, so re-running a gate inflates the document rather than the story. '
+            + 'Run "cadet-agent state compact --keep active", which keeps the newest record per gate plus the red-before-green records and archives the rest.',
+        });
+      }
+    }
     // Gate exceptions are categorised under strict closure (contract v3 §4).
     //
     // v4 gives them their own field, because they are *live state* — scoped to a
@@ -688,16 +732,21 @@ export function compactHistory(entries, { keepRecent = HISTORY_ENTRIES_KEPT } = 
 }
 
 /**
- * Reshape a document into v4 (contract v5): keep only the active work item's
+ * Reshape a document into v4 (contract v5): keep the active work item's live
  * evidence inline, move the rest to `archived` for the caller to persist, promote
  * gate exceptions into their own field, bound the change log, and install the
  * coverage index.
  *
+ * Two independent bounds decide what stays inline — `keep` selects the work items
+ * and `retainAll` controls the within-item retention described on
+ * `retainLiveRecords`. Passing `retainAll: true` keeps an item's whole record set,
+ * which is the pre-retention behaviour.
+ *
  * Pure — it returns the records to archive rather than writing them, so the
  * caller owns the archive location and this stays testable without a filesystem.
  */
-export function toStateV4(state, { keep = 'active', keepHistory = HISTORY_ENTRIES_KEPT } = {}) {
-  const { live, archived, coverage } = splitEvidence(state, { keep });
+export function toStateV4(state, { keep = 'active', keepHistory = HISTORY_ENTRIES_KEPT, retainAll = false } = {}) {
+  const { live, archived, coverage } = splitEvidence(state, { keep, retainAll });
 
   const promoted = [];
   const remainingHistory = [];
@@ -1527,10 +1576,11 @@ export function mergeEvidenceCoverage(existing, records) {
  * merely conservative — it is provably safe for any document that was valid before
  * compaction: `validateState` already rejects a claimed-true gate whose supporting
  * record belongs to a *different* work item, so every gate a valid document
- * depends on is already backed by exactly the records this keeps. A stricter
- * selector (say, "newest passing record per gate") would be smaller and would
- * silently break the red-before-green rule, which needs the prior failing record
- * for the same work item and gate to still exist.
+ * depends on is already backed by exactly the records this keeps.
+ *
+ * This selector answers *which work item*. It deliberately does not answer *which
+ * of that item's records* — see `retainLiveRecords` for that second, independent
+ * bound, and for why "newest passing record per gate" would be wrong on its own.
  */
 function keepSelector(keep, state) {
   if (keep === 'always') return () => true;
@@ -1550,22 +1600,87 @@ function keepSelector(keep, state) {
 }
 
 /**
+ * How many evidence records may stay inline for one work item before
+ * `state validate` warns.
+ *
+ * A record is ~24 fields plus one line per path in `relevantFiles`, and a long
+ * story re-records the same gate many times, so the array grows with *re-runs*
+ * rather than with the size of the story. Measured on the audited repository: 26
+ * `testsPassed` records for a single story, of which one was live.
+ */
+export const DEFAULT_MAX_LIVE_EVIDENCE = 60;
+
+/**
+ * Which of one work item's records stay inline.
+ *
+ * `keepSelector` answers *which work item*; this answers *which of its records*,
+ * and the two bounds are independent. Without this second one, a single long
+ * story's re-run history stays for ever — the story boundary never fires inside a
+ * story, so nothing bounds it.
+ *
+ * The retained set is exactly what the machinery can still read:
+ *
+ *   - the **newest record per gate**, because `latestEvidenceForGate` reads
+ *     precisely that and a newer record shadows every older one for its gate;
+ *   - every **`passed` / `manual-confirmation`** record, because a claimed-true
+ *     gate must be backed by one, and "newest per gate" alone would drop a live
+ *     record that a later-appended but *older-stamped* record shadows (a
+ *     `manual-confirmation` may carry its own `at`);
+ *   - every **`failed`** record, because red-before-green reads the prior red for
+ *     the same work item and gate (`runVerificationLoop`'s `priorEvidence`).
+ *
+ * Everything else — `superseded`, and `blocked` that is not the newest for its
+ * gate — is history. It leaves the document exactly as a closed work item's
+ * records do: same archive, same ordering guarantee, same coverage rebuild.
+ */
+export function retainLiveRecords(records, { retainAll = false } = {}) {
+  const list = Array.isArray(records) ? records : [];
+  if (retainAll) return new Set(list);
+
+  const at = (record) => {
+    const parsed = Date.parse(record?.createdAt);
+    return Number.isFinite(parsed) ? parsed : -Infinity;
+  };
+
+  const newestByGate = new Map();
+  for (const record of list) {
+    if (!record || typeof record !== 'object' || !record.gate) continue;
+    const current = newestByGate.get(record.gate);
+    if (!current || at(record) >= at(current)) newestByGate.set(record.gate, record);
+  }
+
+  const retained = new Set(newestByGate.values());
+  for (const record of list) {
+    if (!record || typeof record !== 'object') continue;
+    if (record.status === 'passed' || record.status === 'manual-confirmation' || record.status === 'failed') {
+      retained.add(record);
+    }
+  }
+  return retained;
+}
+
+/**
  * Split a document's evidence into the part that stays live and the part that
  * becomes history (contract v5).
  *
- * "Live" is defined by a keep selector, defaulting to the active work item — see
- * `keepSelector` for why that boundary is the safe one.
+ * Two independent bounds decide "live": the keep selector (which work items),
+ * defaulting to the active one — see `keepSelector` for why that boundary is safe
+ * — and `retainLiveRecords` (which of that item's records), which is what bounds
+ * a single long story.
  *
  * Returns `{ live, archived, coverage }`. Pure: no I/O, so the caller decides
  * where the archive is written.
  */
-export function splitEvidence(state, { keep = 'active' } = {}) {
+export function splitEvidence(state, { keep = 'active', retainAll = false } = {}) {
   const records = Array.isArray(state?.gateEvidence) ? state.gateEvidence : [];
   const keepRecord = keepSelector(keep, state);
+  const inScope = records.filter((record) => keepRecord(record));
+  const retained = retainLiveRecords(inScope, { retainAll });
   const live = [];
   const archived = [];
   for (const record of records) {
-    if (keepRecord(record)) live.push(record);
+    // Original order is preserved on both sides so the archive stays readable.
+    if (inScope.includes(record) && retained.has(record)) live.push(record);
     else archived.push(record);
   }
   const prior = isPlainObject(state?.evidenceCoverage) ? state.evidenceCoverage : {};

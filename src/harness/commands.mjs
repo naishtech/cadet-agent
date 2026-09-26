@@ -72,6 +72,15 @@ export const COMMANDS = {
     unattended: false,
     requiresForUnattended: ['--keep'],
   },
+  'state begin': {
+    mutates: true,
+    summary: 'Start a work item: reset gates, archive the previous item\'s evidence, fold it into the coverage index.',
+    writes: ['.cadet/state.json', '.cadet/archive/**'],
+    // The bound is already content-bearing: `--epic` and `--story` name the work
+    // item being started, so an unattended caller cannot begin one without saying
+    // which. That is why this needs no separate confirmation flag.
+    unattended: true,
+  },
   'state transition': {
     mutates: true,
     summary: 'Enforce the transition matrix and evidence; applies the transition.',
