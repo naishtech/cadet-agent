@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os';
 import {
   parseTestInventory, normalizeTestName, parseStoryCriteria, compareCoverage, describeCoverageGaps,
 } from '../src/harness/verify-acs.mjs';
+import { computeInputTreeHash } from '../src/harness/state.mjs';
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 
@@ -438,6 +439,57 @@ describe('cli — harness verify-acs', () => {
       assert.ok(ev, 'evidence record must exist');
       assert.equal(typeof ev.freshnessPolicy, 'object', 'freshnessPolicy must be an object, not a string');
       assert.ok(['story', 'phase', 'run', 'manual'].includes(ev.freshnessPolicy.scope), 'scope must be one of story|phase|run|manual');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('binds the story and not the generated report, so re-running the tests cannot stale the record', () => {
+    // The defect: `verify-acs` hashed the report it had just read into its
+    // `inputTreeHash`. A test script that rewrites a fixed report path
+    // (`test-results-junit.xml` and friends) therefore invalidated the AC record
+    // the moment it re-ran the tests — the evidence was staled by the very command
+    // that produced its inventory. The report is the run's OUTPUT, so it is kept as
+    // `artifactPath` for audit but must not be a relevant file.
+    const { dir } = makeProject({ strict: true });
+    try {
+      const story = join(dir, 'story-ok.md');
+      const storyText = [
+        '## Acceptance Criteria',
+        '### AC-1: grid',
+        '- Given a, When b, Then c',
+        '- Declared tests: Grid_Foo',
+      ].join('\n');
+      writeFileSync(story, storyText);
+      const report = join(dir, 'report.txt');
+      writeFileSync(report, ['TAP version 13', 'ok 1 - Grid_Foo', '1..1'].join('\n'));
+
+      const res = runCli(['harness', 'verify-acs', '--story', story, '--report', report, '--target', dir, '--format', 'json']);
+      assert.equal(res.status, 0, res.stderr);
+      const state = JSON.parse(readFileSync(join(dir, '.cadet', 'state.json'), 'utf-8'));
+      const ev = state.gateEvidence.find((e) => e.gate === 'acceptanceCriteriaValidated');
+      assert.ok(ev, 'evidence record must exist');
+
+      // The binding is the story alone, recorded repo-relative so the freshness
+      // re-derivation at transition time actually resolves it under the root.
+      assert.deepEqual(ev.relevantFiles, ['story-ok.md']);
+      assert.equal(computeInputTreeHash(dir, ev.relevantFiles), ev.inputTreeHash,
+        'the recorded hash must re-derive from the recorded relevant files (a live binding, not an inert one)');
+      // The report is retained for audit, where nothing re-hashes it.
+      assert.ok(String(ev.artifactPath || '').endsWith('report.txt'),
+        `artifactPath should name the report for audit, got ${JSON.stringify(ev.artifactPath)}`);
+
+      // Re-running the tests rewrites the report. The record must survive it.
+      writeFileSync(report, ['TAP version 13', 'ok 1 - Grid_Foo', 'ok 2 - Grid_Extra', '1..2'].join('\n'));
+      assert.equal(computeInputTreeHash(dir, ev.relevantFiles), ev.inputTreeHash,
+        'rewriting the generated report must not change the AC input tree');
+
+      // The produced state must still pass the tool's own validator.
+      const validate = runCli(['state', 'validate', '--target', dir, '--format', 'json']);
+      assert.equal(validate.status, 0, `state validate rejected verify-acs output: ${validate.stdout}${validate.stderr}`);
+
+      // The story IS a real input: editing it must invalidate the record.
+      writeFileSync(story, `${storyText}\n- extra note\n`);
+      assert.notEqual(computeInputTreeHash(dir, ev.relevantFiles), ev.inputTreeHash,
+        'editing the story must invalidate the AC input tree');
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 

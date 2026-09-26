@@ -172,10 +172,8 @@ describe('strict closure — closure revalidation', () => {
     const state = baseState({
       session: { workflowPath: 'large', currentPhase: 'validation', trackingMode: 'markdown' },
       gates: Object.fromEntries(all.map((g) => [g, true])),
-      // All records are recorded in the phase being closed (`validation`):
-      // freshness is scoped to the current phase, so evidence stamped `review`
-      // would be rejected for the phase reason rather than the recency reason
-      // this test is about.
+      // Every record is fresh on all three axes that matter here: same input tree,
+      // unexpired, and no recency floor (lastTransition is null).
       gateEvidence: all.map((g) => automated(g, { treeHash, phase: 'validation' })),
     });
     const r = evaluateTransition(state, 'closed', {
@@ -184,6 +182,121 @@ describe('strict closure — closure revalidation', () => {
       now: new Date(Date.now() + 1000),
     });
     assert.equal(r.allowed, true, JSON.stringify(r));
+  });
+
+  it('accepts an earlier-phase record when the tree has not moved (the phase is not re-checked)', () => {
+    // Revalidation asks "is this still true NOW?", which the input-tree hash
+    // answers; it does not ask "was it written in the phase I am leaving?".
+    // Requiring the latter rejected every earlier-phase record unconditionally, so
+    // an unchanged tree still forced the whole gate suite to be re-recorded in
+    // `review` and again in `validation`. Here each record carries the phase it
+    // belongs to and the tree has not moved, so closure must be allowed.
+    //
+    // `lastTransition` is null, so the separate `requireFreshRevalidation` rule has
+    // no floor to apply and is not what is under test here — see the test below.
+    const implGates = ['testsPassed', 'compileCheckConfirmed', 'unityAnalyzerClean', 'storyTrackingUpdated'];
+    const reviewGates = ['codeReviewCompleted', 'securityReviewPassed', 'acceptanceCriteriaValidated'];
+    const treeHash = sha256('tree');
+    const state = baseState({
+      session: { workflowPath: 'large', currentPhase: 'validation', trackingMode: 'markdown' },
+      gates: Object.fromEntries([...implGates, ...reviewGates, 'designArtifactSyncConfirmed'].map((g) => [g, true])),
+      gateEvidence: [
+        automated('designArtifactSyncConfirmed', { treeHash, phase: 'validation' }),
+        ...implGates.map((g) => automated(g, { treeHash, phase: 'implementation' })),
+        ...reviewGates.map((g) => automated(g, { treeHash, phase: 'review' })),
+      ],
+    });
+    const r = evaluateTransition(state, 'closed', {
+      inputTreeHash: treeHash,
+      strictClosure: { enabled: true },
+      now: new Date(Date.now() + 1000),
+    });
+    assert.equal(r.allowed, true, JSON.stringify(r));
+    assert.ok(r.revalidated.includes('testsPassed'),
+      `the implementation gates must still be re-derived: ${JSON.stringify(r.revalidated)}`);
+  });
+
+  it('carries earlier-phase records across the transition only when requireFreshRevalidation is off', () => {
+    // Field-verified on a real repository: the phase scope was only ONE of the two
+    // rules that forced a gate to be re-recorded at every transition.
+    // `requireFreshRevalidation` (default on) independently demands a record newer
+    // than the last transition, so the phase correction alone does not stop the
+    // re-runs. This pins both halves so neither can be assumed away later.
+    const implGates = ['testsPassed', 'compileCheckConfirmed', 'unityAnalyzerClean', 'storyTrackingUpdated'];
+    const reviewGates = ['codeReviewCompleted', 'securityReviewPassed', 'acceptanceCriteriaValidated'];
+    const treeHash = sha256('tree');
+    const now = new Date();
+    const older = new Date(now.getTime() - 3600_000);
+    const state = baseState({
+      session: { workflowPath: 'large', currentPhase: 'validation', trackingMode: 'markdown' },
+      gates: Object.fromEntries([...implGates, ...reviewGates, 'designArtifactSyncConfirmed'].map((g) => [g, true])),
+      gateEvidence: [
+        automated('designArtifactSyncConfirmed', { treeHash, phase: 'validation', createdAt: older }),
+        ...implGates.map((g) => automated(g, { treeHash, phase: 'implementation', createdAt: older })),
+        ...reviewGates.map((g) => automated(g, { treeHash, phase: 'review', createdAt: older })),
+      ],
+      // A real floor: the records predate the transition that follows them, which is
+      // always true of the records that permitted it.
+      lastTransition: { from: 'review', to: 'validation', at: new Date(now.getTime() - 60_000).toISOString(), evidenceIds: [] },
+    });
+
+    const off = evaluateTransition(state, 'closed', {
+      inputTreeHash: treeHash,
+      strictClosure: { enabled: true, requireFreshRevalidation: false },
+      now,
+    });
+    assert.equal(off.allowed, true, JSON.stringify(off));
+
+    const on = evaluateTransition(state, 'closed', {
+      inputTreeHash: treeHash,
+      strictClosure: { enabled: true, requireFreshRevalidation: true },
+      now,
+    });
+    assert.equal(on.allowed, false, 'with recency on, a record older than the last transition must still be refused');
+    const reasons = on.staleEvidence.flatMap((s) => s.reasons || [s.reason]).join(' | ');
+    assert.ok(/predates the last transition/.test(reasons), `expected a recency refusal, got: ${reasons}`);
+    assert.ok(!/recorded for phase/.test(reasons), `the refusal must be recency, never the phase stamp: ${reasons}`);
+  });
+
+  it('still rejects a revalidated gate whose input tree has moved', () => {
+    // The relaxation removes the PHASE dimension from revalidation, not the
+    // staleness check: a record written in an earlier phase is fine, a record
+    // whose files changed underneath it is not.
+    const implGates = ['testsPassed', 'compileCheckConfirmed', 'unityAnalyzerClean', 'storyTrackingUpdated'];
+    const reviewGates = ['codeReviewCompleted', 'securityReviewPassed', 'acceptanceCriteriaValidated'];
+    const state = baseState({
+      session: { workflowPath: 'large', currentPhase: 'validation', trackingMode: 'markdown' },
+      gates: Object.fromEntries([...implGates, ...reviewGates, 'designArtifactSyncConfirmed'].map((g) => [g, true])),
+      gateEvidence: [
+        automated('designArtifactSyncConfirmed', { treeHash: sha256('tree'), phase: 'validation' }),
+        ...implGates.map((g) => automated(g, { treeHash: sha256('OLD-tree'), phase: 'implementation' })),
+        ...reviewGates.map((g) => automated(g, { treeHash: sha256('tree'), phase: 'review' })),
+      ],
+    });
+    const r = evaluateTransition(state, 'closed', {
+      inputTreeHash: sha256('tree'),
+      strictClosure: { enabled: true },
+    });
+    assert.equal(r.allowed, false);
+    assert.ok(r.missingGates.includes('testsPassed'), JSON.stringify(r.missingGates));
+  });
+
+  it('still enforces the phase scope on a primary gate', () => {
+    // The relaxation is scoped to the `revalidate` set. A gate the transition
+    // itself declares must still be recorded in the phase it belongs to, so a
+    // record cannot be carried across phases by construction.
+    const treeHash = sha256('tree');
+    const state = baseState({
+      session: { workflowPath: 'large', currentPhase: 'validation', trackingMode: 'markdown' },
+      gates: { designArtifactSyncConfirmed: true },
+      gateEvidence: [automated('designArtifactSyncConfirmed', { treeHash, phase: 'review' })],
+    });
+    const r = evaluateTransition(state, 'closed', {
+      inputTreeHash: treeHash,
+      strictClosure: { enabled: false },
+    });
+    assert.equal(r.allowed, false);
+    assert.ok(r.staleEvidence.some((s) => s.gate === 'designArtifactSyncConfirmed'), JSON.stringify(r.staleEvidence));
   });
 
   it('rejects an unexpired but pre-transition record when requireFreshRevalidation', () => {
@@ -200,9 +313,9 @@ describe('strict closure — closure revalidation', () => {
     const state = baseState({
       session: { workflowPath: 'large', currentPhase: 'validation', trackingMode: 'markdown' },
       gates: Object.fromEntries(all.map((g) => [g, true])),
-      // Everything recorded well before the transition into validation, but in
-      // the current phase so the phase-scope check does not fire first — this
-      // test isolates the recency rule.
+      // Everything recorded well before the transition into validation. The phase
+      // stamp is irrelevant to revalidation — it is not phase-scoped — so the
+      // recency rule is what this test isolates.
       gateEvidence: all.map((g) => automated(g, {
         treeHash,
         createdAt: new Date(now.getTime() - 3600_000),

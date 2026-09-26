@@ -6,7 +6,7 @@ import {
   validateState, migrateStateFile, readState, writeState, evaluateTransition, applyTransition,
   workItemIdOf, loadPolicy, RunLedger, loadRun, listRuns, cleanupRuns, buildReport, formatReport,
   runVerificationLoop, commandForGate, detectCapabilities, runsDir, gitChangedFiles, PolicyError, StateError,
-  detectRepoRole, describeRepoRole, GATES, manualConfirmation,
+  detectRepoRole, describeRepoRole, GATES, PHASES, manualConfirmation,
   gitChangeSet, DEFAULT_REPORT_DIR,
   reconcileArtifacts, PLANS_DEFAULT_DIR,
   parseTestInventory, parseStoryCriteria, compareCoverage, describeCoverageGaps,
@@ -74,6 +74,7 @@ function showHelp() {
     --command      Command override (harness verify)
     --files        Comma-separated relevant files to bind evidence to (harness verify|confirm)
     --commit       Revision the gate attests, as a hex SHA (harness verify|confirm)
+    --expect-phase Refuse to record a gate unless the current phase matches (harness verify|confirm|verify-acs|verify-reachability)
     --reason       Why automation was unavailable (harness confirm)
     --expires-at   ISO-8601 expiry bounding the confirmation (harness confirm)
     --environment  key=value,... describing what was verified (harness confirm)
@@ -154,6 +155,9 @@ function parseArgs(argv) {
       case '--command': opts.command = value(a); break;
       case '--work-item': opts.workItemId = value(a); break;
       case '--phase': opts.phase = value(a); break;
+      // --expect-phase: a guard against recording a gate into a phase the caller
+      // did not intend. See assertExpectedPhase.
+      case '--expect-phase': opts.expectPhase = value(a); break;
       case '--run': opts.runId = value(a); break;
       case '--type': opts.type = value(a); break;
       case '--reason': opts.reason = value(a); break;
@@ -234,6 +238,40 @@ function fail(opts, message, code = json => json.exitCode || 1, json = {}) {
     console.error(`\n❌ ${message}`);
   }
   process.exit(exitCode);
+}
+
+/**
+ * `--expect-phase <phase>` — refuse to record gate evidence into a phase the
+ * caller did not intend.
+ *
+ * The failure this closes is a caller error, not a framework one: `state
+ * transition` already reports `allowed: false` and exits 1, but an agent that
+ * chains commands with `;` and filters the output reads the *next* command's
+ * success as the transition's, and goes on to record the following gates into the
+ * phase it never left. The verdict was correct and ignored; the record was then
+ * written anyway. This is a check because the mistake recurred after being
+ * documented, and a check is what the framework's own doctrine asks for at that
+ * point.
+ *
+ * The flag is opt-in and cheap: omitting it changes nothing. A mismatch is
+ * refused before any write, so a stray `--expect-phase` cannot corrupt state —
+ * it can only stop the command.
+ */
+function assertExpectedPhase(opts, state) {
+  if (!opts.expectPhase) return;
+  if (!PHASES.includes(opts.expectPhase)) {
+    fail(opts, `--expect-phase "${opts.expectPhase}" is not a known phase. Valid phases: ${PHASES.join(', ')}.`, () => 1, { ok: false, code: 'unknown-phase', expectedPhase: opts.expectPhase });
+  }
+  const actual = state?.session?.currentPhase ?? null;
+  if (actual === opts.expectPhase) return;
+  fail(
+    opts,
+    `--expect-phase ${opts.expectPhase}, but the current phase is "${actual ?? '(none)'}". `
+    + 'Refusing to record evidence for a phase the caller did not intend — re-read .cadet/state.json '
+    + '(or run `state transition --dry-run`) and retry once the phase is what you expected.',
+    () => 1,
+    { ok: false, code: 'phase-mismatch', expectedPhase: opts.expectPhase, actualPhase: actual },
+  );
 }
 
 // ── evidence archive (contract v5) ──────────────────────────────────────────
@@ -672,6 +710,7 @@ async function cmdHarness(opts) {
 
     const { exists, state } = readState(opts.targetDir);
     if (!exists) fail(opts, 'No .cadet/state.json found. Initialise state before recording confirmation.', () => 2);
+    assertExpectedPhase(opts, state);
 
     const strict = policy.strictClosure?.enabled === true ? policy.strictClosure : null;
     const mc = strict?.manualConfirmation || null;
@@ -829,6 +868,7 @@ async function cmdHarness(opts) {
     const gate = opts.gate;
     if (!gate) fail(opts, 'harness verify requires --gate <gate>');
     const { state } = readState(opts.targetDir);
+    assertExpectedPhase(opts, state);
     const caps = detectCapabilities({ targetDir: opts.targetDir });
     const descriptor = opts.command
       ? { command: opts.command, tool: 'custom', automated: true }
@@ -973,6 +1013,7 @@ async function cmdHarness(opts) {
     // never written cannot be asserted into coverage.
     if (!opts.story) fail(opts, 'harness verify-acs requires --story <path>');
     const { exists, state } = readState(opts.targetDir);
+    assertExpectedPhase(opts, state);
     const strict = policy.strictClosure?.enabled === true;
     const workItemId = state ? workItemIdOf(state) : 'unscoped';
     const phase = state?.session?.currentPhase || 'implementation';
@@ -1082,6 +1123,26 @@ async function cmdHarness(opts) {
     const at = new Date();
     const criteriaStrings = coverage.ac.flatMap((a) => [a.id, ...a.declared]);
     const nowIso = at.toISOString();
+    // The story is the only INPUT to the AC claim: it carries the declared
+    // AC→test mapping, and `criteriaHash` binds those names (C12), so editing the
+    // mapping invalidates the record.
+    //
+    // The test report is an OUTPUT of the run that satisfied `testsPassed`, not an
+    // input, and binding it was a defect: a repository whose test script rewrites a
+    // fixed report path (e.g. `test-results-junit.xml`) staled this record the
+    // moment it re-ran the tests, because the file the record had just read changed
+    // underneath it. This is the same class Harness §5 already excludes
+    // (`.cadet/state.json`, `.cadet/runs/**`) — "binding evidence to either would
+    // make a gate stale the instant it was written" — so a generated report gets
+    // the same treatment and is kept as `artifactPath` for audit, where nothing
+    // re-hashes it.
+    //
+    // The story path is made repo-relative for the same reason verify-reachability
+    // does it: an absolute path never resolves under the root when freshness is
+    // re-derived at transition time, so both hashes would be computed over a
+    // missing file and match — a binding that is silently inert.
+    const storyPath = resolve(opts.targetDir, opts.story);
+    const storyRel = relative(opts.targetDir, storyPath).replace(/\\/g, '/') || basename(storyPath);
     const evidence = createEvidence({
       evidenceId: newId(),
       workItemId,
@@ -1092,9 +1153,11 @@ async function cmdHarness(opts) {
       command: `harness verify-acs --story ${opts.story}`,
       result: `AC coverage verified: ${coverage.ac.length} criteria, inventory ${coverage.inventorySize} (${inventory.format})`,
       exitCode: 0,
-      inputTreeHash: computeInputTreeHash(opts.targetDir, [opts.story, ...(reportPath ? [reportPath] : [])]),
+      // Audit pointer only. Not a relevant file: see above.
+      artifactPath: reportPath ? reportPath.replace(/\\/g, '/') : null,
+      inputTreeHash: computeInputTreeHash(opts.targetDir, [storyRel]),
       criteriaHash: hashCriteria(criteriaStrings),
-      relevantFiles: [opts.story, ...(reportPath ? [reportPath] : [])].map((f) => f.replace(/\\/g, '/')),
+      relevantFiles: [storyRel],
       createdAt: at,
       expiresAt: null,
       // Schema + validator require an object carrying a `scope`, not a bare
@@ -1162,6 +1225,7 @@ async function cmdHarness(opts) {
     const storyPath = resolve(opts.targetDir, opts.story);
     const storyRel = relative(opts.targetDir, storyPath).replace(/\\/g, '/') || basename(storyPath);
     const { exists, state } = readState(opts.targetDir);
+    assertExpectedPhase(opts, state);
     const enabled = policy.reachability?.enabled === true;
     const probeCommand = policy.reachability?.command || null;
     const workItemId = state ? workItemIdOf(state) : 'unscoped';

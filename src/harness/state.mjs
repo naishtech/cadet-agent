@@ -1177,8 +1177,17 @@ export function isUngatedForwardEdge(fromPhase, toPhase) {
  * must have been created at or after that instant. Without it, "fresh" would mean
  * only "not yet expired", which lets a long phase carry evidence that predates
  * the work it is meant to attest.
+ *
+ * `phaseScoped` is false for the strict-closure `revalidate` set. A revalidated
+ * gate asks "is this still true *now*?" — answered by the input-tree hash, the
+ * criteria hash, and the expiry — not "was it recorded in the phase I am leaving?".
+ * Enforcing the phase stamp on a revalidated gate made the answer "no" for every
+ * record written in an earlier phase, so the whole suite had to be re-recorded in
+ * `review` and again in `validation` on a tree that had not changed by a byte.
+ * Primary gates keep the phase scope: a record still has to be written in the
+ * phase it belongs to.
  */
-function checkGate({ gate, state, gates, exceptions, now, workItemId, fromPhase, rootDir, computeTreeHash, inputTreeHash, critHash, recencyFloor = null }) {
+function checkGate({ gate, state, gates, exceptions, now, workItemId, fromPhase, rootDir, computeTreeHash, inputTreeHash, critHash, recencyFloor = null, phaseScoped = true }) {
   const missingGates = [];
   const staleEvidence = [];
 
@@ -1204,7 +1213,7 @@ function checkGate({ gate, state, gates, exceptions, now, workItemId, fromPhase,
   const { fresh, reasons } = evidenceFreshness(evidence, {
     now,
     workItemId,
-    phase: fromPhase,
+    phase: phaseScoped ? fromPhase : null,
     inputTreeHash: currentTreeHash,
     criteriaHash: critHash,
   });
@@ -1344,6 +1353,14 @@ export function evaluateTransition(state, toPhase, context = {}) {
   }
 
   // Strict closure: re-derive the earlier gates at this transition.
+  //
+  // A revalidated gate is checked WITHOUT the phase scope (`phaseScoped: false`).
+  // Its question is "is this still true now?", which the input-tree hash, the
+  // criteria hash, and the expiry answer; the phase stamp answers only "which
+  // phase wrote it down", which is exactly the fact revalidation is not doubting.
+  // With the phase scope on, every record written in an earlier phase was rejected
+  // as stale, so an unchanged tree still forced the whole suite to be re-recorded
+  // in `review` and again in `validation`. See checkGate.
   const strict = resolveStrict(context);
   const revalidated = [];
   if (strict && strict.revalidateOnClosure !== false) {
@@ -1353,7 +1370,7 @@ export function evaluateTransition(state, toPhase, context = {}) {
     for (const gate of spec.revalidate) {
       if (spec.gates.includes(gate)) continue; // already checked as a primary gate
       revalidated.push(gate);
-      const r = checkGate({ ...shared, gate, recencyFloor });
+      const r = checkGate({ ...shared, gate, recencyFloor, phaseScoped: false });
       missingGates.push(...r.missingGates);
       staleEvidence.push(...r.staleEvidence);
     }
