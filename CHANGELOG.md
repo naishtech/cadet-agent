@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.47.0] — 2026-09-26
+
 ### Added
 
 - **`/cadet-reconcile` — does the planning chain still agree with itself?** Every per-story check can pass while the chain as a whole stops making sense: a story is renamed and its neighbours still point at the old file, a story is marked done in state while its markdown says planned, a deferral names a work item that finished three stories ago, an epic directory exists that no plan mentions. Each is a claim in one artifact that another artifact contradicts, and nothing looked at more than one document at a time.
