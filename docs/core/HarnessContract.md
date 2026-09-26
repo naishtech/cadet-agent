@@ -37,6 +37,21 @@
 > refused.
 > **(3)** `--expect-phase <phase>` on the four gate-recording commands refuses to write evidence
 > when the current phase is not the expected one.
+>
+> **State growth (2026-09-26).** Contract v5's Tier A was not a bound in practice, and nothing said
+> so. `gateEvidence` is scoped to the active work item, but nothing pruned *within* one, and the
+> story boundary was a hand-edit — `Resume` said "set `activeWorkItem`, reset gates", a sentence that
+> never mentions evidence, while `resetGatesForNewWorkItem` (which clears it correctly) had no
+> caller. The result went unnoticed because `validateState` only ever asked whether a claimed-true
+> gate's own record was bound to the active item, never whether foreign records were sitting in the
+> array. Measured on the audited repository: **135 records for one work item, 115 of them
+> `superseded`, 63 of them a closed work item's, 81% of an 8,000-line document.** Three changes:
+> the story boundary is now `state begin --epic --story` (archives the outgoing records *before* the
+> document is written, folds them into the coverage index); `state compact` retains the newest
+> record per gate plus every `passed`/`manual-confirmation`/`failed` record and archives the rest,
+> with `--retain-all` to opt out; and `state validate` **warns** on foreign records and on an
+> over-long array (warns, because foreign records are unreadable by every gate and a pre-existing
+> document cannot repair itself in place). See `HarnessContract-v5.md` C14 and Tier A.
 
 This file is the Phase 0 deliverable: the implementation contract, the compatibility
 invariants, and the contract test matrix. Any change to the items below is a breaking

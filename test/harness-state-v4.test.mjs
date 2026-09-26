@@ -7,8 +7,11 @@ import {
   validateState, toStateV4, splitEvidence, buildEvidenceCoverage, appendEvidence, recordEvidence,
   migrateStateDocument, migrateStateFile, parseTargetVersion, applyTransition,
   resetGatesForNewWorkItem, workItemIdOf, sealWorkItem, isHistoryExternal, compactHistory,
+  retainLiveRecords, DEFAULT_MAX_LIVE_EVIDENCE,
   STATE_VERSION, GATES, HISTORY_ENTRIES_KEPT, StateError,
 } from '../src/harness/state.mjs';
+import { runVerificationLoop } from '../src/harness/verification.mjs';
+import { defaultPolicy } from '../src/harness/policy.mjs';
 import { newId, sha256, hashCriteria } from '../src/harness/util.mjs';
 
 const ACTIVE = 'epic-8-playable-skirmish::story-4-production-on-buildings.md';
@@ -540,5 +543,125 @@ describe('state v4 — evidence writers keep the index in step', () => {
 
   it('derives a work item id for the active item', () => {
     assert.equal(workItemIdOf(v2WithHistory()), ACTIVE);
+  });
+});
+
+describe('state v4 — within-work-item retention', () => {
+  it('keeps the newest record per gate, every passing record and every failed record', () => {
+    const failed1 = evidence('testsPassed', { status: 'failed', createdAt: '2026-09-10T00:00:00.000Z' });
+    const failed2 = evidence('testsPassed', { status: 'failed', createdAt: '2026-09-11T00:00:00.000Z' });
+    const superseded1 = evidence('testsPassed', { status: 'superseded', createdAt: '2026-09-12T00:00:00.000Z' });
+    const superseded2 = evidence('testsPassed', { status: 'superseded', createdAt: '2026-09-13T00:00:00.000Z' });
+    const green = evidence('testsPassed', { status: 'passed', createdAt: '2026-09-14T00:00:00.000Z' });
+    const reviewHistory = evidence('codeReviewCompleted', { status: 'superseded', createdAt: '2026-09-13T00:00:00.000Z' });
+    const reviewLive = evidence('codeReviewCompleted', { status: 'manual-confirmation', createdAt: '2026-09-14T00:00:00.000Z' });
+
+    const retained = retainLiveRecords([failed1, failed2, superseded1, superseded2, green, reviewHistory, reviewLive]);
+    for (const keep of [green, failed1, failed2, reviewLive]) {
+      assert.equal(retained.has(keep), true, `${keep.gate}/${keep.status} must stay inline`);
+    }
+    for (const drop of [superseded1, superseded2, reviewHistory]) {
+      assert.equal(retained.has(drop), false, 'a superseded record that is not the newest for its gate is history');
+    }
+  });
+
+  it('retain-all keeps every record of the kept work items', () => {
+    const records = [
+      evidence('testsPassed', { status: 'superseded', createdAt: '2026-09-19T00:00:00.000Z' }),
+      evidence('testsPassed', { status: 'passed', createdAt: '2026-09-20T00:00:00.000Z' }),
+    ];
+    assert.equal(retainLiveRecords(records, { retainAll: true }).size, 2);
+  });
+
+  it('archives a work item\'s superseded history while keeping what a gate can read', () => {
+    const red = evidence('testsPassed', { status: 'failed', createdAt: '2026-09-18T00:00:00.000Z' });
+    const history = [
+      evidence('testsPassed', { status: 'superseded', createdAt: '2026-09-15T00:00:00.000Z' }),
+      evidence('testsPassed', { status: 'superseded', createdAt: '2026-09-16T00:00:00.000Z' }),
+    ];
+    const green = evidence('testsPassed', { status: 'passed', createdAt: '2026-09-20T00:00:00.000Z' });
+    const state = { ...toStateV4(v2WithHistory()).state, gateEvidence: [red, ...history, green] };
+
+    const { state: next, archived } = toStateV4(state, { keep: 'active' });
+    assert.deepEqual(next.gateEvidence.map((e) => e.evidenceId), [red.evidenceId, green.evidenceId]);
+    assert.deepEqual(archived.map((e) => e.evidenceId), history.map((e) => e.evidenceId));
+  });
+
+  it('leaves a compacted document still able to license a green testsPassed', async () => {
+    // The retention rule has to be *safe*, not merely small. Red-before-green reads
+    // the prior failing record for the same work item and gate, so a rule of
+    // "newest passing record per gate" would archive the very record a later green
+    // depends on — which is why `failed` records are retained in full.
+    const red = evidence('testsPassed', { status: 'failed', createdAt: '2026-09-18T00:00:00.000Z' });
+    const supersededGreen = evidence('testsPassed', { status: 'superseded', createdAt: '2026-09-19T00:00:00.000Z' });
+    const state = { ...toStateV4(v2WithHistory()).state, gates: { testsPassed: false }, gateEvidence: [red, supersededGreen] };
+    const { state: compacted } = toStateV4(state, { keep: 'active' });
+    assert.ok(compacted.gateEvidence.some((e) => e.status === 'failed'), 'the prior red must survive compaction');
+
+    const policy = defaultPolicy();
+    const runner = async () => ({ exitCode: 0, timedOut: false, stdout: '', stderr: '', durationMs: 1, outputBytes: 0 });
+    const run = (priorEvidence) => runVerificationLoop({
+      gate: 'testsPassed', command: 'npm test', workItemId: ACTIVE, phase: 'implementation',
+      policy, priorEvidence, runCommandImpl: runner, rootDir: process.cwd(),
+    });
+
+    const licensed = await run(compacted.gateEvidence);
+    assert.equal(licensed.status, 'passed', 'the retained red must still license the green');
+
+    const orphaned = await run([]);
+    assert.equal(orphaned.status, 'failed');
+    assert.equal(orphaned.stopReason, 'red-required', 'without the red, the same green is refused');
+  });
+});
+
+describe('state v4 — growth warnings', () => {
+  it('warns about records belonging to another work item, and names them', () => {
+    const state = {
+      ...toStateV4(v2WithHistory()).state,
+      gates: {},
+      gateEvidence: [
+        evidence('testsPassed', { workItemId: CLOSED, createdAt: '2026-09-19T00:00:00.000Z' }),
+        evidence('testsPassed', { createdAt: '2026-09-20T00:00:00.000Z' }),
+      ],
+    };
+    const { warnings } = validateState(state, { rootDir: null });
+    const warning = warnings.find((w) => /not the active one/.test(w.message));
+    assert.ok(warning, JSON.stringify(warnings));
+    assert.match(warning.message, /1 record\(s\)/);
+    assert.match(warning.message, new RegExp(CLOSED.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.match(warning.message, /state compact --keep active/);
+  });
+
+  it('warns about an over-long array and points at the command', () => {
+    const many = Array.from({ length: DEFAULT_MAX_LIVE_EVIDENCE + 1 }, (_, i) =>
+      evidence('testsPassed', { status: 'superseded', createdAt: `2026-09-01T00:${String(Math.floor(i / 60)).padStart(2, '0')}:${String(i % 60).padStart(2, '0')}.000Z` }));
+    const state = { ...toStateV4(v2WithHistory()).state, gates: {}, gateEvidence: many };
+    const { warnings } = validateState(state, { rootDir: null });
+    const warning = warnings.find((w) => /records inline/.test(w.message));
+    assert.ok(warning, JSON.stringify(warnings));
+    assert.match(warning.message, /state compact --keep active/);
+  });
+
+  it('warns about neither for a clean v4 document', () => {
+    const state = toStateV4(v2WithHistory()).state;
+    const { warnings } = validateState(state, { rootDir: null });
+    assert.equal(warnings.some((w) => /not the active one|records inline/.test(w.message)), false, JSON.stringify(warnings));
+  });
+
+  it('never scopes a v1-v3 document this way', () => {
+    // Those versions keep every record inline by design, so foreign records are
+    // normal there and warning about them would be crying wolf on every document.
+    const state = {
+      ...toStateV4(v2WithHistory()).state,
+      version: 3,
+      stateVersion: 3,
+      gates: {},
+      gateEvidence: [
+        evidence('testsPassed', { workItemId: CLOSED, createdAt: '2026-09-19T00:00:00.000Z' }),
+        evidence('testsPassed', { createdAt: '2026-09-20T00:00:00.000Z' }),
+      ],
+    };
+    const { warnings } = validateState(state, { rootDir: null });
+    assert.equal(warnings.some((w) => /not the active one/.test(w.message)), false, JSON.stringify(warnings));
   });
 });

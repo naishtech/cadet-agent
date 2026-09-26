@@ -34,7 +34,7 @@ export {
   STATE_VERSION, READABLE_STATE_VERSIONS, HISTORY_EXTERNAL_SINCE, isHistoryExternal,
   validateState, migrateStateV1toV2, migrateStateDocument, migrateStateFile, parseTargetVersion,
   toStateV4, splitEvidence, buildEvidenceCoverage, mergeEvidenceCoverage, sealWorkItem, recordEvidence, appendEvidence,
-  HISTORY_ENTRIES_KEPT, compactHistory,
+  HISTORY_ENTRIES_KEPT, compactHistory, DEFAULT_MAX_LIVE_EVIDENCE, retainLiveRecords,
   createEvidence, computeInputTreeHash, workItemIdOf, evidenceFreshness,
   latestEvidenceForGate, activeExceptions, requiredGates, isUngatedForwardEdge, evaluateTransition, resolveStrict,
   applyTransition, resetGatesForNewWorkItem, statePathFor, readState, writeState, writeJsonAtomic, StateError,

@@ -44,18 +44,32 @@ recording evidence rewrites.**
 
 ## 1. The model — three tiers
 
-### Tier A — live evidence (inline, bounded by construction)
+### Tier A — live evidence (inline, bounded by two rules)
 
-`gateEvidence` holds **only the active work item's records**. This is not merely conservative; it is
-provably safe for any document that was valid before compaction, because `validateState` already
-rejects a claimed-true gate whose supporting record belongs to a *different* work item. Every gate a
-valid document depends on is therefore already backed by exactly the records this keeps.
+`gateEvidence` holds the **active work item's live records**. Two independent bounds decide
+"live", and the second one was missing until the size was measured:
 
-It is also the only boundary that does not break a rule: the red-before-green requirement needs the
-prior **failing** record for the same work item and gate, so "newest passing record per gate" would
-be smaller and wrong.
+- **Which work item** (the `keep` selector). Only the active one. Not merely conservative — it is
+  provably safe for any document that was valid before compaction, because `validateState` already
+  rejects a claimed-true gate whose supporting record belongs to a *different* work item. Every gate
+  a valid document depends on is therefore already backed by exactly the records this keeps.
+- **Which of that item's records** (the retention rule). The newest record per gate, every
+  `passed` / `manual-confirmation` record, and every `failed` record. `superseded` records, and
+  `blocked` ones that are not the newest for their gate, are history.
 
-Bounded by the work item — one story's worth, typically a handful of records.
+The first rule alone is not a bound: a story boundary never fires *inside* a story. The claim
+originally written here — "bounded by the work item, typically a handful of records" — was wrong by
+two orders of magnitude on the audited repository: **26 `testsPassed` records for one story, 135
+records for one work item, 81% of an 8,000-line document**, of which 9 were live.
+
+The **failing** record has to stay, because red-before-green reads the prior red for the same work
+item and gate — which is why the retention rule keeps *every* `failed` record rather than only the
+newest one for its gate. "Newest passing record per gate" would be smaller and would break that
+rule, so it is deliberately not the rule.
+
+`state compact` applies both bounds; `--retain-all` applies only the first (the pre-retention
+behaviour). A record that leaves either way is archived before the document is written and its work
+item is indexed in `evidenceCoverage`, so compaction is never indistinguishable from evidence loss.
 
 ### Tier B — sealed evidence (git commit trailers)
 
@@ -127,7 +141,7 @@ C1–C13 are unchanged. v5 adds:
 
 | # | Invariant | Guard |
 |---|---|---|
-| **C14** | A v4 document's `gateEvidence` holds only the active work item's records; `evidenceCoverage` indexes what left; `gateExceptions` holds exceptions; and `changeHistory` stays **bounded** (most recent `HISTORY_ENTRIES_KEPT`, overflow archived). A transition adds no history line for v4. v1–v3 documents are unchanged and keep being appended to. | `harness-state-v4.test.mjs` |
+| **C14** | A v4 document's `gateEvidence` holds only the active work item's **live** records — the newest record per gate, every `passed`/`manual-confirmation` record, and every `failed` record; `superseded` history and non-newest `blocked` records live in `.cadet/archive/`. `evidenceCoverage` indexes what left; `gateExceptions` holds exceptions; and `changeHistory` stays **bounded** (most recent `HISTORY_ENTRIES_KEPT`, overflow archived). A transition adds no history line for v4. v1–v3 documents are unchanged and keep being appended to. `state begin` is the supported way to move to a new work item. `validateState` **warns** — never errors — on foreign records or an over-long array, because foreign records are unreadable by every gate check and a document that predates the check cannot repair itself in place. | `harness-state-v4.test.mjs`, `harness-state-begin.test.mjs` |
 | **C15** | Evidence history is preserved when it leaves the document. A record removed from `gateEvidence` is written to `.cadet/archive/` **before** the slimmer document replaces it, and its work item is recorded in `evidenceCoverage`, so the AR-2 coverage check and the audit trail both survive compaction. | `harness-state-v4.test.mjs` |
 | **C16** | Sealed evidence lives in commit trailers, encoded and decoded by `src/harness/gitmemo.mjs`. `state seal` prepares a message; it never commits. A record whose trailer block exceeded the output bound is marked `partial` and must not satisfy a gate. | `harness-git-evidence.test.mjs` |
 
@@ -217,7 +231,8 @@ index together, `recordEvidence` adds supersede-and-flip on top, `compactHistory
 |---|---|---|
 | `state validate [--verify-sealed]` | no | Read-only. `--verify-sealed` can only *clear* an error a real sealed record backs, never raise a new one. |
 | `state migrate [--to 4] [--keep <bound>]` | yes | Atomic; backup `.v{from}.bak`; archive written **before** the document. |
-| `state compact --keep <bound>` | yes | Routine housekeeping on a v4 document. `--keep` is required when unattended. |
+| `state compact --keep <bound> [--retain-all]` | yes | Routine housekeeping on a v4 document. `--keep` selects the **work items** that stay inline and is required when unattended. Within them the retention rule applies unless `--retain-all`. |
+| `state begin --epic <id> --story <file>` | yes | The story boundary: reset every gate, archive the previous item's evidence **before** the document is written, fold it into the coverage index. Refuses a target that is already active, and a `closed` session. |
 | `state seal [--work-item <id>] [--commit-msg <path>]` | yes | Writes the message file and archives the records. Does not commit. |
 
 `--keep` is `always` \| `active` \| a comma-separated work-item list — a content-bearing bound, not a
@@ -257,6 +272,10 @@ history is not an option, so migration **archives** them and only new evidence g
 | Git availability | real repo round trip through `git log` | unavailable git yields `available: false` with a reason, not "no records" | `harness-git-evidence.test.mjs` |
 | Tamper evidence | — | altering a trailer changes the commit id | `harness-git-evidence.test.mjs` |
 | Live scoping | only the active work item stays inline | `keep: always` is the non-vacuity control | `harness-state-v4.test.mjs` |
+| Retention | newest-per-gate, every `passed`/`manual-confirmation` and every `failed` record survive compaction | a `superseded` record that is not the newest for its gate is archived; `--retain-all` keeps everything | `harness-state-v4.test.mjs` |
+| Red-before-green after compaction | a compacted document still licenses a green `testsPassed` | archiving the prior red fails the green | `harness-state-v4.test.mjs` |
+| Story boundary | `state begin` resets gates, archives the outgoing records, folds coverage | refuses an already-active target and a `closed` session | `harness-state-begin.test.mjs` |
+| Growth warning | foreign records and an over-long array each warn, naming the work items | a clean v4 document warns about neither; a v3 document is never scoped this way | `harness-state-v4.test.mjs` |
 | Compaction safety | a valid document is valid after compaction | a done story with no records *or* index row is still rejected | `harness-state-v4.test.mjs` |
 | Index integrity | append merges; recompute replaces | reset does not double-count; malformed index is an error | `harness-state-v4.test.mjs` |
 | History bounding | v4 transition writes no line; tail is kept | a gate exception at index 0 survives a 60-entry trim | `harness-state-v4.test.mjs` |

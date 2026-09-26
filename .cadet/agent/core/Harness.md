@@ -111,10 +111,22 @@ an exception for one story never excuses another.
 
 Evidence has three homes, and the boundary between them is the work item.
 
-- **Live, in `state.json → gateEvidence`** — the **active work item's** records only. This is what
+- **Live, in `state.json → gateEvidence`** — the **active work item's live records**. This is what
   `state transition` reads. It includes records with no commit to cite: a `manual-confirmation`, a
   `compileCheckConfirmed` fallback, and the mid-story green run all live here, because a gate must be
   satisfiable on a tree that has not been committed yet.
+  - **"Live" excludes history, and that is a second, independent bound.** The *newest record per
+    gate*, every `passed`/`manual-confirmation` record, and every `failed` record (red-before-green
+    reads the prior red) stay inline; `superseded` records, and `blocked` ones that are not the newest
+    for their gate, belong in the archive. Without this bound a single long story is unbounded —
+    nothing fires a story boundary *inside* a story. Measured on the audited repository: 26
+    `testsPassed` records for one story, of which one was live, and 81% of an 8,000-line document.
+    `state compact` applies it; `--retain-all` opts out.
+  - **The story boundary is a command, not an edit.** `cadet-agent state begin --epic <id> --story
+    <file>` resets the gates, archives the finished story's records, and folds them into the coverage
+    index. Setting `activeWorkItem` by hand — which is what `Resume` used to instruct — leaves the
+    previous story's records inline for ever, where `evidenceFreshness` rejects them as belonging to
+    another work item: unreadable by every gate, and therefore pure weight.
 - **Sealed, in a commit's trailers** — written by `state seal` and read back with `state validate
   --verify-sealed`. Each record's fields become `Cadet-*` trailers and **the commit id is the seal**:
   trailers are part of the commit object, so editing one changes the SHA and the citation stops
@@ -369,7 +381,8 @@ Run `cadet-agent harness capabilities --format json` to read the registry instea
 
 - `cadet-agent state validate [--verify-sealed]` — validate state against the current schema. Read-only. `--verify-sealed` additionally reads evidence out of commit trailers (§2c); it is additive by design, so it can only clear an error a real sealed record backs and can never raise a new one, and a read that cannot reach git is reported as a warning rather than a silent pass.
 - `cadet-agent state migrate [--to <version>] [--keep <bound>]` — atomically migrate a v1 document forward, or (with `--to 4`) compact a v2/v3 document: promote gate exceptions, archive non-active evidence, and build the coverage index. **On failure the tree is left exactly as found**, backup included: the archive is written only after the migrated document validates, and the backup only after that.
-- `cadet-agent state compact --keep <bound>` — routine housekeeping on a v4 document: move closed work items' evidence into `.cadet/archive/` and refresh `evidenceCoverage`. `--keep` (`always`|`active`|work-item ids) is required when unattended, so an agent states *what* stays inline.
+- `cadet-agent state compact --keep <bound> [--retain-all]` — routine housekeeping on a v4 document. `--keep` (`always`|`active`|work-item ids) selects the **work items** that stay inline and is required when unattended, so an agent states *what* stays. Within those work items the newest record per gate, every `passed`/`manual-confirmation` record, and every `failed` record are kept; the rest is archived to `.cadet/archive/` and `evidenceCoverage` is rebuilt. `--retain-all` keeps every record of the kept work items instead, which is the older behaviour.
+- `cadet-agent state begin --epic <epicId> --story <storyFile>` — start a work item: reset every gate, archive the previous item's evidence to `.cadet/archive/` **before** the document is written, fold it into `evidenceCoverage`, and drop expired gate exceptions. Refuses when the target is already the active work item, and when the session is `closed` (new work starts from `context-resolution`). Use this instead of editing `activeWorkItem` by hand.
 - `cadet-agent state seal [--work-item <id>] [--commit-msg <path>]` — write the active work item's evidence as commit trailers, for `git commit -F`. **Cadet never commits** (C5): this prepares a message file and archives the records; the commit stays the user's action.
 - `cadet-agent state transition --to <phase> [--dry-run]` — enforce the transition matrix + evidence. **`--dry-run` reports the same verdict and writes nothing** — use it for every inspection; without the flag the transition is applied and `state.json` is written. A transition is legal only when it is a gated transition in the matrix or a declared ungated forward edge (bootstrap + planning progression); `closed` is terminal, so leaving it is rejected. A rejection lists every missing or stale gate.
 - `cadet-agent harness record` — append a sanitized span/evidence/decision event. Honours `--dry-run`. Append-only, so it carries no unattended bound: requiring a flag to record evidence would push agents to skip logging.
