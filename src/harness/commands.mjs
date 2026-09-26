@@ -123,6 +123,13 @@ export const COMMANDS = {
     mutates: false,
     summary: 'Summarize budget consumption and failures.',
   },
+  'harness changes': {
+    mutates: false,
+    summary: 'List the files a story changed, with status, line counts, and links.',
+    // Read-only by construction: it runs `git status`/`git diff` and parses the
+    // output. It does not author the Change Report — the agent does, from the
+    // template — so there is no artifact for it to write and nothing to dry-run.
+  },
   'harness matrix-check': {
     mutates: false,
     summary: 'Reconcile a TDD matrix against a compiled test inventory.',

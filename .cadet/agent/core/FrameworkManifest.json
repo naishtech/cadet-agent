@@ -81,6 +81,7 @@
     ".cadet/harness.json",
     ".cadet/runs",
     ".cadet/handoffs",
+    ".cadet/reports",
     ".cadet/archive"
   ],
   "createOnlyPaths": [

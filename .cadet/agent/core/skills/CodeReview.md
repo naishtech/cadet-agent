@@ -73,7 +73,16 @@ Identify defects, regressions, security concerns, and process drift before chang
 20. **Report unresolved escalations:** list any budget exhaustion, stale evidence, or deterministic failures that were escalated and not resolved.
 21. Provide findings ordered by severity with clear remediation steps.
 22. Recommend the user optionally review in a separate chat with a different AI model for an independent second opinion. Also explicitly recommend invoking the Cadet Agent Reviewer for a framework-compliance audit before considering the task complete.
+23. **Produce the Change Report.** Gather the inventory with `cadet-agent harness changes --format json`, then write `.cadet/reports/<YYYY-MM-DD>-<epic-slug>-<story-slug>.md` from `<document index="1"/>` — fill every `<slot/>`, strip all XML wrappers, write pure Markdown.
+    - The file table is not composed by hand: use the inventory's rows and its `link` fields verbatim, one row per file it listed, in its order. A file the inventory reports and the report omits is a change the reader cannot see.
+    - Derive the `why` column from the story's intent and acceptance criteria, not from the diff. That column, and the `intent` and `Guided review` prose, is the only part of the report that is authored rather than measured.
+    - **When the inventory is unavailable** (`available: false`), record the reason under `Limits` and do not list files from memory. **When it lists no files**, the report says so plainly rather than padding the table.
+    - Name the file date-first so a plain `ls` is chronological, never use a colon, and never overwrite an existing report — append `-2`, as the handoff record does.
 </process>
+
+<documents>
+<document index="1" ref=".cadet/agent/core/templates/ChangeReportTemplate.md" purpose="fill-and-strip" />
+</documents>
 
 <output>
 ## Expected Outputs
@@ -86,6 +95,7 @@ Identify defects, regressions, security concerns, and process drift before chang
 - Clear pass/fail or ready/not-ready recommendation.
 - Required remediation actions and follow-up validation needs.
 - Traceability notes covering requirements, design, planning artifact alignment, and guidance/standards/policy mismatches.
+- The Change Report at `.cadet/reports/`, with the file and acceptance-criterion counts it recorded, and any inventory limitation stated under `Limits`.
 </output>
 
 <completion>
@@ -95,4 +105,5 @@ After review:
 - Set `gates.codeReviewCompleted`, `gates.securityReviewPassed`, and `gates.acceptanceCriteriaValidated` to `true` in `.cadet/state.json` only with supporting evidence (agent-owned review decisions recorded as evidence or `changeHistory` entries). When `reachability.enabled` is set, also satisfy `gates.reachabilityAddressed` by running `cadet-agent harness verify-reachability --story <path>` **in this phase** — the record is bound to the phase it is created in, so one made during implementation is rejected as stale here.
 - Set `currentPhase` to `validation` only when all review → validation gates are satisfied.
 - In markdown tracking mode, update the story and epic files to reflect completion.
+- The Change Report is written **in this phase**, before the transition: it is the reader-facing summary of what review just verified, and a report emitted later would describe a phase that has already moved on.
 </completion>
