@@ -25,6 +25,7 @@ const expectedSkills = [
   'Resume.md',
   'MCPSetup.md',
   'Handoff.md',
+  'Reconciliation.md',
 ];
 
 const expectedPrompts = [
@@ -38,6 +39,7 @@ const expectedPrompts = [
   'cadet-resume.prompt.md',
   'cadet-mcp-setup.prompt.md',
   'cadet-handoff.prompt.md',
+  'cadet-reconcile.prompt.md',
 ];
 
 describe('Skill files', () => {
@@ -263,6 +265,7 @@ describe('Skill harness contract', () => {
     'Resume.md',
     'MCPSetup.md',
     'AgentReviewer.md',
+    'Reconciliation.md',
   ];
 
   for (const skill of harnessSkills) {
@@ -471,5 +474,58 @@ describe('Change Report', () => {
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
     const normalized = manifest.preservedPaths.map((p) => p.replace(/\\/g, '/'));
     assert.ok(normalized.includes('.cadet/reports'), '.cadet/reports must be preserved');
+  });
+});
+
+// ── Reconciliation (project-wide artifact consistency) ──────────────────────
+//
+// This skill earns its place only by resting on the mechanical check. A
+// prose-only "check the artifacts agree" pass is the exact shape
+// docs/core/HarnessContract-v4.md §0.1 names as an assertion nothing verifies,
+// so these guards pin both the wiring and the measured/judged split.
+
+describe('Reconciliation', () => {
+  const templatePath = join(coreDir, 'templates', 'ReconciliationTemplate.md');
+  const skillPath = join(skillsDir, 'Reconciliation.md');
+
+  it('ships the template and wires the skill to it', () => {
+    assert.equal(existsSync(templatePath), true, 'missing templates/ReconciliationTemplate.md');
+    const skill = readFileSync(skillPath, 'utf-8');
+    assert.ok(skill.includes('templates/ReconciliationTemplate.md'), 'Reconciliation must reference its template');
+    assert.ok(skill.includes('<document index="1"'), 'Reconciliation must reference the template by document index');
+    assert.ok(skill.includes('cadet-agent harness reconcile'), 'Reconciliation must gather findings from the command');
+    assert.ok(skill.includes('.cadet/reports/'), 'Reconciliation must write its report under .cadet/reports/');
+  });
+
+  it('keeps the measured findings separate from the judged ones', () => {
+    const skill = readFileSync(skillPath, 'utf-8');
+    assert.ok(/mechanic/i.test(skill), 'Reconciliation must name the mechanical pass');
+    assert.ok(/semantic/i.test(skill), 'Reconciliation must name the semantic (judgement) pass');
+    assert.ok(/never edit a planning artifact/i.test(skill), 'Reconciliation must never edit a planning artifact');
+  });
+
+  it('refuses the sync gate on anything but a clean verdict', () => {
+    const skill = readFileSync(skillPath, 'utf-8');
+    assert.ok(skill.includes('designArtifactSyncConfirmed'), 'Reconciliation must state its gate relationship');
+    assert.ok(/blocked/i.test(skill), 'Reconciliation must say when the gate is blocked');
+    assert.ok(/unknown/.test(skill), 'Reconciliation must handle an unreadable artifact, not certify past it');
+  });
+
+  it('exposes the slots the report depends on', () => {
+    const tpl = readFileSync(templatePath, 'utf-8');
+    for (const slot of ['verdict', 'inventory', 'findings', 'semantic', 'repairs', 'limits']) {
+      assert.match(tpl, new RegExp(`slot id="${slot}"`), `template must define a ${slot} slot`);
+    }
+  });
+
+  it('keeps guidance in note attributes, not in the artifact body', () => {
+    // Same rule as the change report: unmarked body text is copied verbatim into
+    // the produced document.
+    const tpl = readFileSync(templatePath, 'utf-8');
+    for (const line of tpl.split(/\r?\n/)) {
+      const t = line.trim();
+      if (!t || t.startsWith('#') || t.includes('<slot') || t === '</slot>') continue;
+      assert.fail(`body line would be copied into the report verbatim: ${t}`);
+    }
   });
 });

@@ -130,6 +130,13 @@ export const COMMANDS = {
     // output. It does not author the Change Report — the agent does, from the
     // template — so there is no artifact for it to write and nothing to dry-run.
   },
+  'harness reconcile': {
+    mutates: false,
+    summary: 'Reconcile the planning chain (requirements, design, plan, epics, stories) against state.json.',
+    // Read-only, and deliberately so: it reports the provable inconsistencies and
+    // never repairs one. An agent that could reconcile artifacts unattended could
+    // rewrite the design it is meant to be checking against.
+  },
   'harness matrix-check': {
     mutates: false,
     summary: 'Reconcile a TDD matrix against a compiled test inventory.',

@@ -21,6 +21,7 @@ Workflow phases are implemented as scoped skills under **[skills/](skills/)**. W
 - [Resume](skills/Resume.md)
 - [MCPSetup](skills/MCPSetup.md)
 - [AgentReviewer](skills/AgentReviewer.md)
+- [Reconciliation](skills/Reconciliation.md)
 
 For GitHub Copilot, these skills are also exposed as slash-command prompts under `.github/prompts/`.
 
@@ -47,6 +48,7 @@ cadet-agent state migrate           # atomically upgrade v1 → v2 (no writes if
 cadet-agent state transition --to <phase>
 cadet-agent harness verify --gate <gate>
 cadet-agent harness report
+cadet-agent harness reconcile      # read-only: reconcile the planning chain against state.json
 cadet-agent harness cleanup --older-than-ms <n>   # required: states the age bound it deletes by
 cadet-agent harness capabilities
 ```

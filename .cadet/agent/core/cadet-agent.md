@@ -120,6 +120,7 @@ Cadet workflows are implemented as scoped skills. The global directive decides *
 | **Handoff** | `/cadet-handoff` | When ending a session, wrapping up, or handing work to a new chat. |
 | **MCP Setup** | `/cadet-mcp-setup` | When the agent needs Unity Editor connectivity via Unity CLI/MCP. |
 | **Agent Reviewer** | `/cadet-agent-reviewer` | Audit-only mode — never writes code; after a story or on demand. |
+| **Reconciliation** | `/cadet-reconcile` | When the artifacts may have drifted — before `validation → closed` to back `designArtifactSyncConfirmed`, at an epic boundary, or on demand. Never edits an artifact or advances a phase. |
 
 ### Dispatch Rules
 

@@ -61,6 +61,7 @@ const READ_ONLY_INVOCATIONS = {
   'harness capabilities': ['harness', 'capabilities'],
   'harness matrix-check': ['harness', 'matrix-check'],
   'harness changes': ['harness', 'changes'],
+  'harness reconcile': ['harness', 'reconcile'],
 };
 
 describe('command registry', () => {

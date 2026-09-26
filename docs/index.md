@@ -33,6 +33,7 @@ Cadet skills are phase-scoped instruction files. When invoked (via `/cadet-<skil
 - [Handoff](https://github.com/naishtech/cadet-agent/blob/main/.cadet/agent/core/skills/Handoff.md) (canonical skill file)
 - [MCP Setup](https://github.com/naishtech/cadet-agent/blob/main/.cadet/agent/core/skills/MCPSetup.md) (canonical skill file)
 - [Agent Reviewer](https://github.com/naishtech/cadet-agent/blob/main/.cadet/agent/core/skills/AgentReviewer.md) (canonical skill file)
+- [Reconciliation](https://github.com/naishtech/cadet-agent/blob/main/.cadet/agent/core/skills/Reconciliation.md) (canonical skill file)
 
 ## Detailed process reference
 
@@ -69,6 +70,7 @@ Cadet skills are phase-scoped instruction files. When invoked (via `/cadet-<skil
 - [Epic Template](templates/EpicTemplate.md)
 - [Story Template](templates/StoryTemplate.md)
 - [Change Report Template](templates/ChangeReportTemplate.md)
+- [Reconciliation Template](templates/ReconciliationTemplate.md)
 - [Spike Template](templates/SpikeTemplate.md)
 - [Policy Template](templates/PolicyTemplate.md)
 - [ADR Decision Template](templates/ADRDecisionTemplate.md)
