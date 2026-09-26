@@ -7,6 +7,7 @@ import {
   workItemIdOf, loadPolicy, RunLedger, loadRun, listRuns, cleanupRuns, buildReport, formatReport,
   runVerificationLoop, commandForGate, detectCapabilities, runsDir, gitChangedFiles, PolicyError, StateError,
   detectRepoRole, describeRepoRole, GATES, manualConfirmation,
+  gitChangeSet, DEFAULT_REPORT_DIR,
   parseTestInventory, parseStoryCriteria, compareCoverage, describeCoverageGaps,
   parseReachabilityDeclaration, validateReachabilityDeclaration, collectWorkItems,
   findDeferralCycles, readSiblingDeclarations, normalizeWorkItemRef, describeReachabilityGaps,
@@ -58,6 +59,7 @@ function showHelp() {
     cadet-agent harness verify-acs  Verify declared AC↔test coverage against a test report
     cadet-agent harness verify-reachability  Verify a story's declared reachability (opt-in)
     cadet-agent harness report      Summarize budget consumption and failures
+    cadet-agent harness changes     List the files a story changed, with status, counts, and links
     cadet-agent harness cleanup     Apply the retention policy to .cadet/runs/
     cadet-agent harness capabilities  Report available CLI/Unity/MCP/hook/token/cost telemetry
 
@@ -78,6 +80,9 @@ function showHelp() {
     --report       Test report to derive the inventory from (harness verify-acs|matrix-check)
     --matrix       TDD matrix markdown to check (harness matrix-check)
     --inventory    Newline-separated test names, when no report is available (harness matrix-check)
+    --range        Base revision to diff instead of the working tree (harness changes)
+    --relative-to  Directory the emitted links are relative to (harness changes; default .cadet/reports)
+    --include-cadet  Keep .cadet/ bookkeeping among the listed files (harness changes)
     --agents-md    keep|overwrite|merge for an existing AGENTS.md (init/sync)
     --older-than-ms  Age bound, in ms, for records cleanup may delete (harness cleanup; required)
     --keep         always|active|<work-item ids> for what stays in state.json (state compact; required)
@@ -164,6 +169,9 @@ function parseArgs(argv) {
       case '--commit': opts.commitGiven = true; opts.commit = value(a); break;
       case '--matrix': opts.matrix = value(a); break;
       case '--inventory': opts.inventory = value(a); break;
+      case '--range': opts.range = value(a); break;
+      case '--relative-to': opts.relativeTo = value(a); break;
+      case '--include-cadet': opts.includeCadet = true; break;
       case '--write-coverage': opts.writeCoverage = true; break;
       case '--strict-orphans': opts.strictOrphans = true; break;
       case '--dry-run': opts.dryRun = true; break;
@@ -1293,6 +1301,64 @@ async function cmdHarness(opts) {
     return;
   }
 
+  // Read-only. Produces the deterministic half of a Change Report — which files
+  // changed, how, and by how much — so the agent never assembles that table from
+  // memory. The other half, why each file changed, is not knowable from git and
+  // stays the agent's job. See .cadet/agent/core/skills/CodeReview.md.
+  //
+  // A missing git is NOT a usage error here. This command informs a review that
+  // can still be completed, so it reports the limitation and exits 0 rather than
+  // blocking the review; the report records it under Limits.
+  if (sub === 'changes') {
+    const relativeTo = opts.relativeTo || DEFAULT_REPORT_DIR;
+    const changes = gitChangeSet(opts.targetDir, {
+      range: opts.range || null,
+      relativeTo,
+      includeCadet: opts.includeCadet === true,
+    });
+
+    const { exists, state } = readState(opts.targetDir);
+    const item = exists ? state?.activeWorkItem ?? null : null;
+    const workItem = item ? { epicId: item.epicId ?? null, storyId: item.storyId ?? null } : null;
+
+    const payload = {
+      ok: true,
+      available: changes.available,
+      workItem,
+      range: opts.range || 'working-tree',
+      relativeTo,
+      files: changes.files,
+      counts: changes.counts,
+      reason: changes.reason,
+    };
+    if (opts.format === 'json') {
+      emit(opts, '', payload);
+      return;
+    }
+
+    if (!changes.available) {
+      console.log(`\n⚠️  Change inventory unavailable: ${changes.reason}`);
+      console.log('   Do not list files from memory — record this as a limit of the report.');
+      return;
+    }
+
+    const c = changes.counts;
+    console.log(`\nChange inventory (${payload.range}) — ${changes.files.length} file(s)`);
+    console.log(`  ${c.added} added · ${c.modified} modified · ${c.renamed} renamed · ${c.deleted} deleted`);
+    if (changes.files.length === 0) {
+      console.log('\n  (no changes)');
+    } else {
+      console.log('');
+      for (const f of changes.files) {
+        const lines = f.added === null && f.deleted === null ? 'new' : `+${f.added ?? 0}/-${f.deleted ?? 0}`;
+        console.log(`  ${f.status}  ${lines.padEnd(10)} ${f.path}`);
+      }
+    }
+    const label = workItem ? `${workItem.epicId || 'none'}::${workItem.storyId || 'none'}` : 'none';
+    console.log(`\n  Links relative to ${relativeTo} · work item: ${label}`);
+    return;
+  }
+
   // AR-5. Reconcile a TDD matrix's DELIVERED test-name claims against a compiled
   // inventory. Read-only: it reports, and never writes state, so it can be run at
   // authoring time (before anything has been implemented) as well as in a gate.
@@ -1390,7 +1456,7 @@ async function cmdHarness(opts) {
     return;
   }
 
-  fail(opts, `Unknown harness subcommand: ${sub || '(none)'}. Use record|confirm|verify|verify-acs|verify-reachability|matrix-check|report|cleanup|capabilities.`);
+  fail(opts, `Unknown harness subcommand: ${sub || '(none)'}. Use record|confirm|verify|verify-acs|verify-reachability|matrix-check|report|changes|cleanup|capabilities.`);
 }
 
 export async function run(argv) {

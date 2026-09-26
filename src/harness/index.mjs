@@ -23,6 +23,8 @@ export {
   newId, isUuid, sha256, sha256Bytes, hashFile, hashTree, hashCriteria, timestamp, canonicalJson, changedFiles, gitChangedFiles,
 } from './util.mjs';
 
+export { DEFAULT_REPORT_DIR, gitChangeSet } from './changes.mjs';
+
 export {
   STATE_VERSION, READABLE_STATE_VERSIONS, HISTORY_EXTERNAL_SINCE, isHistoryExternal,
   validateState, migrateStateV1toV2, migrateStateDocument, migrateStateFile, parseTargetVersion,

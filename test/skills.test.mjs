@@ -410,3 +410,66 @@ describe('Skill harness contract', () => {
     assert.ok(/description/.test(shape), `handoff name must include a description slug: ${shape}`);
   });
 });
+
+// ── Change Report (post-story reporting) ────────────────────────────────────
+//
+// The report exists because end-of-story summaries varied: a bullet list one
+// day, prose the next, nothing the third time. The fix is a fixed table shape
+// whose file rows are measured by `harness changes` rather than remembered. The
+// `<document>` ref is not otherwise machine-checked, so it is pinned here.
+
+describe('Change Report', () => {
+  const templatePath = join(coreDir, 'templates', 'ChangeReportTemplate.md');
+
+  it('ships the report template and wires CodeReview to it', () => {
+    assert.equal(existsSync(templatePath), true, 'missing templates/ChangeReportTemplate.md');
+    const review = readFileSync(join(skillsDir, 'CodeReview.md'), 'utf-8');
+    assert.ok(review.includes('templates/ChangeReportTemplate.md'), 'CodeReview must reference the report template');
+    assert.ok(review.includes('.cadet/reports/'), 'CodeReview must write the report under .cadet/reports/');
+    // Without the command the agent is back to assembling the file table by
+    // hand, which is the defect this support exists to close.
+    assert.ok(review.includes('cadet-agent harness changes'), 'CodeReview must gather the inventory from the command');
+  });
+
+  it('references the template by document index, not by path, in the process', () => {
+    const review = readFileSync(join(skillsDir, 'CodeReview.md'), 'utf-8');
+    assert.ok(review.includes('<document index="1"'), 'CodeReview must reference the template by document index');
+    assert.ok(/Change Report/.test(review), 'CodeReview must name the Change Report as an output');
+  });
+
+  it('exposes the slots the report depends on', () => {
+    const tpl = readFileSync(templatePath, 'utf-8');
+    for (const slot of ['files', 'acMapping', 'walkthrough', 'notChanged', 'notes', 'limits']) {
+      assert.match(tpl, new RegExp(`slot id="${slot}"`), `template must define a ${slot} slot`);
+    }
+  });
+
+  it('keeps report guidance in note attributes, not in the artifact body', () => {
+    // Unmarked body text is copied verbatim into the produced report. Guidance
+    // must live in a slot's note= attribute, which is stripped — otherwise the
+    // finished document ends up telling its own reader never to assemble the
+    // table from memory. Every other core template keeps its guidance in notes;
+    // this one is reader-facing, so the rule is enforced rather than assumed.
+    const tpl = readFileSync(templatePath, 'utf-8');
+    for (const line of tpl.split(/\r?\n/)) {
+      const t = line.trim();
+      if (!t || t.startsWith('#') || t.includes('<slot') || t === '</slot>') continue;
+      assert.fail(`body line would be copied into the report verbatim: ${t}`);
+    }
+  });
+
+  it('declares the report line for the inventory, the rationale, and the evidence', () => {
+    const tpl = readFileSync(templatePath, 'utf-8');
+    // The rationale column is the only authored part; the rest is measured.
+    assert.ok(/slot id="why"/.test(tpl), 'the file table must carry a why column');
+    assert.ok(/slot id="fileLink"/.test(tpl), 'the file table must use the inventory link verbatim');
+  });
+
+  it('keeps the report directory a preserved path', () => {
+    // A report is the consumer's record of their own change; a framework sync
+    // must never clobber it.
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+    const normalized = manifest.preservedPaths.map((p) => p.replace(/\\/g, '/'));
+    assert.ok(normalized.includes('.cadet/reports'), '.cadet/reports must be preserved');
+  });
+});
