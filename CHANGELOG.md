@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.49.0] — 2026-09-26
+
 ### Fixed
 
 - **`state.json` had no bound inside a single work item, and the story boundary never touched evidence.** Contract v5 scopes `gateEvidence` to the active work item, but nothing pruned *within* one — and the boundary itself was a hand-edit. `Resume` said "set `activeWorkItem`, reset gates", a sentence that never mentions evidence, while `resetGatesForNewWorkItem` — the function that clears it correctly — had no caller anywhere in `src/`. Nothing surfaced the result, because `state validate` only ever asked whether a claimed-true gate's *own* record was bound to the active item, never whether foreign records were sitting in the array. Measured on the audited repository: **7,986 lines**, of which `gateEvidence` was 6,495 (81%) holding **135 records — 115 `superseded`, 63 of them a closed work item's, 9 live**. Two fixes: `state compact` now applies a within-work-item retention rule as well as the cross-work-item one — it keeps the newest record per gate, every `passed`/`manual-confirmation` record, and every `failed` record (red-before-green reads the prior red), archives the rest to `.cadet/archive/`, and reports the counts, with `--retain-all` to opt out — and `state validate` now **warns** when `gateEvidence` holds records for another work item, or more than 60 records, naming the work items and pointing at the command.
