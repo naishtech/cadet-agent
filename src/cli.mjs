@@ -8,6 +8,7 @@ import {
   runVerificationLoop, commandForGate, detectCapabilities, runsDir, gitChangedFiles, PolicyError, StateError,
   detectRepoRole, describeRepoRole, GATES, manualConfirmation,
   gitChangeSet, DEFAULT_REPORT_DIR,
+  reconcileArtifacts, PLANS_DEFAULT_DIR,
   parseTestInventory, parseStoryCriteria, compareCoverage, describeCoverageGaps,
   parseReachabilityDeclaration, validateReachabilityDeclaration, collectWorkItems,
   findDeferralCycles, readSiblingDeclarations, normalizeWorkItemRef, describeReachabilityGaps,
@@ -60,6 +61,7 @@ function showHelp() {
     cadet-agent harness verify-reachability  Verify a story's declared reachability (opt-in)
     cadet-agent harness report      Summarize budget consumption and failures
     cadet-agent harness changes     List the files a story changed, with status, counts, and links
+    cadet-agent harness reconcile   Reconcile the planning chain against state.json (read-only)
     cadet-agent harness cleanup     Apply the retention policy to .cadet/runs/
     cadet-agent harness capabilities  Report available CLI/Unity/MCP/hook/token/cost telemetry
 
@@ -83,6 +85,7 @@ function showHelp() {
     --range        Base revision to diff instead of the working tree (harness changes)
     --relative-to  Directory the emitted links are relative to (harness changes; default .cadet/reports)
     --include-cadet  Keep .cadet/ bookkeeping among the listed files (harness changes)
+    --plans-dir    Directory holding the planning artifacts (harness reconcile; default .cadet/agent/project-plans)
     --agents-md    keep|overwrite|merge for an existing AGENTS.md (init/sync)
     --older-than-ms  Age bound, in ms, for records cleanup may delete (harness cleanup; required)
     --keep         always|active|<work-item ids> for what stays in state.json (state compact; required)
@@ -172,6 +175,7 @@ function parseArgs(argv) {
       case '--range': opts.range = value(a); break;
       case '--relative-to': opts.relativeTo = value(a); break;
       case '--include-cadet': opts.includeCadet = true; break;
+      case '--plans-dir': opts.plansDir = value(a); break;
       case '--write-coverage': opts.writeCoverage = true; break;
       case '--strict-orphans': opts.strictOrphans = true; break;
       case '--dry-run': opts.dryRun = true; break;
@@ -1359,6 +1363,51 @@ async function cmdHarness(opts) {
     return;
   }
 
+  // Read-only. Reconciles the planning chain against state.json: the mechanical
+  // half of the Reconciliation skill. It reports the inconsistencies it can prove
+  // from the artifacts and never repairs one — the skill proposes repairs for the
+  // user to approve. See .cadet/agent/core/skills/Reconciliation.md.
+  //
+  // Exit 0 whatever the verdict: the verdict is the payload, and a caller reading
+  // `--format json` must not have to tolerate a failure exit to get it. A run with
+  // no planning artifacts at all is a legitimate state (a framework-source repo, a
+  // small change), not an error.
+  if (sub === 'reconcile') {
+    const { exists, state } = readState(opts.targetDir);
+    const result = reconcileArtifacts(opts.targetDir, {
+      state: exists ? state : null,
+      plansDir: opts.plansDir || PLANS_DEFAULT_DIR,
+      story: opts.story || null,
+    });
+
+    if (opts.format === 'json') {
+      emit(opts, '', result);
+      return;
+    }
+    if (!result.available) {
+      console.log(`\nℹ️  Nothing to reconcile: ${result.reason}`);
+      return;
+    }
+
+    const s = result.summary;
+    console.log(`\nReconcile ${result.plansDir}${result.scopedEpic ? ` (${result.scopedEpic})` : ''} — verdict: ${result.verdict}`);
+    console.log(`  ${result.artifacts.epicCount} epic(s), ${result.artifacts.storyCount} story file(s)`);
+    console.log(`  ${s.total} finding(s): ${s.blocking} blocking · ${s.warning} warning · ${s.info} info`);
+    if (s.total === 0) {
+      console.log('\n  ✅ The chain is internally consistent.');
+    } else {
+      console.log('');
+      for (const f of result.findings) {
+        console.log(`  [${f.severity}] ${f.id} ${f.code} — ${f.subject}`);
+        console.log(`        ${f.detail}${f.evidence ? ` (${f.evidence})` : ''}`);
+      }
+    }
+    if (result.verdict === 'unknown') {
+      console.log('\n  ⚠️  At least one artifact could not be read, so consistency cannot be certified.');
+    }
+    return;
+  }
+
   // AR-5. Reconcile a TDD matrix's DELIVERED test-name claims against a compiled
   // inventory. Read-only: it reports, and never writes state, so it can be run at
   // authoring time (before anything has been implemented) as well as in a gate.
@@ -1456,7 +1505,7 @@ async function cmdHarness(opts) {
     return;
   }
 
-  fail(opts, `Unknown harness subcommand: ${sub || '(none)'}. Use record|confirm|verify|verify-acs|verify-reachability|matrix-check|report|changes|cleanup|capabilities.`);
+  fail(opts, `Unknown harness subcommand: ${sub || '(none)'}. Use record|confirm|verify|verify-acs|verify-reachability|matrix-check|report|changes|reconcile|cleanup|capabilities.`);
 }
 
 export async function run(argv) {

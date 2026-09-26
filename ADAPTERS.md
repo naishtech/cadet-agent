@@ -41,13 +41,18 @@ The permitted prose in an adapter is *connective pointer text* ("Read X, then fo
 | GitHub Copilot | `.github/prompts/cadet-review.prompt.md` | Slash-command prompt | `.cadet/agent/core/skills/CodeReview.md` |
 | GitHub Copilot | `.github/prompts/cadet-resume.prompt.md` | Slash-command prompt | `.cadet/agent/core/skills/Resume.md` |
 | GitHub Copilot | `.github/prompts/cadet-mcp-setup.prompt.md` | Slash-command prompt | `.cadet/agent/core/skills/MCPSetup.md` |
+| GitHub Copilot | `.github/prompts/cadet-reconcile.prompt.md` | Slash-command prompt | `.cadet/agent/core/skills/Reconciliation.md` |
 | GitHub Copilot | `.github/hooks/git-guard.json` | PreToolUse hook config | n/a (infrastructure) |
 | Cursor | `.cursor/rules/cadet-agent.md` | Always-apply rule | `.cadet/agent/core/cadet-agent.md` |
 | Cursor | `.cursor/rules/cadet-agent-reviewer.md` | Reviewer rule | `.cadet/agent/core/cadet-agent.md` + `.cadet/agent/core/skills/AgentReviewer.md` |
 | Cursor | `.cursor/rules/cadet-planning-review.md` | Phase rule | `.cadet/agent/core/skills/PlanningReview.md` |
+| Cursor | `.cursor/rules/cadet-handoff.md` | Phase rule | `.cadet/agent/core/skills/Handoff.md` |
+| Cursor | `.cursor/rules/cadet-reconcile.md` | Phase rule | `.cadet/agent/core/skills/Reconciliation.md` |
 | Continue | `.continue/rules/cadet-agent.md` | System rule | `.cadet/agent/core/cadet-agent.md` |
 | Continue | `.continue/rules/cadet-agent-reviewer.md` | Reviewer rule | `.cadet/agent/core/cadet-agent.md` + `.cadet/agent/core/skills/AgentReviewer.md` |
 | Continue | `.continue/rules/cadet-planning-review.md` | Phase rule | `.cadet/agent/core/skills/PlanningReview.md` |
+| Continue | `.continue/rules/cadet-handoff.md` | Phase rule | `.cadet/agent/core/skills/Handoff.md` |
+| Continue | `.continue/rules/cadet-reconcile.md` | Phase rule | `.cadet/agent/core/skills/Reconciliation.md` |
 | Continue | `.continue/config.yaml` | Custom commands | `.cadet/agent/core/skills/*.md` |
 | Claude Code | `.claude/skills/cadet-agent/SKILL.md` | Base/global skill | `.cadet/agent/core/cadet-agent.md` |
 | Claude Code | `.claude/skills/cadet-agent-reviewer/SKILL.md` | Reviewer skill | `.cadet/agent/core/cadet-agent.md` + `.cadet/agent/core/skills/AgentReviewer.md` |
@@ -62,6 +67,7 @@ The permitted prose in an adapter is *connective pointer text* ("Read X, then fo
 | Claude Code | `.claude/skills/cadet-resume/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Resume.md` |
 | Claude Code | `.claude/skills/cadet-mcp-setup/SKILL.md` | Phase skill | `.cadet/agent/core/skills/MCPSetup.md` |
 | Claude Code | `.claude/skills/cadet-visual-evidence/SKILL.md` | Phase skill | `.cadet/agent/core/skills/VisualEvidence.md` |
+| Claude Code | `.claude/skills/cadet-reconcile/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Reconciliation.md` |
 | Deep Code | `.agents/skills/cadet-agent/SKILL.md` | Base/global skill | `.cadet/agent/core/cadet-agent.md` |
 | Deep Code | `.agents/skills/cadet-agent-reviewer/SKILL.md` | Reviewer skill | `.cadet/agent/core/cadet-agent.md` + `.cadet/agent/core/skills/AgentReviewer.md` |
 | Deep Code | `.agents/skills/cadet-requirements/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Requirements.md` |
@@ -75,6 +81,7 @@ The permitted prose in an adapter is *connective pointer text* ("Read X, then fo
 | Deep Code | `.agents/skills/cadet-resume/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Resume.md` |
 | Deep Code | `.agents/skills/cadet-mcp-setup/SKILL.md` | Phase skill | `.cadet/agent/core/skills/MCPSetup.md` |
 | Deep Code | `.agents/skills/cadet-visual-evidence/SKILL.md` | Phase skill | `.cadet/agent/core/skills/VisualEvidence.md` |
+| Deep Code | `.agents/skills/cadet-reconcile/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Reconciliation.md` |
 | Cross-client | `AGENTS.md` | Root agent-instruction pointer (create-only) | `.cadet/agent/core/cadet-agent.md` |
 
 > Deep Code adapters live under `.agents/skills/` (the cross-client Agent Skills root) rather than a Deep-Code-only `.deepcode/skills/` directory, so the same pointers are discoverable by any client that reads the `.agents/` convention. Deep Code scans `.deepcode/skills/` first, then `.agents/skills/`. See `docs/guidance/DeepCode.md`.

@@ -26,6 +26,11 @@ export {
 export { DEFAULT_REPORT_DIR, gitChangeSet } from './changes.mjs';
 
 export {
+  PLANS_DEFAULT_DIR, REQUIRED_ARTIFACTS, RECONCILE_SEVERITIES, RECONCILE_VERDICTS,
+  DEFAULT_MAX_DOC_BYTES, parseStoryHeader, parseEpicHeader, collectArtifacts, reconcileArtifacts,
+} from './reconcile.mjs';
+
+export {
   STATE_VERSION, READABLE_STATE_VERSIONS, HISTORY_EXTERNAL_SINCE, isHistoryExternal,
   validateState, migrateStateV1toV2, migrateStateDocument, migrateStateFile, parseTargetVersion,
   toStateV4, splitEvidence, buildEvidenceCoverage, mergeEvidenceCoverage, sealWorkItem, recordEvidence, appendEvidence,

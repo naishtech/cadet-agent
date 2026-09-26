@@ -9,7 +9,7 @@ Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished g
   - `cadet-agent.md` is the thin global directive: identity, non-negotiable rules, workflow routing, hard-gate protocol, and skill dispatch.
   - `Harness.md` is the canonical harness contract: budgets, evidence-backed gates, retries, context tiers, tool routing, privacy, and escalation.
   - `harness.schema.json` and `state.schema.json` are the machine-readable schemas for harness records and session state.
-  - `skills/` contains scoped workflow-phase skills (PlanningReview, Requirements, Architecture, Spike, StoryBreakdown, TDD, Debugging, CodeReview, Resume, MCPSetup, AgentReviewer).
+  - `skills/` contains scoped workflow-phase skills (PlanningReview, Requirements, Architecture, Spike, StoryBreakdown, TDD, Debugging, CodeReview, Resume, MCPSetup, AgentReviewer, Handoff, Reconciliation).
   - `templates/` contains runtime templates for planning artifacts.
 - `.cadet/harness.json` holds repository-local budget/policy overrides (preserved by sync).
 - `.cadet/runs/` holds sanitized run ledgers (preserved by sync; no secrets or raw prompts by default).
@@ -28,7 +28,7 @@ Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished g
 
 ## Cross-IDE Support
 
-Cadet-Agent provides full workflow parity across five IDEs. The same 10 skills + reviewer are available in each:
+Cadet-Agent provides full workflow parity across five IDEs. The same 11 skills + reviewer are available in each:
 
 | Feature | GitHub Copilot | Cursor | Continue | Claude Code | Deep Code |
 |---|---|---|---|---|---|
@@ -44,6 +44,7 @@ Cadet-Agent provides full workflow parity across five IDEs. The same 10 skills +
 | Code Review | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Resume | ✅ | ✅ | ✅ | ✅ | ✅ |
 | MCP Setup | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Reconciliation | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Reviewer mode | Agent picker | Rule toggle | `/cadet-agent-reviewer` | `/cadet-agent-reviewer` | `cadet-agent-reviewer` skill |
 | Git guard | PreToolUse hook | Manual | Manual | Manual | `permissions.ask` (`mutate-git-log`) |
 
@@ -199,6 +200,7 @@ cadet-agent state seal                           # write the active work item's 
 cadet-agent state transition --to review         # enforce the matrix + evidence
 cadet-agent harness verify --gate testsPassed --files src/a.cs   # bounded, classified loop
 cadet-agent harness report                       # budget consumption and failures (no secrets)
+cadet-agent harness reconcile                    # reconcile the planning chain against state.json (read-only)
 cadet-agent harness cleanup --older-than-ms <n>  # apply the retention policy (bound required)
 cadet-agent harness capabilities                 # available CLI/Unity/MCP/hook/token/cost telemetry
 ```

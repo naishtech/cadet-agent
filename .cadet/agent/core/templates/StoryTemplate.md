@@ -1,6 +1,6 @@
 # Story: <slot id="name"/>
 <slot id="storyId" fmt="EPIC-N-STORY-N"/>
-Parent Epic: <slot id="parentEpic" fmt="../epic.md"/>
+Parent Epic: <slot id="parentEpic" fmt="epic.md" note="the `epic.md` in THIS directory. A story lives beside its epic — `epic-N-slug/epic.md` and `epic-N-slug/story-M-slug.md` — so the reference is a sibling, not a parent. `../epic.md` was written here until 0.47.0 and resolves to a file that does not exist, which is why `harness reconcile` reports a bad parent only when the sibling filename is actually wrong."/>
 Status: <slot id="status" opt="Planned|In Progress|Done">Planned</slot>
 Estimate: <slot id="estimate" opt="Small|Medium" note="completable in a single session"/>
 Reachability: <slot id="reachability" note="REQUIRED, and one of exactly two forms: 'witnessed — <what a user or operator does and what they see>', or 'deferred to <work-item id> — <why it cannot be witnessed yet>'. Silence is not reachability. A deferral is honoured only while its target is unfinished, so it expires when that work item is done: either note it here as witnessed or fix the wiring. Infrastructure that produces nothing reachable yet declares a deferral; that is what the form is for, and it must name an owner. Verified by `cadet-agent harness verify-reachability` when the repository sets `reachability.enabled`."/>

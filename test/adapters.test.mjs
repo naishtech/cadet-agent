@@ -27,6 +27,7 @@ const expectedSkills = [
   'MCPSetup.md',
   'PlanningReview.md',
   'Handoff.md',
+  'Reconciliation.md',
 ];
 
 // ── Per-IDE expected adapter files ──────────────────────────────────────────
@@ -50,6 +51,7 @@ const ideAdapters = {
       'MCPSetup.md': 'cadet-mcp-setup.prompt.md',
       'Handoff.md': 'cadet-handoff.prompt.md',
       'VisualEvidence.md': 'cadet-visual-evidence.prompt.md',
+      'Reconciliation.md': 'cadet-reconcile.prompt.md',
     },
     extraPrompts: ['cadet-resume.prompt.md', 'cadet-planning-review.prompt.md'],
   },
@@ -58,7 +60,7 @@ const ideAdapters = {
     rulesDir: '.cursor/rules',
     ruleFile: '.cursor/rules/cadet-agent.md',
     reviewerFile: '.cursor/rules/cadet-agent-reviewer.md',
-    extraRules: ['.cursor/rules/cadet-planning-review.md'],
+    extraRules: ['.cursor/rules/cadet-planning-review.md', '.cursor/rules/cadet-handoff.md', '.cursor/rules/cadet-reconcile.md'],
   },
   continue: {
     baseDir: join(repoRoot, '.continue'),
@@ -66,7 +68,7 @@ const ideAdapters = {
     ruleFile: '.continue/rules/cadet-agent.md',
     reviewerFile: '.continue/rules/cadet-agent-reviewer.md',
     configFile: '.continue/config.yaml',
-    extraRules: ['.continue/rules/cadet-planning-review.md'],
+    extraRules: ['.continue/rules/cadet-planning-review.md', '.continue/rules/cadet-handoff.md', '.continue/rules/cadet-reconcile.md'],
   },
   'claude-code': {
     baseDir: join(repoRoot, '.claude'),
@@ -85,6 +87,7 @@ const ideAdapters = {
       'PlanningReview.md': 'cadet-planning-review/SKILL.md',
       'Handoff.md': 'cadet-handoff/SKILL.md',
       'VisualEvidence.md': 'cadet-visual-evidence/SKILL.md',
+      'Reconciliation.md': 'cadet-reconcile/SKILL.md',
     },
     extraSkills: ['cadet-resume/SKILL.md'],
   },
@@ -105,6 +108,7 @@ const ideAdapters = {
       'PlanningReview.md': 'cadet-planning-review/SKILL.md',
       'Handoff.md': 'cadet-handoff/SKILL.md',
       'VisualEvidence.md': 'cadet-visual-evidence/SKILL.md',
+      'Reconciliation.md': 'cadet-reconcile/SKILL.md',
     },
     extraSkills: ['cadet-resume/SKILL.md'],
   },
@@ -346,7 +350,7 @@ describe('Adapter inventory', () => {
         'cadet-requirements', 'cadet-architecture', 'cadet-spike',
         'cadet-breakdown', 'cadet-tdd', 'cadet-debug', 'cadet-review',
         'cadet-resume', 'cadet-mcp-setup', 'cadet-agent-reviewer',
-        'cadet-planning-review', 'cadet-handoff',
+        'cadet-planning-review', 'cadet-handoff', 'cadet-reconcile',
       ];
       for (const name of skillNames) {
         assert.ok(
@@ -376,6 +380,8 @@ describe('Adapter inventory', () => {
       ['.continue/rules/cadet-planning-review.md', 'PlanningReview.md'],
       ['.cursor/rules/cadet-handoff.md', 'Handoff.md'],
       ['.continue/rules/cadet-handoff.md', 'Handoff.md'],
+      ['.cursor/rules/cadet-reconcile.md', 'Reconciliation.md'],
+      ['.continue/rules/cadet-reconcile.md', 'Reconciliation.md'],
     ];
 
     it('has at least one extra phase rule', () => {
@@ -966,14 +972,17 @@ describe('Adapter inventory', () => {
       '.github/prompts/cadet-resume.prompt.md',
       '.github/prompts/cadet-mcp-setup.prompt.md',
       '.github/prompts/cadet-planning-review.prompt.md',
+      '.github/prompts/cadet-reconcile.prompt.md',
       // Cursor
       '.cursor/rules/cadet-agent.md',
       '.cursor/rules/cadet-agent-reviewer.md',
       '.cursor/rules/cadet-planning-review.md',
+      '.cursor/rules/cadet-reconcile.md',
       // Continue
       '.continue/rules/cadet-agent.md',
       '.continue/rules/cadet-agent-reviewer.md',
       '.continue/rules/cadet-planning-review.md',
+      '.continue/rules/cadet-reconcile.md',
       '.continue/config.yaml',
       // Claude Code
       '.claude/skills/cadet-agent',
@@ -988,6 +997,7 @@ describe('Adapter inventory', () => {
       '.claude/skills/cadet-review',
       '.claude/skills/cadet-resume',
       '.claude/skills/cadet-mcp-setup',
+      '.claude/skills/cadet-reconcile',
       // Deep Code (cross-client skills root)
       '.agents/skills/cadet-agent',
       '.agents/skills/cadet-agent-reviewer',
@@ -1001,6 +1011,7 @@ describe('Adapter inventory', () => {
       '.agents/skills/cadet-resume',
       '.agents/skills/cadet-mcp-setup',
       '.agents/skills/cadet-planning-review',
+      '.agents/skills/cadet-reconcile',
       // Core
       '.cadet/agent/core',
       '.cadet/agent/core/templates',
