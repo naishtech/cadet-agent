@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.48.0] — 2026-09-26
+
 ### Fixed
 
 - **Re-running the tests no longer invalidates the AC-coverage record those tests produced.** `harness verify-acs` bound the test report it had read into its evidence `inputTreeHash` *and* `relevantFiles`. A repository whose test script rewrites a fixed report path (a `test-results-junit.xml` and friends) therefore staled `acceptanceCriteriaValidated` the moment it re-ran the tests — the evidence was invalidated by the very command that produced its inventory, and it broke `review → validation` at every closure. A report is an *output* of the run, not an input, so it is now kept as `artifactPath` for audit and is deliberately **not** a relevant file. The record binds the story — recorded repo-relative, so the freshness re-derivation at transition time resolves it under the root instead of silently hashing a missing file and matching itself — and the declared test names, which already participate in `criteriaHash`. This is the same class Harness §5 already excludes for `.cadet/state.json` and `.cadet/runs/**`: "binding evidence to either would make a gate stale the instant it was written".
