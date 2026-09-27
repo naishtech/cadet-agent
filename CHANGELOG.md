@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.50.0] — 2026-09-27
+
 ### Added
 
 - **Hermes Agent as a sixth supported IDE.** [Hermes Agent](https://hermes-agent.nousresearch.com/docs/) (Nous Research's open-source agent CLI) discovers project skills in `.agents/skills/` — the same cross-client root Deep Code uses — so the existing adapters are shared, not duplicated: no new adapter files and no `.hermes/` directory in consumer installs. `FrameworkManifest.json` adds `hermes` to `supportedIDEs`; `test/adapters.test.mjs` registers a `hermes` entry with a drift guard that keeps its skill maps in lockstep with Deep Code's and asserts no `.hermes/` directory ships; the installer prints Hermes next steps (`hermes skills trust` to enable project skills, command approval policies as the git-guard substitute); `package-agent.ps1` comments name both clients on the shared root. The shared base adapter's Git Guard section is now client-neutral (Deep Code permissions vs Hermes approval policies). New docs: `docs/guidance/Hermes.md` (discovery, trust, invocation, approval policies, MCP, configuration) and `.cadet/agent/docs/hermes.md` (per-IDE setup guide); `README.md` gains the sixth parity column and a Hermes verification request; `ADAPTERS.md` rows note the shared registration.
