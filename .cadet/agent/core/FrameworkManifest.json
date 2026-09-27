@@ -9,7 +9,8 @@
     "cursor",
     "continue",
     "claude-code",
-    "deepcode"
+    "deepcode",
+    "hermes"
   ],
   "managedPaths": [
     ".github/agents/cadet.agent.md",

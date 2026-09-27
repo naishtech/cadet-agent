@@ -54,6 +54,7 @@ Cadet skills are phase-scoped instruction files. When invoked (via `/cadet-<skil
 - [Technology Decision Framework](guidance/TechnologyDecisionFramework.md)
 - [Harness Troubleshooting](guidance/HarnessTroubleshooting.md)
 - [Deep Code Integration](guidance/DeepCode.md)
+- [Hermes Integration](guidance/Hermes.md)
 
 ## Standards
 

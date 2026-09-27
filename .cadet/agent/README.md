@@ -4,7 +4,7 @@ This repository packages Cadet-Agent as a cross-IDE framework with a shared core
 
 ## Layout
 - `core/` contains the shared Cadet-Agent framework.
-- The repository root contains thin IDE-specific adapter files under `.github/`, `.cursor/`, `.continue/`, and `.claude/` for native integration.
+- The repository root contains thin IDE-specific adapter files under `.github/`, `.cursor/`, `.continue/`, `.claude/`, and `.agents/` for native integration.
 - `docs/` contains setup guides for each supported IDE.
 
 ## Package Output
@@ -26,6 +26,8 @@ Running `package-agent.ps1` produces `cadet-agent.zip` with these install paths:
 - [GitHub Copilot](docs/github-copilot.md)
 - [Cursor](docs/cursor.md)
 - [Continue](docs/continue.md)
+- [Claude Code](docs/claude-code.md)
+- [Hermes](docs/hermes.md)
 
 ## Shared Conventions
 - Repository-specific policy overlays belong in `.cadet/agent/policies`.

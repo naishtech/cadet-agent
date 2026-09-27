@@ -352,6 +352,13 @@ export async function install(targetDir, opts = {}) {
   console.log('    Reviewer: the cadet-agent-reviewer skill');
   console.log('    Git guard: no hook — approve via .deepcode\\settings.json permissions.ask (mutate-git-log)');
   console.log('    Docs: https://deepcode.vegamo.cn/');
+  console.log('  Hermes:');
+  console.log('    Already active — .agents\\skills\\cadet-agent\\SKILL.md is discovered as a project skill');
+  console.log('    Run `hermes skills trust` once inside the repo to enable project skills');
+  console.log('    Slash commands: /cadet-requirements, /cadet-tdd, /cadet-resume, ...');
+  console.log('    Reviewer: /cadet-agent-reviewer');
+  console.log('    Git guard: no hook — configure command approval policies for commit/push');
+  console.log('    Docs: https://hermes-agent.nousresearch.com/docs/');
   console.log('');
 }
 

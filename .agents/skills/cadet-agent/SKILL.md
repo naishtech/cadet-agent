@@ -3,7 +3,7 @@ name: cadet-agent
 description: Cadet-Agent global operating rules for Unity and game-development workflows. Loads automatically as a project skill and dispatches to phase-specific skills. Always active.
 ---
 
-This file is the Cadet entry point for Deep Code: it registers the framework and points at its canonical instructions.
+This file is the Cadet entry point for the `.agents/skills/` cross-client root (Deep Code, Hermes): it registers the framework and points at its canonical instructions.
 
 ## Read First
 
@@ -13,4 +13,9 @@ Phase skills are selected from the `/` skills menu (`/skills` lists them); each 
 
 ## Git Guard
 
-Deep Code has no PreToolUse hook. Enforce approval through `.deepcode/settings.json` permissions instead: put `mutate-git-log` (and optionally `network`, `write-out-cwd`) in `permissions.ask`, or use `"defaultMode": "askAll"`. Before any commit or push, also present a summary of changes and wait for explicit approval.
+This client has no PreToolUse hook — enforce approval through your client's permission system:
+
+- Deep Code: put `mutate-git-log` (and optionally `network`, `write-out-cwd`) in `.deepcode/settings.json` `permissions.ask`, or use `"defaultMode": "askAll"`.
+- Hermes: enable command approval policies so `git commit` and `git push` require confirmation (see `docs/guidance/Hermes.md`).
+
+Before any commit or push, also present a summary of changes and wait for explicit approval.
