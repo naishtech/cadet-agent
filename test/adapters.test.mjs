@@ -112,6 +112,30 @@ const ideAdapters = {
     },
     extraSkills: ['cadet-resume/SKILL.md'],
   },
+  // Hermes reads the same .agents/skills/ cross-client root (project-skill
+  // discovery), so its registration is a mirror of Deep Code's. The Hermes
+  // describe block enforces that the two maps never drift apart.
+  hermes: {
+    baseDir: join(repoRoot, '.agents'),
+    skillsDir: join(repoRoot, '.agents', 'skills'),
+    skillFile: '.agents/skills/cadet-agent/SKILL.md',
+    reviewerFile: '.agents/skills/cadet-agent-reviewer/SKILL.md',
+    skillToFile: {
+      'Requirements.md': 'cadet-requirements/SKILL.md',
+      'Architecture.md': 'cadet-architecture/SKILL.md',
+      'Spike.md': 'cadet-spike/SKILL.md',
+      'StoryBreakdown.md': 'cadet-breakdown/SKILL.md',
+      'TDD.md': 'cadet-tdd/SKILL.md',
+      'Debugging.md': 'cadet-debug/SKILL.md',
+      'CodeReview.md': 'cadet-review/SKILL.md',
+      'MCPSetup.md': 'cadet-mcp-setup/SKILL.md',
+      'PlanningReview.md': 'cadet-planning-review/SKILL.md',
+      'Handoff.md': 'cadet-handoff/SKILL.md',
+      'VisualEvidence.md': 'cadet-visual-evidence/SKILL.md',
+      'Reconciliation.md': 'cadet-reconcile/SKILL.md',
+    },
+    extraSkills: ['cadet-resume/SKILL.md'],
+  },
 };
 
 // ── Helper ──────────────────────────────────────────────────────────────────
@@ -585,6 +609,48 @@ describe('Adapter inventory', () => {
         const folder = rel.split('/').slice(-2)[0];
         assert.equal(name, folder, `${rel} frontmatter name must match its folder name`);
       }
+    });
+  });
+
+  // ── Hermes adapters (shares the .agents/ cross-client skills root) ─────
+
+  describe('Hermes', () => {
+    const hermes = ideAdapters['hermes'];
+    const deepcode = ideAdapters['deepcode'];
+
+    it('shares the Deep Code cross-client skills root', () => {
+      // Hermes natively scans <project-root>/.agents/skills/ (same SKILL.md
+      // convention), so its registration must stay a mirror of Deep Code's:
+      // adding a skill to one map without the other silently drops it from
+      // one of the two clients.
+      assert.equal(hermes.baseDir, deepcode.baseDir);
+      assert.equal(hermes.skillFile, deepcode.skillFile);
+      assert.equal(hermes.reviewerFile, deepcode.reviewerFile);
+      assert.deepEqual(hermes.skillToFile, deepcode.skillToFile);
+      assert.deepEqual(hermes.extraSkills, deepcode.extraSkills);
+    });
+
+    it('base skill references cadet-agent.md', () => {
+      const content = readFile(hermes.skillFile);
+      assert.ok(
+        content.includes('.cadet/agent/core/cadet-agent.md'),
+        'Hermes base skill must reference cadet-agent.md'
+      );
+    });
+
+    it('base skill references state.json', () => {
+      const content = readFile(hermes.skillFile);
+      assert.ok(
+        content.includes('.cadet/state.json') || content.includes('state.json'),
+        'Hermes base skill must reference state.json'
+      );
+    });
+
+    it('ships no .hermes directory (Hermes reads .agents/skills/)', () => {
+      assert.ok(
+        !existsSync(join(repoRoot, '.hermes')),
+        '.hermes/ must not exist — Hermes project skills come from .agents/skills/'
+      );
     });
   });
 

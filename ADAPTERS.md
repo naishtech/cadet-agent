@@ -1,6 +1,6 @@
 # Cadet-Agent Adapter Inventory
 
-> Generated: 2026-08-14 | Updated: 2026-09-26 | Framework version: 0.49.0
+> Generated: 2026-08-14 | Updated: 2026-09-27 | Framework version: 0.49.0
 
 This document tracks every IDE adapter file, its purpose, and its canonical dependency. The adapter contract is: **no IDE-specific file may duplicate canonical content from `.cadet/agent/core/`.** Each adapter must only contain frontmatter, file-reference instructions, and IDE-specific mechanics.
 
@@ -82,9 +82,12 @@ The permitted prose in an adapter is *connective pointer text* ("Read X, then fo
 | Deep Code | `.agents/skills/cadet-mcp-setup/SKILL.md` | Phase skill | `.cadet/agent/core/skills/MCPSetup.md` |
 | Deep Code | `.agents/skills/cadet-visual-evidence/SKILL.md` | Phase skill | `.cadet/agent/core/skills/VisualEvidence.md` |
 | Deep Code | `.agents/skills/cadet-reconcile/SKILL.md` | Phase skill | `.cadet/agent/core/skills/Reconciliation.md` |
+| Hermes | `.agents/skills/cadet-agent/SKILL.md` | Project skill (shared Deep Code files) | `.cadet/agent/core/cadet-agent.md` |
+| Hermes | `.agents/skills/cadet-agent-reviewer/SKILL.md` | Reviewer skill (shared Deep Code files) | `.cadet/agent/core/cadet-agent.md` + `.cadet/agent/core/skills/AgentReviewer.md` |
+| Hermes | `.agents/skills/cadet-*/SKILL.md` | Phase skills (shared Deep Code files) | `.cadet/agent/core/skills/<SkillName>.md` |
 | Cross-client | `AGENTS.md` | Root agent-instruction pointer (create-only) | `.cadet/agent/core/cadet-agent.md` |
 
-> Deep Code adapters live under `.agents/skills/` (the cross-client Agent Skills root) rather than a Deep-Code-only `.deepcode/skills/` directory, so the same pointers are discoverable by any client that reads the `.agents/` convention. Deep Code scans `.deepcode/skills/` first, then `.agents/skills/`. See `docs/guidance/DeepCode.md`.
+> Deep Code adapters live under `.agents/skills/` (the cross-client Agent Skills root) rather than a Deep-Code-only `.deepcode/skills/` directory, so the same pointers are discoverable by any client that reads the `.agents/` convention. Deep Code scans `.deepcode/skills/` first, then `.agents/skills/`. **Hermes** also scans `.agents/skills/` as a project-skill root (after `hermes skills trust`) and shares these files — see `docs/guidance/DeepCode.md` and `docs/guidance/Hermes.md`.
 
 > `AGENTS.md` is a repository-root pointer recognized by multiple agent clients. It is listed in the manifest as a **create-only path** (`createOnlyPaths`): `init`/`sync` create it when absent but never overwrite an existing file, because a consumer repo may already own one. See the "AGENTS.md is create-only" section in `README.md`.
 
@@ -99,4 +102,4 @@ Run `npm test` to validate:
 
 ## Harness pointers
 
-Adapters do not restate harness rules. Each adapter's `Read First` pointer to `.cadet/agent/core/cadet-agent.md` leads to the Harness rules; the canonical harness contract is `.cadet/agent/core/Harness.md`. Capability-limited IDEs (Cursor, Continue, Claude Code) have no native PreToolUse hook — their adapters must state that limitation, and the harness reports it (`cadet-agent harness capabilities`). Deep Code also has no hook; its adapter directs users to `.deepcode/settings.json` `permissions.ask` (`mutate-git-log`) instead. Copilot hooks (`git-guard.sh` / `git-guard.ps1`) fail closed on malformed input by default; `fail-open` is opt-in only.
+Adapters do not restate harness rules. Each adapter's `Read First` pointer to `.cadet/agent/core/cadet-agent.md` leads to the Harness rules; the canonical harness contract is `.cadet/agent/core/Harness.md`. Capability-limited IDEs (Cursor, Continue, Claude Code) have no native PreToolUse hook — their adapters must state that limitation, and the harness reports it (`cadet-agent harness capabilities`). Deep Code also has no hook; its adapter directs users to `.deepcode/settings.json` `permissions.ask` (`mutate-git-log`) instead. Hermes has no hook either; its users enable command approval policies for commit/push (see `docs/guidance/Hermes.md`). Copilot hooks (`git-guard.sh` / `git-guard.ps1`) fail closed on malformed input by default; `fail-open` is opt-in only.

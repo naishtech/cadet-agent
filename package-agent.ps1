@@ -13,9 +13,9 @@
 #   .claude\skills\cadet-agent\SKILL.md (Claude Code base skill)
 #   .claude\skills\cadet-agent-reviewer\SKILL.md (Claude Code reviewer)
 #   .claude\skills\cadet-*\SKILL.md (Claude Code per-phase skills)
-#   .agents\skills\cadet-agent\SKILL.md (Deep Code / cross-client base skill)
-#   .agents\skills\cadet-agent-reviewer\SKILL.md (Deep Code reviewer)
-#   .agents\skills\cadet-*\SKILL.md (Deep Code per-phase skills)
+#   .agents\skills\cadet-agent\SKILL.md (Deep Code / Hermes cross-client base skill)
+#   .agents\skills\cadet-agent-reviewer\SKILL.md (Deep Code / Hermes reviewer)
+#   .agents\skills\cadet-*\SKILL.md (Deep Code / Hermes per-phase skills)
 #   AGENTS.md (create-only: never overwrites an existing consumer AGENTS.md)
 # The core folder contains cadet-agent.md (condensed agent instructions),
 # FrameworkManifest.json, and the runtime templates under .cadet/agent/core/templates.
@@ -229,7 +229,7 @@ Write-Host "    .continue\config.yaml"
 Write-Host "    .claude\skills\cadet-agent\SKILL.md"
 Write-Host "    .claude\skills\cadet-agent-reviewer\SKILL.md"
 Write-Host "    .claude\skills\cadet-*\SKILL.md"
-Write-Host "    .agents\skills\cadet-agent\SKILL.md (Deep Code / cross-client skills root)"
+Write-Host "    .agents\skills\cadet-agent\SKILL.md (Deep Code / Hermes cross-client skills root)"
 Write-Host "    .agents\skills\cadet-agent-reviewer\SKILL.md"
 Write-Host "    .agents\skills\cadet-*\SKILL.md"
 Write-Host "    AGENTS.md (only if not already present)"
