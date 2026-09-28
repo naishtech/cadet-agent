@@ -118,13 +118,15 @@ Each instruction extracted from source files is traced to its disposition in `ca
 | "After update, instruct user to start fresh chat" | ✅ cadet-agent.md Framework Sync section |
 | "If update check fails, continue with snapshot and state reason" | ✅ cadet-agent.md Framework Sync section |
 
-## Source: FirstResponseFormat.md
+## Source: FirstResponseFormat.md — retired 2026-09-28
+
+The file was deleted. It was a required format that no session produced, no skill read, and nothing enforced; two of its three lines restated context the reader already had. Its instructions were re-homed, not dropped:
 
 | Instruction | Disposition |
 |---|---|
-| "Summarize understanding in one short paragraph" | ✅ cadet-agent.md — implied by operating mode routing |
-| "State learner-tier assumption and operating mode in one line" | ✅ cadet-agent.md Learner Calibration / Operating Mode sections |
-| "State active policy selection or 'none'" | ✅ cadet-agent.md — Context Resolution handles this |
+| "Summarize understanding of user objective (one short paragraph)" | ⤵️ dropped as restatement — cadet-agent.md `Next` names the action the objective paragraph was paraphrasing; cadet-agent.md `/cadet-resume` and `KickoffFlow.md` still open a session with the work item under it |
+| "State learner tier and operating mode (one line, when known and material)" | ✅ cadet-agent.md Response Contract — the `Tier/mode` line on a session's first reply, read from `.cadet/cadet-local-config.md` |
+| "State active policy or 'none' (one line)" | ✅ cadet-agent.md Response Contract — a policy is named in a change's `why` when it decided that change; resolving it stays mandatory in OperatingRules |
 
 ## Source: PolicyAndGuidanceRules.md
 

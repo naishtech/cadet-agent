@@ -29,6 +29,8 @@ These rules apply to all work, regardless of learner tier, operating mode, or wo
 - Apply guidance as preferred heuristics and lessons learned, not as a substitute for standards or policy. In all outputs, distinguish guidance recommendations from mandatory requirements.
 - Place reusable shared infrastructure in the repository's designated shared-code location when one exists. Confirm extraction scope with the user before moving shared code.
 
+- **Every reply opens with the status block, and says nothing else about the framework.** Status (`Item`, `Phase`, `Gates open`, `Blocking`, `You owe`, `Next`), then one line per change — what changed and why. Only rows and lines that can change a decision the reader is making. See the Response Contract section.
+
 ### XML Tag Convention
 
 Two XML tag families are used throughout this framework.
@@ -138,6 +140,29 @@ Cadet workflows are implemented as scoped skills. The global directive decides *
 Each skill is responsible for verifying the gates relevant to its phase. The directive must still enforce the global rule: **no phase transition while any required gate is `false`.**
 
 
+## Response Contract
+
+Every reply that reports framework state opens with the block below and reports nothing else about the framework. This replaces `FirstResponseFormat.md`, retired 2026-09-28: a format that restates session context does not give a reader the information by which they decide their next action.
+
+**Status** — one line per field, and no line that cannot change a decision the reader is making:
+
+| Field | Meaning |
+|---|---|
+| `Item` | The work item and its epic; `none` outside a story. |
+| `Phase` | `session.currentPhase`, and the transition in flight when one is. |
+| `Gates open` | Only the gates still unmet for the target phase — never the satisfied ones. |
+| `Blocking` | Only findings the reader can act on. Excused gaps are counted in the count, not listed. |
+| `You owe` | What is the owner's to decide or do — a flag, never a question asked before acting. |
+| `Next` | The single next action, or the one decision that unblocks it. |
+
+**Changed** — what changed, then why, one line per change, with evidence record ids inline. This is the Change Report at reply scale: no headings, no AC tables, no restatement of the story. State a limit or an unmeasured claim where one exists rather than smoothing over it.
+
+**First reply of a session** adds one line, `Tier/mode` — learner tier, operating mode, workflow path and tracking mode as resolved into `state.json → session`, read from `.cadet/cadet-local-config.md` where they are persisted. Once per session; it does not recur.
+
+**A policy appears only when it decided something**, named in the `why` of the change it decided. OperatingRules already requires surfacing resolved configuration when it materially affects the next action, and naming the default when you deviate from it; a standing policy line is the one field that is identical every time it is printed, so it can never change a decision.
+
+**On a client that cannot render a table** — any chat surface — keep the same fields, in the same order, as labelled lines. The fields are the contract; the table is only their rendering.
+
 ## Operational Files
 
 These files define specific operational workflows. Read them on session start or when state is unclear. Their rules are also condensed into this directive.
@@ -145,7 +170,6 @@ These files define specific operational workflows. Read them on session start or
 - `.cadet/agent/core/GitFirstRule.md` — Git bootstrap procedure. Git must be initialized before any Unity project or code, and branch status must be checked before starting new work.
 - `.cadet/agent/core/FrameworkSyncGate.md` — Framework update check. Check for framework updates before substantive work.
 - `.cadet/agent/core/KickoffFlow.md` — Full kickoff sequence. Step-by-step sequence for the first interaction in a session.
-- `.cadet/agent/core/FirstResponseFormat.md` — Required response structure. Required format for the first response.
 - `.cadet/agent/core/Harness.md` — **Harness rules.** Budgets, evidence-backed gates, retry classes, context tiers, tool routing, redaction, and escalation. Every skill follows it. The CLI (`cadet-agent state …`, `cadet-agent harness …`) enforces it; see `.cadet/harness.json` for repository overrides.
 
 ## Important Paths
