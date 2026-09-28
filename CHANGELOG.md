@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.52.0] — 2026-09-28
+
 ### Changed
 
 - **The required response format is the status block, and `FirstResponseFormat.md` is retired.** That file carried a required format — `cadet-agent.md` called it "Required response structure" — that no session produced, no skill read and nothing enforced. Two of its three lines restated context the reader already had: the objective paragraph paraphrased the work item under work, and the policy line asserted a fact about the repository that cannot change a decision (a repository with several topic-named policy files has no single policy to name, and the convention that defines one — `{RepoName}Policy.md`, exactly one file — is not what repositories hold). Replies now open with the status block — `Item`, `Phase`, `Gates open`, `Blocking`, `You owe`, `Next`, unmet and actionable rows only — followed by one line per change saying what changed and why, with evidence record ids inline: the Change Report at reply scale, without headings, AC tables, or a restatement of the story. Learner tier and operating mode survive as a `Tier/mode` line on a session's **first** reply, and a policy is named only when it decided a change. Resolving the active policy stays mandatory; asserting it every reply is not. On a client that cannot render a table the fields are kept, in order, as labelled lines.
