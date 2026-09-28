@@ -204,10 +204,12 @@ Security and quality gates apply to all paths:
 
 Set the gate to `true` in `.cadet/state.json` before advancing to `closed`.
 
-**Next story vs. closure.** `validation → closed` is taken only when the epic (and plan) has no remaining stories — `closed` is terminal, with no transition out of it. When stories remain, launch the next one from `validation`:
+**Next story vs. closure.** `validation → closed` is taken only when the epic (and plan) has no remaining stories — `closed` is terminal, with no transition out of it, and it means the **epic** is finished. When stories remain, launch the next one from `validation`:
 
-1. Set `activeWorkItem` to the next story and reset its gates.
+1. Run `cadet-agent state begin --epic <epicId> --story <storyFile>`. It archives the finished story's evidence before anything is written, folds it into the coverage index, resets the gates, and **records the story it moved on from**: `storyCompletions` gains one row naming that work item, when the boundary happened, and how many evidence records stood behind it. Never set `activeWorkItem` by hand.
 2. Transition `validation → implementation` (the `NEXT_STORY → yes → IMPL` loop).
+
+**A finished story is not a closed one, and never had to pretend to be.** `closed` means the epic is finished, so a story that completes while its epic is still open is expressed by the *boundary* above: the next story begins, and the previous one is recorded as complete with the evidence it stood on. That is the whole vocabulary — there is no story-level terminal transition, and there does not need to be. `storyCompletions` is a record of what happened, not a gate: nothing blocks on it.
 
 Do not close each story individually. A project that closes per-story ends up in `closed` with more work to do, and `closed` cannot be left by a transition; recovering requires a deliberate, recorded state correction.
 

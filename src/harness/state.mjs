@@ -225,6 +225,29 @@ export function validateState(state, context = {}) {
         }
       });
     }
+    // The story-completion marker. Non-terminal and additive: it records which
+    // work items a session has moved on from, and it is what makes "this story is
+    // finished, its epic is not" a state a reader can check rather than infer. A
+    // malformed entry is an error for the same reason a malformed coverage index
+    // is: a marker that reads as absent makes a finished story's outcome
+    // unattributable again, which is the ambiguity it exists to remove.
+    if (state.storyCompletions !== undefined && !Array.isArray(state.storyCompletions)) {
+      errors.push({ path: 'storyCompletions', message: 'storyCompletions must be an array' });
+    }
+    if (Array.isArray(state.storyCompletions)) {
+      state.storyCompletions.forEach((row, i) => {
+        if (!isPlainObject(row)) {
+          errors.push({ path: `storyCompletions[${i}]`, message: 'story completion must be an object' });
+          return;
+        }
+        if (typeof row.workItemId !== 'string' || row.workItemId.length === 0) {
+          errors.push({ path: `storyCompletions[${i}].workItemId`, message: 'workItemId must be a non-empty string' });
+        }
+        if (typeof row.completedAt !== 'string' || row.completedAt.length === 0) {
+          errors.push({ path: `storyCompletions[${i}].completedAt`, message: 'completedAt must be a timestamp string' });
+        }
+      });
+    }
     // The coverage index (contract v5). It is what keeps the "a done story owns
     // evidence" check answerable once the records themselves have moved to
     // commits and `.cadet/archive/`, so a malformed index is an error: an index
@@ -1725,6 +1748,34 @@ export function resetGatesForNewWorkItem(state, { epicId = null, storyId = null,
     gateEvidence: [],
     activeWorkItem: { epicId, storyId },
   };
+
+  // The story boundary, recorded rather than implied.
+  //
+  // There is no story-level terminal transition — `closed` is the epic's, and it
+  // stays terminal — so a story that finishes while its epic is still open had no
+  // vocabulary at all, and every boundary ended in a judgement call about which
+  // edge was legal. None of them means "this story is finished", so that call had
+  // no correct answer: a session spent a full decision cycle on it and closed
+  // nothing. Moving on from a work item now names the outcome.
+  //
+  // It records what HAPPENED — the session moved on from this item — not a
+  // verdict: `completedAt` is the boundary's timestamp and `evidenceRecords` is
+  // how much the item left behind, so a completion with nothing behind it is
+  // visible rather than implied. One row per work item, replaced rather than
+  // appended if the same item is begun again, and no prose: bounded, like
+  // everything else this version keeps in the document.
+  const outgoingId = state?.activeWorkItem ? workItemIdOf(state) : null;
+  if (outgoingId && outgoingId !== `${epicId}::${storyId}`) {
+    base.storyCompletions = [
+      ...(Array.isArray(state.storyCompletions) ? state.storyCompletions : [])
+        .filter((row) => row?.workItemId !== outgoingId),
+      {
+        workItemId: outgoingId,
+        completedAt: timestamp(at),
+        evidenceRecords: Array.isArray(state.gateEvidence) ? state.gateEvidence.length : 0,
+      },
+    ];
+  }
 
   if (isHistoryExternal(state)) {
     // Fold the cleared records into the coverage index before they go.

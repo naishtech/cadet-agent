@@ -90,7 +90,7 @@ Never blur the two. A judgement dressed as a measurement is worse than no findin
 ## Phase 5 — Record
 
 15. Write the report to `.cadet/reports/<YYYY-MM-DD>-reconciliation.md` from `<document index="1"/>` — fill every `<slot/>`, strip all XML wrappers, write pure Markdown. Date-first so a plain `ls` is chronological, no colon, and never overwrite an existing report (append `-2`).
-16. State the `designArtifactSyncConfirmed` verdict per the rule in the template: supported only when the command verdict is `consistent` and the semantic pass found nothing blocking; otherwise blocked, naming the finding responsible.
+16. State the `designArtifactSyncConfirmed` verdict per the rule in the template: supported when the run reports **no unexcused blocking finding** and the semantic pass found nothing blocking; otherwise blocked, naming the finding responsible. An advisory `warning` never blocks the gate, and a run whose only remaining rows are honoured (`excused-gap` at `info`) or advisory is claimable — the rule that demanded a `consistent` verdict made the gate unclaimable in any repository with a permanently expected warning, which turns a gate into a ritual. `unknown` still never certifies. State the blocking count in the statement, and name the rows that were excused rather than measured.
 </process>
 
 <documents>

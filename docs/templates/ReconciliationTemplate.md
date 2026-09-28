@@ -18,9 +18,9 @@ The split is the point. A judgement presented as a measurement is worse than no 
 
 [TODO — consistent | findings | unknown]
 
-[TODO — state the verdict in words a reader can act on, and what it does and does not mean. If it is `unknown`, name the artifact that could not be read and say consistency therefore cannot be certified. If it is `consistent`, say the mechanical checks passed and what the semantic pass separately concluded.]
+[TODO — state the verdict in words a reader can act on, and what it does and does not mean. If it is `unknown`, name the artifact that could not be read and say consistency therefore cannot be certified. If it is `consistent`, say the mechanical checks passed and what the semantic pass separately concluded. If it is `findings` with no blocking rows, say so explicitly — the mechanical pass found advisory and honoured rows only, and name them; `findings` on its own does not tell a reader whether the chain is untrustworthy or merely imperfect.]
 
-[TODO — the `designArtifactSyncConfirmed` statement. Either the gate is supported, because the command verdict is `consistent` and the semantic pass found nothing blocking; or the gate is BLOCKED, naming the finding that blocks it. Never claim it from a run whose verdict is `findings` or `unknown`.]
+[TODO — the `designArtifactSyncConfirmed` statement. Either the gate is supported, because the run reported **no unexcused blocking finding** (state the command's blocking count, and name the `excused-gap` rows the run honoured rather than measured) and the semantic pass found nothing blocking; or the gate is BLOCKED, naming the finding that blocks it. An advisory `warning` never blocks this gate — a repository with one permanently expected warning would otherwise be unable to claim it for ever, which is how a gate becomes a ritual. `unknown` still blocks: an artifact that could not be read leaves consistency uncertified.]
 
 ## Artifact inventory
 

@@ -601,16 +601,26 @@ async function cmdState(opts) {
     const written = appendEvidenceArchive(opts.targetDir, outgoing);
     const next = resetGatesForNewWorkItem(state, { epicId: opts.epicId, storyId: opts.story });
     writeState(opts.targetDir, next);
+    // The boundary records the outgoing work item as complete (see
+    // `resetGatesForNewWorkItem`), so report it: that record is the answer to "is
+    // this story finished, with its epic still open?" — the question the framework
+    // had no vocabulary for.
+    const completed = fromId && Array.isArray(next.storyCompletions)
+      ? next.storyCompletions.find((row) => row?.workItemId === fromId) ?? null
+      : null;
     emit(
       opts,
       `✅ Began ${toId}.\n   Gates reset; ${outgoing.length} evidence record(s) archived (${written.appended} appended, ${written.skipped} already archived).`
-      + (fromId ? `\n   Previous work item: ${fromId}` : '')
+      + (completed
+        ? `\n   Completed: ${completed.workItemId} (${completed.evidenceRecords} evidence record(s) behind it)`
+        : fromId ? `\n   Previous work item: ${fromId}` : '')
       + `\n   Coverage rows: ${Object.keys(next.evidenceCoverage || {}).length}`,
       {
         ok: true,
         from: fromId,
         to: toId,
         gatesReset: true,
+        completed: completed ? { workItemId: completed.workItemId, completedAt: completed.completedAt } : null,
         archived: written.appended,
         alreadyArchived: written.skipped,
         coverageRows: Object.keys(next.evidenceCoverage || {}).length,

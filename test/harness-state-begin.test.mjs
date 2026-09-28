@@ -177,6 +177,75 @@ describe('state begin — the story boundary', () => {
   });
 });
 
+describe('state begin — the boundary records the story it finished', () => {
+  // There is no story-level terminal transition: `closed` means the EPIC is
+  // finished, so a story completing while its epic is open had no vocabulary at
+  // all, and every boundary ended in a judgement call about which edge was legal.
+  it('records the outgoing work item, with what stood behind it', () => {
+    const dir = project();
+    try {
+      const res = run(dir, ['--epic', 'epic-1', '--story', 'story-2.md']);
+      assert.equal(res.status, 0, res.stderr);
+      const rows = readState(dir).storyCompletions;
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].workItemId, 'epic-1::story-1.md');
+      assert.match(rows[0].completedAt, /^\d{4}-\d{2}-\d{2}T/);
+      assert.equal(rows[0].evidenceRecords, 1, 'the record says how much evidence stood behind it');
+      assert.equal(res.json.completed.workItemId, 'epic-1::story-1.md');
+      assert.match(res.json.completed.completedAt, /^\d{4}-\d{2}-\d{2}T/);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('says so in the human-readable output too', () => {
+    // An agent reads this line, and it is the answer to "is this story finished
+    // with its epic still open?" — so it must not be JSON-only.
+    const dir = project();
+    try {
+      const r = spawnSync(process.execPath, [CLI, 'state', 'begin', '--target', dir, '--epic', 'epic-1', '--story', 'story-2.md'], { encoding: 'utf-8' });
+      assert.equal(r.status, 0, r.stderr);
+      assert.match(r.stdout, /Completed: epic-1::story-1\.md/);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('keeps one row per work item, replacing rather than accumulating', () => {
+    const dir = project();
+    try {
+      assert.equal(run(dir, ['--epic', 'epic-1', '--story', 'story-2.md']).status, 0);
+      assert.equal(run(dir, ['--epic', 'epic-1', '--story', 'story-1.md']).status, 0);
+      const rows = readState(dir).storyCompletions;
+      assert.equal(rows.length, 2);
+      assert.deepEqual(rows.map((r) => r.workItemId).sort(), ['epic-1::story-1.md', 'epic-1::story-2.md']);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('writes no row when nothing was active — nothing finished', () => {
+    const dir = project();
+    try {
+      const state = readState(dir);
+      state.activeWorkItem = null;
+      writeFileSync(join(dir, '.cadet', 'state.json'), JSON.stringify(state, null, 2) + '\n', 'utf-8');
+      assert.equal(run(dir, ['--epic', 'epic-1', '--story', 'story-2.md']).status, 0);
+      assert.equal(readState(dir).storyCompletions, undefined);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('leaves a valid document, and rejects a malformed marker', () => {
+    const dir = project();
+    const validate = () => spawnSync(process.execPath, [CLI, 'state', 'validate', '--target', dir, '--format', 'json'], { encoding: 'utf-8' });
+    try {
+      assert.equal(run(dir, ['--epic', 'epic-1', '--story', 'story-2.md']).status, 0);
+      assert.equal(JSON.parse(validate().stdout).valid, true);
+
+      const state = readState(dir);
+      state.storyCompletions = { 'epic-1::story-1.md': 'done' };
+      writeFileSync(join(dir, '.cadet', 'state.json'), JSON.stringify(state, null, 2) + '\n', 'utf-8');
+      const bad = validate();
+      assert.notEqual(bad.status, 0);
+      assert.match(bad.stdout + bad.stderr, /storyCompletions must be an array/);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});
+
 describe('state begin — command registry (C13)', () => {
   it('declares that it writes, and which paths', () => {
     const described = describeCommand('state begin');
