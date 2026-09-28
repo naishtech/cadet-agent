@@ -298,6 +298,48 @@ describe('cli — harness verify-reachability', () => {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
+  // ── The commit citation (AR-1 / policies/gate-commit-citation.md) ──────────
+  // Same defect as verify-acs, same fix: the flag was accepted and dropped, so a
+  // reachability record could never cite the revision it attests.
+
+  it('records the cited revision on the evidence when --commit is passed', () => {
+    const { dir, story } = makeProject({ enabled: true });
+    try {
+      const sha = '39a8a6c3b45f0e1d2c3b4a5968778695a4b3c2d1';
+      const res = runCli(['harness', 'verify-reachability', '--story', story, '--target', dir,
+        '--commit', sha, '--format', 'json']);
+      assert.equal(res.status, 0, res.stderr);
+      const state = JSON.parse(readFileSync(join(dir, '.cadet', 'state.json'), 'utf-8'));
+      assert.equal(state.gateEvidence.find((e) => e.gate === REACHABILITY_GATE).commit, sha);
+
+      const validate = runCli(['state', 'validate', '--target', dir]);
+      assert.equal(validate.status, 0, `state validate rejected the cited record: ${validate.stdout}${validate.stderr}`);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('leaves commit null when no revision is cited', () => {
+    const { dir, story } = makeProject({ enabled: true });
+    try {
+      const res = runCli(['harness', 'verify-reachability', '--story', story, '--target', dir, '--format', 'json']);
+      assert.equal(res.status, 0, res.stderr);
+      const state = JSON.parse(readFileSync(join(dir, '.cadet', 'state.json'), 'utf-8'));
+      assert.equal(state.gateEvidence.find((e) => e.gate === REACHABILITY_GATE).commit, null);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('refuses a branch or tag name as a citation, and writes no record', () => {
+    const { dir, story } = makeProject({ enabled: true });
+    try {
+      const before = readFileSync(join(dir, '.cadet', 'state.json'), 'utf-8');
+      const res = runCli(['harness', 'verify-reachability', '--story', story, '--target', dir,
+        '--commit', 'main', '--format', 'json']);
+      assert.equal(res.status, 1);
+      assert.match(res.stderr, /4-40 character hex revision identifier/);
+      assert.equal(readFileSync(join(dir, '.cadet', 'state.json'), 'utf-8'), before,
+        'a refused citation must not leave a record behind');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
   it('fails a deferral whose target is already done', () => {
     const { dir, story } = makeProject({
       enabled: true,
