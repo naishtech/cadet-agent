@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.53.0] — 2026-09-28
+
 ### Fixed
 
 - **`verify-acs` and `verify-reachability` accepted `--commit` and silently dropped it, so two of the gates the citation policy covers could never carry a citation.** The CLI parses `--commit` for every command (`src/cli.mjs`), but only the `harness verify` and `harness confirm` builders ever put it on a record: the `acceptanceCriteriaValidated` and `reachabilityAddressed` builders constructed their evidence with no `commit` field at all. So `policies/gate-commit-citation.md` — *"every gate record must cite the revision it attests"* — was **unsatisfiable by construction** for those two gates: a repository that re-recorded them to add the citation got a fresh record that still read `commit: null`, with the flag eaten silently and the command exiting 0, which reads as success. Both builders now pass the value through `createEvidence`, which normalizes it and refuses a branch or tag name for the same reason `verify`/`confirm` do — those move, so a citation naming one cannot be checked later.
