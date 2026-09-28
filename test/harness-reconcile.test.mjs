@@ -95,7 +95,7 @@ ${witness}
 `;
 }
 
-function stateDoc({ phase = 'validation', workflowPath = 'large', epics = {}, evidenceCoverage = {} } = {}) {
+function stateDoc({ phase = 'validation', workflowPath = 'large', epics = {}, evidenceCoverage = {}, ...rest } = {}) {
   return JSON.stringify({
     version: 4,
     stateVersion: 4,
@@ -105,6 +105,11 @@ function stateDoc({ phase = 'validation', workflowPath = 'large', epics = {}, ev
     gates: {},
     gateEvidence: [],
     evidenceCoverage,
+    // Anything else the caller passed — `gateExceptions`, `changeHistory` — is a
+    // real field of a state document. Dropping it silently turned three fixtures
+    // into tests of nothing: the reconciler never saw the exception it was
+    // supposed to honour.
+    ...rest,
   }, null, 2);
 }
 
@@ -624,6 +629,184 @@ describe('reconcile: gaps are reported for open work, not for history', () => {
     });
     try {
       assert.ok(codes(run(dir)).includes('done-without-evidence'));
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});
+
+// ── An accepted gap is excused, not re-raised ───────────────────────────────
+//
+// A recorded gate-exception is a reviewed human decision: "this gap is known,
+// categorised and accepted, and re-proving it is out of scope". Re-raising it as
+// `blocking` on every run is what turns a report into noise, and this module's own
+// header already promised the opposite — an accepted historical gap is a recorded
+// gate-exception, not silence.
+
+describe('reconcile: a recorded exception excuses the gap it names', () => {
+  const WORK_ITEM = 'epic-1-foo::story-1-a.md';
+
+  /** A done story with no evidence, and optionally the exception recording that. */
+  function doneWithoutEvidence(exception = null) {
+    return healthy({
+      storyOverrides: { status: 'Done' },
+      stateOverrides: {
+        epics: { 'epic-1-foo': { status: 'complete', stories: { 'story-1-a.md': 'done' } } },
+        evidenceCoverage: {},
+        ...(exception ? { gateExceptions: [exception] } : {}),
+      },
+    });
+  }
+
+  it('reports the gap as info naming the exception, and not as blocking', () => {
+    const dir = doneWithoutEvidence({
+      type: 'gate-exception',
+      gate: 'storyTrackingUpdated',
+      category: 'pre-harness-story',
+      scope: [WORK_ITEM],
+      rationale: 'closed before the harness existed in this project',
+      date: '2026-09-15T06:22:24.943Z',
+    });
+    try {
+      const { result } = summary(dir);
+      assert.equal(codes(result).includes('done-without-evidence'), false);
+      const excused = result.findings.find((f) => f.code === 'excused-gap');
+      assert.ok(excused, 'the excused gap must still be reported, never dropped');
+      assert.equal(excused.severity, 'info');
+      assert.equal(excused.subject, WORK_ITEM);
+      assert.match(excused.detail, /pre-harness-story/);
+      assert.match(excused.detail, /closed before the harness existed/);
+      assert.equal(result.summary.blocking, 0);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('still blocks when the exception names a different work item', () => {
+    // The safety property. Scope is the rule, so an exception covering a neighbour
+    // must not silence this story's gap.
+    const dir = doneWithoutEvidence({
+      type: 'gate-exception',
+      gate: 'storyTrackingUpdated',
+      category: 'pre-harness-story',
+      scope: ['epic-1-foo::story-9-elsewhere.md'],
+      rationale: 'a different story entirely',
+      date: '2026-09-15T06:22:24.943Z',
+    });
+    try {
+      const { result } = summary(dir);
+      assert.ok(codes(result).includes('done-without-evidence'));
+      assert.equal(result.findings.some((f) => f.code === 'excused-gap'), false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('ignores an exception that has expired', () => {
+    const dir = doneWithoutEvidence({
+      type: 'gate-exception',
+      gate: 'storyTrackingUpdated',
+      category: 'tooling-gap',
+      scope: [WORK_ITEM],
+      rationale: 'a tool that did not exist yet',
+      expiresAt: '2000-01-01T00:00:00.000Z',
+    });
+    try {
+      assert.ok(codes(summary(dir).result).includes('done-without-evidence'));
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('honours an exception kept in changeHistory, the v1-v3 home', () => {
+    const dir = doneWithoutEvidence();
+    try {
+      const statePath = join(dir, '.cadet', 'state.json');
+      const state = JSON.parse(readFileSync(statePath, 'utf-8'));
+      state.changeHistory = [{
+        type: 'gate-exception',
+        gate: 'storyTrackingUpdated',
+        category: 'pre-harness-story',
+        scope: [WORK_ITEM],
+        rationale: 'recorded before gateExceptions existed',
+        date: '2026-09-15',
+      }];
+      writeFileSync(statePath, JSON.stringify(state, null, 2));
+      assert.equal(codes(summary(dir).result).includes('done-without-evidence'), false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});
+
+// ── A scope must name an epic, or be refused ────────────────────────────────
+
+describe('reconcile: scoping', () => {
+  /** `epic-1-foo` on disk, plus two epics state tracks with no directory. */
+  function threeEpics() {
+    return healthy({
+      stateOverrides: {
+        epics: {
+          'epic-1-foo': { status: 'in-progress', stories: { 'story-1-a.md': 'in-progress' } },
+          'epic-2-two': { status: 'in-progress', stories: { 'story-1-b.md': 'in-progress' } },
+          'epic-3-three': { status: 'in-progress', stories: { 'story-1-c.md': 'in-progress' } },
+        },
+      },
+    });
+  }
+
+  it('does not report unscoped epics as missing when a scope is given', () => {
+    // The defect: a scoped run iterated every epic in state.json against the
+    // scoped disk set, so thirteen epics it was never asked about became thirteen
+    // blocking findings — and `consistent` became unreachable for a scoped run.
+    const dir = threeEpics();
+    try {
+      const full = run(dir);
+      assert.equal(full.findings.filter((f) => f.code === 'missing-epic-dir').length, 2);
+      const scoped = run(dir, { story: `${PLANS}/epic-1-foo/story-1-a.md` });
+      assert.equal(codes(scoped).includes('missing-epic-dir'), false);
+      assert.equal(scoped.summary.blocking, 0);
+      assert.equal(scoped.artifacts.epicCount, 1);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('accepts an epic directory, an epic key, and a path to epic.md', () => {
+    // The directory case is the one that used to resolve to the literal scope
+    // `"epics"` — a key matching no epic — and silently reconcile everything.
+    const dir = healthy();
+    try {
+      for (const story of [`${PLANS}/epic-1-foo`, 'epic-1-foo', `${PLANS}/epic-1-foo/epic.md`]) {
+        const scoped = run(dir, { story });
+        assert.equal(scoped.scopedEpic, 'epic-1-foo', `scope from ${story}`);
+        assert.equal(scoped.artifacts.epicCount, 1, `epic count for ${story}`);
+      }
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('still reports a scoped epic that state tracks but disk does not have', () => {
+    // Refusing a bad scope must not swallow the finding a good one exists for.
+    const dir = healthy({
+      stateOverrides: { epics: { 'epic-9-ghost': { status: 'in-progress', stories: {} } } },
+    });
+    try {
+      const scoped = run(dir, { story: 'epic-9-ghost' });
+      assert.equal(scoped.scopedEpic, 'epic-9-ghost');
+      assert.deepEqual(codes(scoped), ['missing-epic-dir']);
+      assert.equal(scoped.summary.blocking, 1);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('refuses a scope that names no epic instead of reconciling everything', () => {
+    const dir = healthy();
+    try {
+      const result = run(dir, { story: `${PLANS}/epic-9-typo/story-1-x.md` });
+      assert.equal(result.ok, false);
+      assert.match(result.scopeError, /epic-9-typo/);
+      assert.match(result.scopeError, /Known epics: `epic-1-foo`/);
+      assert.deepEqual(result.findings, []);
+      assert.equal(result.summary.total, 0);
+      assert.equal(result.verdict, 'unknown');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('exits 2 on an unresolvable scope, because the argument was unsatisfiable', () => {
+    const dir = healthy();
+    try {
+      const res = spawnSync('node', [cli, 'harness', 'reconcile', '--story', 'epic-9-typo', '--target', dir, '--format', 'json'],
+        { encoding: 'utf-8', cwd: dir, windowsHide: true });
+      assert.equal(res.status, 2);
+      assert.match(res.stderr, /matches no epic/);
+      assert.equal(JSON.parse(res.stderr).ok, false);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

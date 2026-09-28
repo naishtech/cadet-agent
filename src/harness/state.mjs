@@ -225,6 +225,29 @@ export function validateState(state, context = {}) {
         }
       });
     }
+    // The story-completion marker. Non-terminal and additive: it records which
+    // work items a session has moved on from, and it is what makes "this story is
+    // finished, its epic is not" a state a reader can check rather than infer. A
+    // malformed entry is an error for the same reason a malformed coverage index
+    // is: a marker that reads as absent makes a finished story's outcome
+    // unattributable again, which is the ambiguity it exists to remove.
+    if (state.storyCompletions !== undefined && !Array.isArray(state.storyCompletions)) {
+      errors.push({ path: 'storyCompletions', message: 'storyCompletions must be an array' });
+    }
+    if (Array.isArray(state.storyCompletions)) {
+      state.storyCompletions.forEach((row, i) => {
+        if (!isPlainObject(row)) {
+          errors.push({ path: `storyCompletions[${i}]`, message: 'story completion must be an object' });
+          return;
+        }
+        if (typeof row.workItemId !== 'string' || row.workItemId.length === 0) {
+          errors.push({ path: `storyCompletions[${i}].workItemId`, message: 'workItemId must be a non-empty string' });
+        }
+        if (typeof row.completedAt !== 'string' || row.completedAt.length === 0) {
+          errors.push({ path: `storyCompletions[${i}].completedAt`, message: 'completedAt must be a timestamp string' });
+        }
+      });
+    }
     // The coverage index (contract v5). It is what keeps the "a done story owns
     // evidence" check answerable once the records themselves have moved to
     // commits and `.cadet/archive/`, so a malformed index is an error: an index
@@ -1121,24 +1144,48 @@ export function recordEvidence(state, evidence) {
 }
 
 /**
- * Active gate exceptions keyed by gate, honoring scope and expiry.
+ * Every active exception entry covering `workItemId`, in record order.
  *
  * Reads both homes for an exception: `changeHistory` (v1-v3, where a `type`
  * discriminator picks it out of the log) and `gateExceptions` (v4, a dedicated
- * field where the discriminator would be redundant). Later entries win, so a
- * v4 document that still carries legacy entries behaves as it did before.
+ * field where the discriminator would be redundant).
+ *
+ * `activeExceptions` collapses these to one entry per gate, which is what a
+ * transition needs. A caller that must NAME the exception which excused
+ * something — the reconciler does, for a `done` story with no evidence — needs
+ * the entry itself, and a gate-keyed map has already discarded the ones it did
+ * not keep. Both read this function, so the two can never disagree about what is
+ * excused.
+ *
+ * An entry naming no gate is not active: an exception records that a GATE was
+ * not required, or was satisfied another way, so one that names no gate excuses
+ * nothing.
  */
-export function activeExceptions(state, { workItemId, now = new Date() } = {}) {
+export function activeExceptionEntries(state, { workItemId, now = new Date() } = {}) {
   const candidates = [
     ...(Array.isArray(state?.changeHistory) ? state.changeHistory.filter((e) => e?.type === 'gate-exception') : []),
     ...(Array.isArray(state?.gateExceptions) ? state.gateExceptions : []),
   ];
-  const active = {};
+  const active = [];
   for (const entry of candidates) {
     if (!isPlainObject(entry)) continue;
+    if (!entry.gate) continue;
     if (workItemId && entry.scope && !String(entry.scope).includes(workItemId)) continue;
     if (entry.expiresAt && new Date(entry.expiresAt).getTime() <= now.getTime()) continue;
-    if (entry.gate) active[entry.gate] = entry;
+    active.push(entry);
+  }
+  return active;
+}
+
+/**
+ * Active gate exceptions keyed by gate, honoring scope and expiry — a projection
+ * of {@link activeExceptionEntries}. Later entries win, so a v4 document that
+ * still carries legacy entries behaves as it did before.
+ */
+export function activeExceptions(state, { workItemId, now = new Date() } = {}) {
+  const active = {};
+  for (const entry of activeExceptionEntries(state, { workItemId, now })) {
+    active[entry.gate] = entry;
   }
   return active;
 }
@@ -1701,6 +1748,34 @@ export function resetGatesForNewWorkItem(state, { epicId = null, storyId = null,
     gateEvidence: [],
     activeWorkItem: { epicId, storyId },
   };
+
+  // The story boundary, recorded rather than implied.
+  //
+  // There is no story-level terminal transition — `closed` is the epic's, and it
+  // stays terminal — so a story that finishes while its epic is still open had no
+  // vocabulary at all, and every boundary ended in a judgement call about which
+  // edge was legal. None of them means "this story is finished", so that call had
+  // no correct answer: a session spent a full decision cycle on it and closed
+  // nothing. Moving on from a work item now names the outcome.
+  //
+  // It records what HAPPENED — the session moved on from this item — not a
+  // verdict: `completedAt` is the boundary's timestamp and `evidenceRecords` is
+  // how much the item left behind, so a completion with nothing behind it is
+  // visible rather than implied. One row per work item, replaced rather than
+  // appended if the same item is begun again, and no prose: bounded, like
+  // everything else this version keeps in the document.
+  const outgoingId = state?.activeWorkItem ? workItemIdOf(state) : null;
+  if (outgoingId && outgoingId !== `${epicId}::${storyId}`) {
+    base.storyCompletions = [
+      ...(Array.isArray(state.storyCompletions) ? state.storyCompletions : [])
+        .filter((row) => row?.workItemId !== outgoingId),
+      {
+        workItemId: outgoingId,
+        completedAt: timestamp(at),
+        evidenceRecords: Array.isArray(state.gateEvidence) ? state.gateEvidence.length : 0,
+      },
+    ];
+  }
 
   if (isHistoryExternal(state)) {
     // Fold the cleared records into the coverage index before they go.
