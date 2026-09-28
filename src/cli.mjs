@@ -1228,6 +1228,12 @@ async function cmdHarness(opts) {
       command: `harness verify-acs --story ${opts.story}`,
       result: `AC coverage verified: ${coverage.ac.length} criteria, inventory ${coverage.inventorySize} (${inventory.format})`,
       exitCode: 0,
+      // The revision this coverage claim attests, when the caller names one. AR-1/the
+      // citation policy make it required once the gated work is committed: without it the
+      // record can name its work item and its files but never the commit, and a reviewer
+      // has no structured way to check the claim (Harness.md §1). Validated and normalized
+      // by createEvidence, so a branch or tag name is refused rather than stored.
+      commit: opts.commit || null,
       // Audit pointer only. Not a relevant file: see above.
       artifactPath: reportPath ? reportPath.replace(/\\/g, '/') : null,
       inputTreeHash: computeInputTreeHash(opts.targetDir, [storyRel]),
@@ -1397,6 +1403,10 @@ async function cmdHarness(opts) {
         ? `reachability addressed (${validation.code}); project probe exit ${probe.exitCode}`
         : `reachability addressed (${validation.code}); no project probe configured`,
       exitCode: 0,
+      // Same citation requirement as verify-acs: the declaration is what is being attested,
+      // and it is attested of a revision. Validated and normalized by createEvidence, so a
+      // branch or tag name is refused rather than stored.
+      commit: opts.commit || null,
       inputTreeHash: computeInputTreeHash(opts.targetDir, [storyRel]),
       criteriaHash: hashCriteria([
         workItemId,

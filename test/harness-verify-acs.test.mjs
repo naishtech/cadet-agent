@@ -422,6 +422,73 @@ describe('cli — harness verify-acs', () => {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
+  // ── The commit citation (AR-1 / policies/gate-commit-citation.md) ──────────
+  // The flag was ACCEPTED and silently dropped on these two gates until 0.53.0:
+  // the CLI parsed --commit for every command while only verify/confirm stored it,
+  // so a record that the policy requires to cite its revision could never carry one.
+
+  it('records the cited revision on the evidence when --commit is passed', () => {
+    const { dir } = makeProject({ strict: true });
+    try {
+      const story = join(dir, 'story-ok.md');
+      writeFileSync(story, [
+        '## Acceptance Criteria',
+        '### AC-1: grid',
+        '- Given a, When b, Then c',
+        '- Declared tests: Grid_Foo',
+      ].join('\n'));
+      const sha = 'adca5ae59967068a2eb56511dd23362479d67b7f';
+      const res = runCli(['harness', 'verify-acs', '--story', story, '--report', join(dir, 'report.txt'),
+        '--target', dir, '--commit', sha, '--format', 'json']);
+      assert.equal(res.status, 0, res.stderr);
+      const state = JSON.parse(readFileSync(join(dir, '.cadet', 'state.json'), 'utf-8'));
+      const ev = state.gateEvidence.find((e) => e.gate === 'acceptanceCriteriaValidated');
+      assert.equal(ev.commit, sha, 'the record must cite the revision it attests');
+
+      const validate = runCli(['state', 'validate', '--target', dir, '--format', 'json']);
+      assert.equal(validate.status, 0, `state validate rejected the cited record: ${validate.stdout}${validate.stderr}`);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('leaves commit null when no revision is cited', () => {
+    const { dir } = makeProject({ strict: true });
+    try {
+      const story = join(dir, 'story-ok.md');
+      writeFileSync(story, [
+        '## Acceptance Criteria',
+        '### AC-1: grid',
+        '- Given a, When b, Then c',
+        '- Declared tests: Grid_Foo',
+      ].join('\n'));
+      const res = runCli(['harness', 'verify-acs', '--story', story, '--report', join(dir, 'report.txt'),
+        '--target', dir, '--format', 'json']);
+      assert.equal(res.status, 0, res.stderr);
+      const state = JSON.parse(readFileSync(join(dir, '.cadet', 'state.json'), 'utf-8'));
+      assert.equal(state.gateEvidence.find((e) => e.gate === 'acceptanceCriteriaValidated').commit, null,
+        'uncommitted work may leave the citation null');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('refuses a branch or tag name as a citation, and writes no record', () => {
+    const { dir } = makeProject({ strict: true });
+    try {
+      const story = join(dir, 'story-ok.md');
+      writeFileSync(story, [
+        '## Acceptance Criteria',
+        '### AC-1: grid',
+        '- Given a, When b, Then c',
+        '- Declared tests: Grid_Foo',
+      ].join('\n'));
+      const before = readFileSync(join(dir, '.cadet', 'state.json'), 'utf-8');
+      const res = runCli(['harness', 'verify-acs', '--story', story, '--report', join(dir, 'report.txt'),
+        '--target', dir, '--commit', 'main', '--format', 'json']);
+      assert.equal(res.status, 1, 'a symbolic revision cannot be cited: it moves');
+      assert.match(res.stderr, /4-40 character hex revision identifier/);
+      assert.equal(readFileSync(join(dir, '.cadet', 'state.json'), 'utf-8'), before,
+        'a refused citation must not leave a record behind');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
   it('writes a freshnessPolicy the schema accepts (object with a scope)', () => {
     const { dir } = makeProject({ strict: true });
     try {
