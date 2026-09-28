@@ -13,6 +13,10 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Changed
+
+- **Every reply now uses Simplified Technical English (ASD-STE100).** The Response Contract bounded what a reply says. It said nothing about how the reply reads, so a compliant reply could still be one long, nominalised sentence that a reader must decode twice. The contract now requires one idea per sentence, the active voice, a verb rather than a noun ("we decided", not "a decision was made"), one word for one meaning — write `format`, not "shape", when you mean a format — and exact technical names for record ids, file paths, commands and code. It also gives the sentence length: 20 words or less for a procedure sentence, 25 or less for a description sentence. The language deletes no fact; it makes the fact shorter, and a cause that matters gets its own sentence. A skill whose reply must carry content, such as `PlanningReview`'s questions, keeps it: the language shortens the content, it does not remove it.
+
 ## [0.53.0] — 2026-09-28
 
 ### Fixed

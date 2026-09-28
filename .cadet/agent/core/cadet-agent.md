@@ -29,7 +29,7 @@ These rules apply to all work, regardless of learner tier, operating mode, or wo
 - Apply guidance as preferred heuristics and lessons learned, not as a substitute for standards or policy. In all outputs, distinguish guidance recommendations from mandatory requirements.
 - Place reusable shared infrastructure in the repository's designated shared-code location when one exists. Confirm extraction scope with the user before moving shared code.
 
-- **Every reply opens with the status block, and says nothing else about the framework.** Status (`Item`, `Phase`, `Gates open`, `Blocking`, `You owe`, `Next`), then one line per change — what changed and why. Only rows and lines that can change a decision the reader is making. See the Response Contract section.
+- **Every reply opens with the status block, and says nothing else about the framework.** Status (`Item`, `Phase`, `Gates open`, `Blocking`, `You owe`, `Next`), then one line per change — what changed and why. Only rows and lines that can change a decision the reader is making. Write every reply in Simplified Technical English. See the Response Contract section.
 
 ### XML Tag Convention
 
@@ -143,6 +143,17 @@ Each skill is responsible for verifying the gates relevant to its phase. The dir
 ## Response Contract
 
 Every reply that reports framework state opens with the block below and reports nothing else about the framework. This replaces `FirstResponseFormat.md`, retired 2026-09-28: a format that restates session context does not give a reader the information by which they decide their next action.
+
+**Language** — every reply uses Simplified Technical English (ASD-STE100).
+
+- One idea in one sentence. A procedure sentence has 20 words or less. A description sentence has 25 words or less.
+- Use the active voice. Write "the test failed", not "a failure was recorded".
+- Use a verb, not a noun. Write "we decided", not "a decision was made".
+- Use one word for one meaning. Do not change a word for variety. Write `format` when you mean a format.
+- Keep technical names exact: record ids, file paths, commands and code.
+- The language deletes no fact. It only makes the fact shorter.
+- If a cause matters, give it its own sentence.
+- A skill whose reply must carry content, such as `PlanningReview`'s questions, keeps that content. The language shortens the content. It does not remove it.
 
 **Status** — one line per field, and no line that cannot change a decision the reader is making:
 
