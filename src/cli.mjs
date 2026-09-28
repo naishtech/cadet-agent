@@ -1501,6 +1501,10 @@ async function cmdHarness(opts) {
   // `--format json` must not have to tolerate a failure exit to get it. A run with
   // no planning artifacts at all is a legitimate state (a framework-source repo, a
   // small change), not an error.
+  //
+  // A scope that names no epic is the one exception, and it is not a verdict: the
+  // request itself was unsatisfiable, so it exits 2 like every other bad argument
+  // rather than quietly reconciling a set the caller never asked about.
   if (sub === 'reconcile') {
     const { exists, state } = readState(opts.targetDir);
     const result = reconcileArtifacts(opts.targetDir, {
@@ -1508,6 +1512,8 @@ async function cmdHarness(opts) {
       plansDir: opts.plansDir || PLANS_DEFAULT_DIR,
       story: opts.story || null,
     });
+
+    if (result.scopeError) fail(opts, result.reason, () => 2);
 
     if (opts.format === 'json') {
       emit(opts, '', result);

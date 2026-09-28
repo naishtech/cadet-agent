@@ -1121,24 +1121,48 @@ export function recordEvidence(state, evidence) {
 }
 
 /**
- * Active gate exceptions keyed by gate, honoring scope and expiry.
+ * Every active exception entry covering `workItemId`, in record order.
  *
  * Reads both homes for an exception: `changeHistory` (v1-v3, where a `type`
  * discriminator picks it out of the log) and `gateExceptions` (v4, a dedicated
- * field where the discriminator would be redundant). Later entries win, so a
- * v4 document that still carries legacy entries behaves as it did before.
+ * field where the discriminator would be redundant).
+ *
+ * `activeExceptions` collapses these to one entry per gate, which is what a
+ * transition needs. A caller that must NAME the exception which excused
+ * something — the reconciler does, for a `done` story with no evidence — needs
+ * the entry itself, and a gate-keyed map has already discarded the ones it did
+ * not keep. Both read this function, so the two can never disagree about what is
+ * excused.
+ *
+ * An entry naming no gate is not active: an exception records that a GATE was
+ * not required, or was satisfied another way, so one that names no gate excuses
+ * nothing.
  */
-export function activeExceptions(state, { workItemId, now = new Date() } = {}) {
+export function activeExceptionEntries(state, { workItemId, now = new Date() } = {}) {
   const candidates = [
     ...(Array.isArray(state?.changeHistory) ? state.changeHistory.filter((e) => e?.type === 'gate-exception') : []),
     ...(Array.isArray(state?.gateExceptions) ? state.gateExceptions : []),
   ];
-  const active = {};
+  const active = [];
   for (const entry of candidates) {
     if (!isPlainObject(entry)) continue;
+    if (!entry.gate) continue;
     if (workItemId && entry.scope && !String(entry.scope).includes(workItemId)) continue;
     if (entry.expiresAt && new Date(entry.expiresAt).getTime() <= now.getTime()) continue;
-    if (entry.gate) active[entry.gate] = entry;
+    active.push(entry);
+  }
+  return active;
+}
+
+/**
+ * Active gate exceptions keyed by gate, honoring scope and expiry — a projection
+ * of {@link activeExceptionEntries}. Later entries win, so a v4 document that
+ * still carries legacy entries behaves as it did before.
+ */
+export function activeExceptions(state, { workItemId, now = new Date() } = {}) {
+  const active = {};
+  for (const entry of activeExceptionEntries(state, { workItemId, now })) {
+    active[entry.gate] = entry;
   }
   return active;
 }

@@ -31,7 +31,11 @@
  * story in flight (it is written during implementation), a witness checkpoint by
  * an epic that is not closed, and a `done` story's evidence ALWAYS — a completion
  * claim has to be traceable whenever it was made, and the framework's answer to
- * an accepted historical gap is a recorded gate-exception, not silence.
+ * an accepted historical gap is a recorded gate-exception, not silence. That
+ * exception is therefore HONOURED here rather than merely permitted: a gap an
+ * exception covers is reported as `info` naming the exception, because a blocking
+ * section filled with rows a human already ruled on teaches its reader to ignore
+ * the whole report.
  *
  * Discovery is by content, not by path: an epic is a directory containing
  * `epic.md` wherever it sits, and a required document is matched by filename
@@ -48,9 +52,10 @@
  */
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { basename, isAbsolute, join, relative } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative } from 'node:path';
 
 import { PHASES } from './policy.mjs';
+import { activeExceptionEntries } from './state.mjs';
 import {
   collectWorkItems,
   parseReachabilityDeclaration,
@@ -306,14 +311,16 @@ export function collectArtifacts(targetDir, {
     return { name, path, relPath: path ? repoRelative(targetDir, path) : null, present: path !== null };
   });
 
-  // Scope to one epic when a story path is given. State keys epics by directory
-  // NAME (`epic-1-player-movement`), not by path, so the scope is that name — and
-  // every epic lookup in this module uses the same key.
-  let scopedEpic = null;
-  if (story) {
-    const abs = isAbsolute(story) ? story : join(targetDir, story);
-    scopedEpic = basename(join(abs, '..'));
-  }
+  // Scope to one epic when a story or epic path is given. State keys epics by
+  // directory NAME (`epic-1-player-movement`), not by path, so the scope is that
+  // name — and every epic lookup in this module uses the same key.
+  //
+  // RESOLVED here, APPLIED by the caller. Collecting the whole tree first is what
+  // lets `reconcileArtifacts` refuse a scope that names nothing: filtering during
+  // collection made an unrecognised argument indistinguishable from no argument
+  // at all, which is how an epic *directory* came to be understood as the literal
+  // scope `"epics"` and reconciled every epic regardless.
+  const scopedEpic = resolveScope(targetDir, story);
 
   const epics = [];
   for (const dir of dirs) {
@@ -323,7 +330,6 @@ export function collectArtifacts(targetDir, {
     // name the folder anything, and `adr/`, `spikes/` and `evidence/` live in the
     // same tree — at whatever depth the project chose.
     if (!existsSync(epicFile)) continue;
-    if (scopedEpic && name !== scopedEpic) continue;
 
     const epicRead = readBounded(epicFile, maxBytes);
     let storyFiles = [];
@@ -356,6 +362,45 @@ export function collectArtifacts(targetDir, {
 }
 
 /**
+ * The epic key that a `--story` argument names.
+ *
+ * Accepts what a caller actually has to hand: the path to a story file, the path
+ * to `epic.md`, the epic's own directory, or the epic's key on its own. A FILE
+ * lives inside its epic; anything else IS the epic. Getting this wrong is not
+ * harmless: the previous version took the parent directory of whatever it was
+ * given, so an epic *directory* resolved to `"epics"` — a key that matches no
+ * epic — and the request was silently reinterpreted as "reconcile everything".
+ */
+function resolveScope(targetDir, story) {
+  if (!story) return null;
+  const abs = isAbsolute(story) ? story : join(targetDir, story);
+  return /\.md$/i.test(abs) ? basename(dirname(abs)) : basename(abs);
+}
+
+/**
+ * Refuse a scope that names nothing.
+ *
+ * The caller asked about ONE epic. Answering about a different set — or about all
+ * of them — is a wrong answer delivered confidently, which is worse than an error
+ * the user can correct; `Principles.md` says to state uncertainty explicitly
+ * rather than guess, and a scope that resolves to nothing is the guess.
+ *
+ * An epic tracked in `state.json` but absent from disk is NOT a failure: that is
+ * the `missing-epic-dir` finding, which is the whole point of asking.
+ */
+function scopeFailure(scope, collected, stateEpics) {
+  if (!scope) return null;
+  if (collected.epics.some((e) => e.key === scope)) return null;
+  if (Object.hasOwn(stateEpics, scope)) return null;
+  const known = [...new Set([...collected.epics.map((e) => e.key), ...Object.keys(stateEpics)])].sort();
+  return `--story scope \`${scope}\` matches no epic on disk or in state.json, so nothing was reconciled. `
+    + (known.length > 0
+      ? `Known epics: ${known.map((k) => `\`${k}\``).join(', ')}.`
+      : 'No epic directories were found under the plans directory.')
+    + ' Pass an epic directory, an epic key, or the path to one of its story files.';
+}
+
+/**
  * Reconcile the planning tree against `state.json`.
  *
  * @returns {{ok: boolean, available: boolean, plansDir: string, verdict: string|null,
@@ -369,6 +414,25 @@ export function reconcileArtifacts(targetDir, {
 } = {}) {
   const collected = collectArtifacts(targetDir, { plansDir, story, maxBytes });
   const plansDirRel = toPosix(plansDir);
+  const stateEpics = state?.epics && typeof state.epics === 'object' ? state.epics : {};
+
+  // ── 0. An explicit scope must name an epic ────────────────────────────────
+  // Checked before anything else, so a scope that names nothing is refused rather
+  // than answered with the whole tree.
+  const scopeError = scopeFailure(collected.scopedEpic, collected, stateEpics);
+  if (scopeError) {
+    return {
+      ok: false,
+      available: true,
+      plansDir: plansDirRel,
+      scopedEpic: collected.scopedEpic,
+      scopeError,
+      verdict: 'unknown',
+      findings: [],
+      summary: { total: 0, blocking: 0, warning: 0, info: 0 },
+      reason: scopeError,
+    };
+  }
 
   if (!collected.available) {
     return {
@@ -383,7 +447,12 @@ export function reconcileArtifacts(targetDir, {
     findings.push({ code, severity, subject, artifact, detail, evidence });
   };
 
-  const stateEpics = state?.epics && typeof state.epics === 'object' ? state.epics : {};
+  // Apply the scope (validated above): every per-epic and per-story check below
+  // must see only the epic that was asked about.
+  const epics = collected.scopedEpic
+    ? collected.epics.filter((e) => e.key === collected.scopedEpic)
+    : collected.epics;
+
   const phase = state?.session?.currentPhase ?? null;
   const workflowPath = state?.session?.workflowPath ?? null;
   const phaseIndex = PHASES.indexOf(phase);
@@ -405,15 +474,21 @@ export function reconcileArtifacts(targetDir, {
   }
 
   // ── 2. Epics: state vs disk, both directions ──────────────────────────────
-  const onDisk = new Set(collected.epics.map((e) => e.key));
+  const onDisk = new Set(epics.map((e) => e.key));
   for (const epicDir of Object.keys(stateEpics).sort()) {
+    // Compare only what is in scope. Iterating every epic in `state.json` while
+    // `onDisk` held just the scoped epic reported each UNSCOPED epic as
+    // `missing-epic-dir` (blocking) — twelve blocking findings about epics the run
+    // was never asked about, which also made a scoped run unable to reach
+    // `consistent` by construction.
+    if (collected.scopedEpic && epicDir !== collected.scopedEpic) continue;
     if (!onDisk.has(epicDir)) {
       add('missing-epic-dir', 'blocking', epicDir, `${plansDirRel}/${epicDir}`,
         'state.json tracks this epic, but no `epic.md` exists for it on disk. Every story under it is unreachable as an artifact.');
     }
   }
 
-  for (const epic of collected.epics) {
+  for (const epic of epics) {
     const stateEpic = stateEpics[epic.key];
 
     if (!stateEpic) {
@@ -554,8 +629,31 @@ export function reconcileArtifacts(targetDir, {
           ?? Object.values(state?.evidenceCoverage ?? {}).find((r) => r?.workItemId === subject);
         const count = Number(row?.recordCount ?? 0);
         if (!row || !Number.isFinite(count) || count <= 0) {
-          add('done-without-evidence', 'blocking', subject, storyFile.relPath,
-            'state.json marks this story done, but no evidence record is indexed against it. The completion cannot be traced to anything that ran.');
+          // … unless the framework has already ruled the gap accepted. A recorded
+          // gate-exception is a reviewed human decision naming this work item, its
+          // category and its reason; re-raising it as `blocking` on every run fills
+          // the blocking section with rows nobody can act on, and teaches the
+          // reader to skim the one section that must never be skimmed. The honest
+          // fix — re-running eight merged, green stories' suites to manufacture
+          // records that never existed — is explicitly out of scope, which is what
+          // the exception records.
+          //
+          // The gap is still REPORTED, as `info` naming the exception, because this
+          // module's contract is a recorded gap rather than silence. The match is
+          // the one a transition uses (`activeExceptionEntries`, by work-item
+          // scope), so the two can never disagree about what is excused.
+          const excused = activeExceptionEntries(state, { workItemId: subject });
+          if (excused.length > 0) {
+            const exception = excused[excused.length - 1];
+            const date = exception.date ? String(exception.date).slice(0, 10) : null;
+            add('excused-gap', 'info', subject, storyFile.relPath,
+              `state.json marks this story done without an indexed evidence record, and \`${exception.gate}\` is recorded as an accepted gap `
+              + `(${exception.category ?? 'uncategorised'}${date ? `, ${date}` : ''}): ${exception.rationale ?? 'no rationale recorded'}`,
+              date ? `excepted ${date}` : 'excepted');
+          } else {
+            add('done-without-evidence', 'blocking', subject, storyFile.relPath,
+              'state.json marks this story done, but no evidence record is indexed against it. The completion cannot be traced to anything that ran.');
+          }
         }
       }
     }
@@ -593,13 +691,14 @@ export function reconcileArtifacts(targetDir, {
     available: true,
     plansDir: plansDirRel,
     scopedEpic: collected.scopedEpic,
+    scopeError: null,
     verdict,
     findings,
     summary,
     artifacts: {
       docs: collected.docs.map((d) => ({ name: d.name, present: d.present, path: d.relPath })),
-      epicCount: collected.epics.length,
-      storyCount: collected.epics.reduce((n, e) => n + e.stories.length, 0),
+      epicCount: epics.length,
+      storyCount: epics.reduce((n, e) => n + e.stories.length, 0),
     },
     reason: null,
   };
