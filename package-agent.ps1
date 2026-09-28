@@ -1,4 +1,4 @@
-# package-agent.ps1
+﻿# package-agent.ps1
 # Packages the Cadet-Agent universal bootstrap package into a zip archive.
 # Extract the zip at any Unity project root and files will land at:
 #   .cadet\agent\core\

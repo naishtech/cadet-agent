@@ -1,4 +1,4 @@
-# bump-version.ps1
+﻿# bump-version.ps1
 # Bumps the Cadet-Agent version, updates every file that carries the version
 # string, commits with the repo's conventional message, creates the vX.Y.Z tag,
 # and pushes both the branch and the tag.
@@ -17,7 +17,16 @@
 #
 # Before touching any file, the script runs `npm run lint` (the same offline
 # markdown-link check CI runs) and aborts if it fails, so a broken link can
-# never be committed or tagged. Pass -SkipLint only when lint is unavailable.
+# can never be committed or tagged. Pass -SkipLint only when lint is unavailable.
+#
+# ENCODING — this file is UTF-8 WITH a byte-order mark, on purpose. Windows
+# PowerShell 5.1 reads a .ps1 that has no mark with the system ANSI code page,
+# and the em dash in a generated CHANGELOG heading then decodes to a U+201D
+# smart quote. PowerShell accepts that character as a string delimiter, so the
+# string ends early, `$today` is parsed as code, and the file fails to parse
+# with "Missing closing '}'" errors that name lines far from the real cause.
+# Do not strip the mark: it is the only thing that makes the parser read the
+# punctuation correctly. PowerShell 7 and the Linux CI both handle it too.
 #
 # Version bump policy (see CHANGELOG.md):
 #   patch  wording/doc-only corrections that do not change agent behavior
@@ -98,7 +107,7 @@ function Invoke-Lint {
 }
 
 function Get-JsonVersion([string]$Path) {
-  $json = Get-Content $Path -Raw | ConvertFrom-Json
+  $json = Get-TextFile $Path | ConvertFrom-Json
   return $json.version
 }
 
@@ -119,6 +128,16 @@ function Compare-Semver($A, $B) {
   if ($A.Major -ne $B.Major) { return $A.Major - $B.Major }
   if ($A.Minor -ne $B.Minor) { return $A.Minor - $B.Minor }
   return $A.Patch - $B.Patch
+}
+
+# Read a file as UTF-8 explicitly, without a BOM. `Get-Content -Raw` cannot be
+# used for this: Windows PowerShell 5.1 decodes with the system ANSI code page,
+# so a non-ASCII character in the data (an em dash in the CHANGELOG) is read as
+# mojibake and then written back corrupt, silently and into a tagged release.
+# Reading through an explicit decoder makes both interpreters agree with the
+# bytes on disk.
+function Get-TextFile([string]$Path) {
+  return [System.IO.File]::ReadAllText($Path, [System.Text.UTF8Encoding]::new($false))
 }
 
 # Write a file as UTF-8 without a BOM and with LF line endings, matching the
@@ -239,19 +258,19 @@ try {
   Write-Step "Updating version files"
 
   # package.json — only the top-level "version" line.
-  $pkgText = Get-Content $packageJson -Raw
+  $pkgText = Get-TextFile $packageJson
   $pkgText = [regex]::Replace($pkgText, '("version"\s*:\s*")[^"]*(")', "`${1}$targetRaw`${2}", 1)
   Set-TextFile $packageJson $pkgText
   Write-Ok "package.json -> $targetRaw"
 
   # FrameworkManifest.json — frameworkVersion.
-  $manifestText = Get-Content $manifestJson -Raw
+  $manifestText = Get-TextFile $manifestJson
   $manifestText = [regex]::Replace($manifestText, '("frameworkVersion"\s*:\s*")[^"]*(")', "`${1}$targetRaw`${2}", 1)
   Set-TextFile $manifestJson $manifestText
   Write-Ok ".cadet/agent/core/FrameworkManifest.json -> $targetRaw"
 
   # ADAPTERS.md — "Framework version: X.Y.Z", and refresh the Updated date.
-  $adaptersText = Get-Content $adaptersMd -Raw
+  $adaptersText = Get-TextFile $adaptersMd
   $adaptersText = [regex]::Replace($adaptersText, '(Framework version:\s*)\d+\.\d+\.\d+', "`${1}$targetRaw", 1)
   $adaptersText = [regex]::Replace($adaptersText, '(Updated:\s*)\d{4}-\d{2}-\d{2}', "`${1}$today", 1)
   Set-TextFile $adaptersMd $adaptersText
@@ -260,7 +279,7 @@ try {
   # CHANGELOG.md — promote [Unreleased] to the new version, then open a fresh
   # [Unreleased] section (Keep a Changelog). If there is no [Unreleased] block,
   # insert a new versioned section after the policy separator.
-  $changelogText = Get-Content $changelogMd -Raw
+  $changelogText = Get-TextFile $changelogMd
   if ($changelogText -match '(?m)^## \[Unreleased\]\s*$') {
     $replacement = "## [Unreleased]`n`n## [$targetRaw] — $today`n"
     $changelogText = [regex]::Replace(
