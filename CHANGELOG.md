@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.51.0] — 2026-09-28
+
 ### Added
 
 - **`state begin` now records the story it finished — the boundary, as a record.** There is no story-level terminal transition: `closed` means the *epic* is finished, so a story completing while its epic is still open had no vocabulary at all, and every boundary ended in a judgement call about which edge was legal — a call with no correct answer, because none of the edges means "this story is finished". A session spent a full decision cycle on it and closed nothing. The boundary now names the outcome: `state.json` gains `storyCompletions`, one bounded row per work item the session moved on from — `{ workItemId, completedAt, evidenceRecords }`. It records what *happened* (the session moved on from this item) rather than a verdict, and `evidenceRecords` makes a completion with nothing behind it visible instead of implied. Non-terminal and additive: **no transition edge, no gate, nothing that can block**, and `closed` keeps its epic meaning. Re-beginning a work item replaces its row rather than appending, so the array stays bounded the way the rest of this version is. `state validate` rejects a malformed marker, and `state begin` reports the completion on both the human and JSON paths. **Docs corrected with it:** `Workflow.md` still told agents to "set `activeWorkItem` to the next story" by hand — the same defect `0.49.0` fixed in `Resume` — and now states the rule plainly: `closed` is epic-level, a finished story is expressed by the boundary, and no story-level terminal transition is needed.
