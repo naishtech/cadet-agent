@@ -66,7 +66,8 @@ These files define specific operational workflows. Their rules are also condense
 - [GitFirstRule](GitFirstRule.md) — Git must be initialized before any Unity project or code, and branch status must be checked before starting new work.
 - [FrameworkSyncGate](FrameworkSyncGate.md) — Check for framework updates before substantive work.
 - [KickoffFlow](KickoffFlow.md) — Step-by-step kickoff sequence.
-- [FirstResponseFormat](FirstResponseFormat.md) — Required format for first response.
+
+The required response format is defined in [cadet-agent.md](cadet-agent.md#response-contract) — the status block — not in a separate file.
 
 ## Full Documentation
 
