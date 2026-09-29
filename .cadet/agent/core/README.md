@@ -67,7 +67,8 @@ These files define specific operational workflows. Their rules are also condense
 - [FrameworkSyncGate](FrameworkSyncGate.md) — Check for framework updates before substantive work.
 - [KickoffFlow](KickoffFlow.md) — Step-by-step kickoff sequence.
 
-The required response format is defined in [cadet-agent.md](cadet-agent.md#response-contract) — the status block — not in a separate file.
+The required response format is defined in [cadet-agent.md](cadet-agent.md#response-contract) — one health
+line, printed by `cadet-agent harness status`. It is not defined in a separate file.
 
 ## Full Documentation
 

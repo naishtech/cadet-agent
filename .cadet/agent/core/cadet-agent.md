@@ -29,7 +29,7 @@ These rules apply to all work, regardless of learner tier, operating mode, or wo
 - Apply guidance as preferred heuristics and lessons learned, not as a substitute for standards or policy. In all outputs, distinguish guidance recommendations from mandatory requirements.
 - Place reusable shared infrastructure in the repository's designated shared-code location when one exists. Confirm extraction scope with the user before moving shared code.
 
-- **Every reply opens with the status block, and says nothing else about the framework.** Status (`Item`, `Phase`, `Gates open`, `Blocking`, `You owe`, `Next`), then one line per change — what changed and why. Only rows and lines that can change a decision the reader is making. Write every reply in Simplified Technical English. See the Response Contract section.
+- **Every reply carries one line about the framework, and says nothing else about it.** `cadet-agent: ok`, or the problem in its place — print it with `cadet-agent harness status`, which derives it from the record rather than asserting it. The rest of the reply carries the work: the plan being agreed, or the change and what the checks show. Write every reply in Simplified Technical English. See the Response Contract section.
 
 ### XML Tag Convention
 
@@ -142,7 +142,7 @@ Each skill is responsible for verifying the gates relevant to its phase. The dir
 
 ## Response Contract
 
-Every reply that reports framework state opens with the block below and reports nothing else about the framework. This replaces `FirstResponseFormat.md`, retired 2026-09-28: a format that restates session context does not give a reader the information by which they decide their next action.
+Every reply carries **one line about the framework, and no more**: `cadet-agent: ok` when the tracking record is sound, or the problem in its place. Everything else in the reply is about the work. This replaces the six-field status table, retired 2026-09-29: four of its six fields could not change a decision on a normal turn, so the contract paid six lines on every reply to fund the rare turn where one of them mattered. `FirstResponseFormat.md` was retired the day before for the same reason one level up — a format that restates session context does not give the reader the information by which they decide their next action.
 
 **Language** — every reply uses Simplified Technical English (ASD-STE100).
 
@@ -155,24 +155,42 @@ Every reply that reports framework state opens with the block below and reports 
 - If a cause matters, give it its own sentence.
 - A skill whose reply must carry content, such as `PlanningReview`'s questions, keeps that content. The language shortens the content. It does not remove it.
 
-**Status** — one line per field, and no line that cannot change a decision the reader is making:
+**The health line** — one line, first, printed by `cadet-agent harness status`. Print the command's
+line; never compose one.
 
-| Field | Meaning |
-|---|---|
-| `Item` | The work item and its epic; `none` outside a story. |
-| `Phase` | `session.currentPhase`, and the transition in flight when one is. |
-| `Gates open` | Only the gates still unmet for the target phase — never the satisfied ones. |
-| `Blocking` | Only findings the reader can act on. Excused gaps are counted in the count, not listed. |
-| `You owe` | What is the owner's to decide or do — a flag, never a question asked before acting. |
-| `Next` | The single next action, or the one decision that unblocks it. |
+- `ok` means the workflow record is readable, valid and fresh, and no recorded run stopped on a budget or
+  failed to run. The line carries nothing else: no work item, no phase, no gate count, no version.
+- **A gate that is unmet because the work is unfinished is NOT a problem.** The four implementation gates
+  are unmet for most of every story. The line reports only what is wrong, because a line that prints a
+  problem on every turn is the table this replaces.
+- When a problem exists, the line states it in place of `ok`, in one line, with what it blocks and what
+  resolves it. The command reports: a missing record in a consumer repository, an unreadable or invalid
+  record, and a last run that stopped rather than reporting an outcome.
+- **A problem the command cannot see is still stated, in that same one line** — a transition you
+  attempted and the framework refused, an expired deferral, a launch failure, a budget warning. Name the
+  problem and nothing else.
+- Nothing else about the framework appears in a reply. The files are the record: a reader who wants the
+  phase, the gates or the evidence ids asks for them, or opens `.cadet/state.json`.
 
-**Changed** — what changed, then why, one line per change, with evidence record ids inline. This is the Change Report at reply scale: no headings, no AC tables, no restatement of the story. State a limit or an unmeasured claim where one exists rather than smoothing over it.
+**The work** — the reply carries the work, and what it must carry depends on the stage:
 
-**First reply of a session** adds one line, `Tier/mode` — learner tier, operating mode, workflow path and tracking mode as resolved into `state.json → session`, read from `.cadet/cadet-local-config.md` where they are persisted. Once per session; it does not recur.
+| Stage | The reply must carry | The reader's decision |
+|---|---|---|
+| `context-resolution`, `requirements`, `architecture`, `spikes`, `story-breakdown` | the decisions being taken, the alternatives rejected and why, the questions that need the owner, the artifact updated, and what the plan now says | *do we agree on this plan?* |
+| `implementation`, `review`, `validation` | what changed and why, what the checks show — red then green, compile, analyzer, review verdict, findings — and what is unverified or deferred | *is this correct and complete?* |
 
-**A policy appears only when it decided something**, named in the `why` of the change it decided. OperatingRules already requires surfacing resolved configuration when it materially affects the next action, and naming the default when you deviate from it; a standing policy line is the one field that is identical every time it is printed, so it can never change a decision.
-
-**On a client that cannot render a table** — any chat surface — keep the same fields, in the same order, as labelled lines. The fields are the contract; the table is only their rendering.
+- **Changed** — what changed, then why, one line per change, with evidence record ids inline. This is the
+  Change Report at reply scale: no headings, no AC tables, no restatement of the story. State a limit or an
+  unmeasured claim where one exists rather than smoothing over it.
+- **A policy appears only when it decided something**, named in the `why` of the change it decided.
+  OperatingRules already requires surfacing resolved configuration when it materially affects the next
+  action, and naming the default when you deviate from it; a standing policy line is identical every time
+  it is printed, so it can never change a decision.
+- **An owed decision and the next action are conditions, not fields.** State them when they exist — as
+  the problem line, as a question in the body, or as a trailing `next:` line — and say nothing when they
+  do not.
+- On a client that cannot render a table, write the work table's row as prose. The work is the contract;
+  the table is only its rendering.
 
 ## Operational Files
 

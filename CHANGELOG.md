@@ -13,6 +13,12 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Changed
+
+- **The Response Contract is one line: `cadet-agent: ok`, or the problem in its place.** It replaces the six-field status table shipped in 0.52.0 (`Item`, `Phase`, `Gates open`, `Blocking`, `You owe`, `Next`). The table obeyed the contract's own rule — *no line that cannot change a decision the reader is making* — for two of its six fields: `Item` and `Phase` change about once per story, `Gates open` is a progress bar for the framework rather than for the work, and `Next` restates the prose that follows it. So the contract printed six lines on every reply to fund the rare turn where one of them mattered. Deleted with the table: the `Tier/mode` line on a session's first reply, and the "keep the same fields, in the same order, as labelled lines" clause, which existed only to render the table. **The reply now carries the work, and `cadet-agent.md` states what each stage must carry** — planning stages carry the decisions taken, the alternatives rejected and why, the questions that need the owner, and what the plan now says; build stages carry what changed and why, what the checks show, and what is unverified or deferred. `docs/coverage-report.md` records where each retired row went. Unchanged: the hard-gate rule (a failing gate is still stated and still blocks), the nine gates, evidence immutability, red-before-green, the reachability gate and the human commit gate.
+
+- **New read-only command: `cadet-agent harness status`.** It derives the health line instead of asserting it, composing checks that already exist — `validateState` (schema, freshness, expiry) and the run ledger — so the framework's only per-reply output is evidence rather than a claim. `cadet-agent: ok` means the record is readable, valid and fresh and no recorded run stopped on a budget or failed to run. **A gate unmet because the work is unfinished is not a problem**: the four implementation gates are unmet for most of every story, so the line reports only what is wrong — a missing record in a consumer repository, an unreadable or invalid record, or a last run whose status is `exhausted` or `blocked`. A `failed` run is a RED and is never a problem, because that is how TDD works. `--format json` carries the problems, each with what it blocks and what resolves it; the exit code carries the same verdict as the line. Declared `mutates: false`, so the registry guard asserts it writes nothing under any flag.
+
 ## [0.54.0] — 2026-09-28
 
 ### Changed

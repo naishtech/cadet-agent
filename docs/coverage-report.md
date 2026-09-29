@@ -125,8 +125,30 @@ The file was deleted. It was a required format that no session produced, no skil
 | Instruction | Disposition |
 |---|---|
 | "Summarize understanding of user objective (one short paragraph)" | ⤵️ dropped as restatement — cadet-agent.md `Next` names the action the objective paragraph was paraphrasing; cadet-agent.md `/cadet-resume` and `KickoffFlow.md` still open a session with the work item under it |
-| "State learner tier and operating mode (one line, when known and material)" | ✅ cadet-agent.md Response Contract — the `Tier/mode` line on a session's first reply, read from `.cadet/cadet-local-config.md` |
+| "State learner tier and operating mode (one line, when known and material)" | ⤵️ dropped 2026-09-29 with the `Tier/mode` line — see *the six-field status table* below; the learner model and `.cadet/cadet-local-config.md` are unchanged |
 | "State active policy or 'none' (one line)" | ✅ cadet-agent.md Response Contract — a policy is named in a change's `why` when it decided that change; resolving it stays mandatory in OperatingRules |
+
+## Source: the six-field status table — retired 2026-09-29
+
+The table (`Item`, `Phase`, `Gates open`, `Blocking`, `You owe`, `Next`) was the Response Contract for one day.
+Its own rule — *no line that cannot change a decision the reader is making* — failed for four of its six fields
+on a normal turn, so the contract printed six lines on every reply to fund the rare turn where one of them
+mattered. Its instructions were re-homed, not dropped, apart from the ones that were restatement:
+
+| Instruction | Disposition |
+|---|---|
+| `Item` — the work item and its epic | ⤵️ dropped — the reply's body names the work item when it matters, and `cadet-agent harness status --format json` still reports `workItemId` for a caller that needs it |
+| `Phase` — `session.currentPhase` | ⤵️ dropped — a reader acting on the phase reads `state.json` or asks; the health line names a phase problem only when one exists |
+| `Gates open` — the unmet ones only | ⤴️ moved into the problem line, printed only when a gate **blocks the next step**. A gate unmet because the work is unfinished is not a problem, or the line would print on nearly every reply |
+| `Blocking` — actionable findings only | ⤴️ moved into the problem line, unchanged in meaning |
+| `You owe` — what waits on the owner | ⤴️ kept as a condition: stated when a decision is genuinely waiting, never as a standing row |
+| `Next` — the next action | ⤴️ kept as a conditional trailing `next:` line |
+| `Tier/mode` on the first reply of a session | ⤵️ dropped as telemetry — the learner model and `.cadet/cadet-local-config.md` are unchanged; announcing the resolution once per session cannot change a decision |
+| "keep the same fields, in the same order, as labelled lines" for a client that cannot render a table | ⤵️ dropped with the table it existed to render |
+
+**Replacement:** `cadet-agent harness status` derives the one line from the record — `validateState` plus the
+run ledger — so the framework's only per-reply output is evidence rather than an assertion. The reply's body
+now carries the work, and `cadet-agent.md` states what each stage must carry.
 
 ## Source: PolicyAndGuidanceRules.md
 
