@@ -58,6 +58,7 @@ function makeProject(stateDoc) {
 const READ_ONLY_INVOCATIONS = {
   'state validate': ['state', 'validate'],
   'harness report': ['harness', 'report'],
+  'harness status': ['harness', 'status'],
   'harness capabilities': ['harness', 'capabilities'],
   'harness matrix-check': ['harness', 'matrix-check'],
   'harness changes': ['harness', 'changes'],

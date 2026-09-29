@@ -6,7 +6,7 @@ import {
   validateState, migrateStateFile, readState, writeState, evaluateTransition, applyTransition,
   workItemIdOf, loadPolicy, RunLedger, loadRun, listRuns, cleanupRuns, buildReport, formatReport,
   runVerificationLoop, commandForGate, detectCapabilities, runsDir, gitChangedFiles, PolicyError, StateError,
-  detectRepoRole, describeRepoRole, GATES, PHASES, manualConfirmation,
+  detectRepoRole, describeRepoRole, GATES, PHASES, manualConfirmation, computeStatus,
   gitChangeSet, DEFAULT_REPORT_DIR,
   reconcileArtifacts, PLANS_DEFAULT_DIR,
   parseTestInventory, parseStoryCriteria, compareCoverage, describeCoverageGaps,
@@ -65,6 +65,7 @@ function showHelp() {
     cadet-agent harness reconcile   Reconcile the planning chain against state.json (read-only)
     cadet-agent harness cleanup     Apply the retention policy to .cadet/runs/
     cadet-agent harness capabilities  Report available CLI/Unity/MCP/hook/token/cost telemetry
+    cadet-agent harness status      Print the one-line framework health line (ok, or the problem)
 
   Options:
     --target, -t  Target directory (default: current working directory)
@@ -1443,6 +1444,21 @@ async function cmdHarness(opts) {
     return;
   }
 
+  // The health line. This command exists so the framework's one line of output is
+  // DERIVED rather than asserted: an agent composing its own `ok` is a claim, and
+  // this repository's whole complaint about itself is claims that nothing checks.
+  //
+  // The exit code carries the same verdict as the line, because the CLI's contract
+  // is that a command returns nonzero for invalid state. `process.exitCode` is set
+  // rather than calling `process.exit()`, so buffered stdout cannot be truncated
+  // when the caller is reading the line from a pipe.
+  if (sub === 'status') {
+    const status = computeStatus(opts.targetDir);
+    emit(opts, status.line, { ok: status.ok, status });
+    process.exitCode = status.ok ? 0 : 1;
+    return;
+  }
+
   if (sub === 'report') {
     const runs = listRuns(opts.targetDir);
     const target = opts.runId || runs[0]?.runId;
@@ -1660,7 +1676,7 @@ async function cmdHarness(opts) {
     return;
   }
 
-  fail(opts, `Unknown harness subcommand: ${sub || '(none)'}. Use record|confirm|verify|verify-acs|verify-reachability|matrix-check|report|changes|reconcile|cleanup|capabilities.`);
+  fail(opts, `Unknown harness subcommand: ${sub || '(none)'}. Use record|confirm|verify|verify-acs|verify-reachability|matrix-check|report|status|changes|reconcile|cleanup|capabilities.`);
 }
 
 export async function run(argv) {

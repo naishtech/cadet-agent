@@ -132,6 +132,12 @@ export const COMMANDS = {
     mutates: false,
     summary: 'Summarize budget consumption and failures.',
   },
+  // The health line: the framework's entire per-reply output. Read-only, and it
+  // writes no ledger, so printing it cannot change the state it reports on.
+  'harness status': {
+    mutates: false,
+    summary: 'Print the one-line framework health line: ok, or the problem.',
+  },
   'harness changes': {
     mutates: false,
     summary: 'List the files a story changed, with status, line counts, and links.',

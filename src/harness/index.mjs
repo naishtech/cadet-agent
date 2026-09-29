@@ -102,3 +102,5 @@ export {
   COMMANDS, mutatingCommands, readOnlyCommands, resolveCommand,
   describeCommand, describeAllCommands, checkUnattendedRequirements,
 } from './commands.mjs';
+
+export { computeStatus, STATUS_OK_LINE, STATUS_PREFIX } from './status.mjs';
