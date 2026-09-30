@@ -66,7 +66,7 @@ Capture requirements with clear, testable Given/When/Then acceptance criteria th
 
 After the requirements are accepted, update `.cadet/state.json`:
 - Set `currentPhase` to `requirementsComplete`.
-- Record the requirements document path in `changeHistory`.
+- Record the requirements document path in `changeHistory`. Record it as a pointer — the artifact path, and the commit when there is one, never a summary of what the artifact says (`.cadet/agent/core/Harness.md` §2c).
 - Reset gates for the next phase.
 - Before advancing to architecture, confirm all assumptions are classified (verified/reasonable/unverified).
 </completion>

@@ -8,6 +8,8 @@
  */
 
 import { existsSync } from 'node:fs';
+
+import { HOSTS } from './hosts.mjs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -38,13 +40,23 @@ export function detectCapabilities({ targetDir = process.cwd(), env = process.en
     || existsSync(join(targetDir, '.cursor', 'mcp.json'))
     || existsSync(join(targetDir, '.mcp.json'));
 
+  // `hook` used to be `{ copilot: existsSync('.github/hooks/git-guard.json') }`, which the framework
+  // itself ships — so it read `true` for every consumer repository no matter which host ran it, and
+  // a claim that cannot be false is not a measurement. What is reported now is what is configured,
+  // and whether the mechanism actually answers (see src/harness/hosts.mjs). The level is reported
+  // per action, never per repository.
+  const hookConfig = join(targetDir, '.github', 'hooks', 'git-guard.json');
+  const hookScript = join(targetDir, '.github', 'hooks', 'scripts', 'git-guard.sh');
   return {
     cli: true,
     unityCli: unity.available ? { available: true, path: unity.path, version: unity.version } : { available: false },
     mcp: mcpConfigured ? { available: true, configured: true } : { available: false, configured: false },
     hook: {
-      copilot: existsSync(join(targetDir, '.github', 'hooks', 'git-guard.json')),
-      note: 'Cursor, Continue, and Claude Code have no native PreToolUse hook',
+      configured: existsSync(hookConfig),
+      scriptPresent: existsSync(hookScript),
+      verified: null, // measured only when a caller asks for the probe: `harness capabilities --verify-host`
+      note: 'a configured hook is not an active control: run "harness capabilities --verify-host" for the measured level per action',
+      hosts: HOSTS.map((h) => h.id),
     },
     tokenTelemetry: { provider: false, source: 'estimate' },
     costTelemetry: { available: false, reason: 'no model rate card configured' },

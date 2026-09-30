@@ -76,7 +76,7 @@ When a defect remains unresolved after multiple attempts and further speculation
 
 After the fix is verified:
 - Update `.cadet/state.json` if a story is active.
-- Record the fix and any regression tests added in `changeHistory`.
+- Record the fix and any regression tests added in `changeHistory`. Record it as a pointer — the artifact path, and the commit when there is one, never a summary of what the artifact says (`.cadet/agent/core/Harness.md` §2c).
 - Preserve regression tests.
 - If the fix completes a story, verify implementation → review gates before transitioning.
 </completion>

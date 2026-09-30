@@ -54,6 +54,16 @@ stateDiagram-v2
 
 The framework now expresses the checkpoints as XML structure in the core agent instructions, using `<gates>`, `<transition>`, and `<gate>` elements. The prose below preserves the same semantics for human readers.
 
+### Architecture Complete → Story Breakdown Gate
+
+Before the StoryBreakdown skill turns a finished design into work items:
+
+| Gate | Requirement | How to Satisfy |
+|------|-------------|----------------|
+| `designReviewCompleted` | The design was challenged and every finding carries a disposition, with no contested decision left unresolved | Run `cadet-agent harness verify-design-review --artifact <review artifact> --files <technical-design,requirements,ADRs>` **in the `architectureComplete` phase**, after filling the review artifact from `templates/DesignReviewTemplate.md`. **Required only when** `.cadet/harness.json` sets `designReview.enabled`; the shipped policy file turns it on for a new project. A finding marked `contested` fails the gate until it names the person who resolved it — that is the case the gate exists for. |
+
+**Transition rule:** If the gate is required and not satisfied, do NOT advance to `story-breakdown`. The review runs before the work items exist precisely because that is the last point at which "do not build this" is still cheap.
+
 ### Implementation → Review Transition Gates
 
 Before transitioning from `implementation` to `review`, ALL of the following gates must be explicitly satisfied:
@@ -64,6 +74,7 @@ Before transitioning from `implementation` to `review`, ALL of the following gat
 | `compileCheckConfirmed` | Unity project compiles without errors | Run `unity build`/`run`/`command eval` (CLI), or ask user to focus Unity and confirm 0 errors — see `core/UnityCli.md`. |
 | `unityAnalyzerClean` | Zero Unity analyzer diagnostics in the changed files | Run the analyzer command declared in `.cadet/harness.json` — see `core/UnityCli.md`. |
 | `storyTrackingUpdated` | Story markdown marked complete, epic progress updated | Update story file to `[x] done`, update epic tracker. |
+| `architectureFitnessPassed` | The project's declared architecture checks hold for the changed files | Run `cadet-agent harness verify-architecture`. Required only when `.cadet/harness.json` declares checks under `architectureFitness` AND sets `enabled: true`; there is no command-line override, and an advisory check never blocks. See [Architecture Fitness](ArchitectureFitness.md). |
 
 > `testsPassed`, `compileCheckConfirmed` and `unityAnalyzerClean` are **agent-executable** via the Unity CLI. Use CLI commands for these deterministic checks (exit codes), and MCP mode for inspection/reasoning — see `core/UnityCli.md`.
 
@@ -87,6 +98,7 @@ Before transitioning from `review` to `validation`, the following gates must be 
 | Gate | Requirement | How to Satisfy |
 |------|-------------|----------------|
 | `designArtifactSyncConfirmed` | Requirements, design, project plan, and epics are mutually consistent | Cross-reference all planning artifacts. Update any stale docs. |
+| `humanAcceptanceConfirmed` | A person accepted the delivered work | Record it in two commands: `cadet-agent harness acceptance-form --epic <id>` writes a form filled in from state, you answer the three blank fields, and `cadet-agent harness confirm --gate humanAcceptanceConfirmed --artifact <the form> --reason "<why>" --expires-at <ISO-8601>` records it. No command can satisfy it. Required only when `.cadet/harness.json` sets `humanAcceptance.enabled`, and never on `validation → implementation` — the next-story loop stays unblocked. Work a user cannot reach takes a `non-user-facing` exception that names who judged it. |
 
 ---
 

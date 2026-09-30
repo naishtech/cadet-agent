@@ -669,3 +669,53 @@ describe('cli — harness verify-acs', () => {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });
+
+describe('verify-acs — where the story is read from', () => {
+  // The defect this pins: `harness verify-acs --story <path> --target <dir>` parsed the story
+  // relative to the PROCESS WORKING DIRECTORY while binding the evidence to
+  // `<target>/<story>`. So the command failed when run from outside the project, and — worse —
+  // when a file of that name existed under the working directory it attested THAT file's criteria
+  // against the target's path: the silently-inert binding verify-reachability's own comment warns
+  // about. Every other path flag in the CLI resolves against the target; this pins that this one
+  // does too, from a working directory that is not the target.
+  function acsFixture() {
+    const dir = mkdtempSync(join(tmpdir(), 'cadet-acs-target-'));
+    mkdirSync(join(dir, '.cadet'), { recursive: true });
+    mkdirSync(join(dir, 'stories'), { recursive: true });
+    mkdirSync(join(dir, 'reports'), { recursive: true });
+    writeFileSync(join(dir, '.cadet', 'harness.json'), JSON.stringify({}));
+    writeFileSync(join(dir, 'stories', 'story-1.md'), [
+      'Status: In progress',
+      'Reachability: witnessed — the counter rises in the demo scene',
+      '',
+      '## Acceptance Criteria',
+      '',
+      '### AC-1: rectangular',
+      '',
+      '- Declared tests: Grid_IsRectangular',
+      '',
+    ].join('\n'));
+    writeFileSync(join(dir, 'reports', 'tap.txt'), ['TAP version 13', 'ok 1 - Grid_IsRectangular', '1..1'].join('\n'));
+    spawnSync('git', ['-c', 'init.defaultBranch=main', 'init', '-q', '.'], { cwd: dir, encoding: 'utf-8' });
+    spawnSync('git', ['-C', dir, 'add', '-A'], { encoding: 'utf-8' });
+    spawnSync('git', ['-C', dir, '-c', 'user.email=t@e.com', '-c', 'user.name=T', 'commit', '-q', '-m', 'fixture'], { encoding: 'utf-8' });
+    writeFileSync(join(dir, 'stories', 'story-1.md'), readFileSync(join(dir, 'stories', 'story-1.md'), 'utf-8') + '\nEdited by the story.\n');
+    return dir;
+  }
+
+  it('reads the story and the report from --target, not from the working directory', () => {
+    const dir = acsFixture();
+    try {
+      const init = spawnSync('node', [cli, 'state', 'init', '--target', dir], { encoding: 'utf-8', cwd: repoRoot, windowsHide: true });
+      assert.equal(init.status, 0, init.stdout + init.stderr);
+      const begin = spawnSync('node', [cli, 'state', 'begin', '--epic', 'E-1', '--story', 'stories/story-1.md', '--target', dir], { encoding: 'utf-8', cwd: repoRoot, windowsHide: true });
+      assert.equal(begin.status, 0, begin.stdout + begin.stderr);
+
+      // The working directory is the framework repository, which has no `stories/story-1.md`.
+      const r = spawnSync('node', [cli, 'harness', 'verify-acs', '--story', 'stories/story-1.md',
+        '--report', 'reports/tap.txt', '--target', dir, '--format', 'json'],
+      { encoding: 'utf-8', cwd: repoRoot, windowsHide: true });
+      assert.equal(r.status, 0, `the story and the report must resolve inside the target: ${r.stdout}${r.stderr}`);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});

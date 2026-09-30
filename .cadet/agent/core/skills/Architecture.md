@@ -67,7 +67,7 @@ Produce a technical design that translates approved requirements into implementa
 
 After the design is accepted, update `.cadet/state.json`:
 - Set `currentPhase` to `architectureComplete`.
-- Record the technical design path and ADR paths in `changeHistory`.
+- Record the technical design path and ADR paths in `changeHistory`. Record it as a pointer — the artifact path, and the commit when there is one, never a summary of what the artifact says (`.cadet/agent/core/Harness.md` §2c).
 - Reset gates for the next phase.
 - If unverified assumptions remain, invoke the Spike skill before advancing.
 </completion>

@@ -15,6 +15,7 @@ import { hashCriteria, sha256Bytes, timestamp, newId } from './util.mjs';
 import { BudgetTracker, budgetExhaustedResult, evaluateHardStop } from './budget.mjs';
 import { redactString } from './redaction.mjs';
 import { whichAll } from './routing.mjs';
+import { gateBuilder, describeGateRefusal, describeMissingCommand } from './gates.mjs';
 
 export const RETRY_CLASSES = Object.freeze(['deterministic', 'transient', 'repair', 'unknown']);
 export const RESULT_STATUSES = Object.freeze(['passed', 'failed', 'flaky', 'blocked', 'timed-out']);
@@ -342,35 +343,43 @@ export function runCommand(command, {
  * Project-specific commands (analyzer/compile/test) come from `.cadet/harness.json`.
  */
 export function commandForGate(gate, { projectPath = '.', policy = null, unityAvailable = false } = {}) {
-  switch (gate) {
-    case 'testsPassed':
-      return policy?.testCommand
-        ? { command: policy.testCommand, tool: 'test', automated: true }
-        : { command: 'npm test', tool: 'test', automated: true };
-    case 'compileCheckConfirmed':
-      if (policy?.compileCommand) {
-        return { command: policy.compileCommand, tool: 'unity-build', automated: true };
-      }
-      if (unityAvailable) {
-        return {
-          command: `unity build ${projectPath} --target StandaloneWindows64 -o "${join(projectPath, 'Temp', 'cadet-build')}" --format json`,
-          tool: 'unity-build',
-          automated: true,
-        };
-      }
-      return { command: null, tool: 'manual-confirmation', automated: false, reason: 'Unity CLI unavailable' };
-    case 'unityAnalyzerClean':
-      if (policy?.analyzerCommand) {
-        return {
-          command: `unity run ${projectPath} --command ${policy.analyzerCommand} --format json`,
-          tool: 'unity-analyzer',
-          automated: true,
-        };
-      }
-      return { command: null, tool: 'unity-analyzer', automated: false, reason: 'analyzer command not declared in .cadet/harness.json' };
-    default:
-      return { command: null, tool: 'agent-owned', automated: false, reason: `${gate} is agent-owned` };
+  // The registry decides, not a switch in this file: a gate whose contract is not
+  // a project command has no default command to run, and one whose contract IS a
+  // project command may still have nothing configured yet.
+  const builder = gateBuilder(gate);
+  if (!builder) {
+    return { command: null, tool: 'unknown-gate', automated: false, reason: describeGateRefusal(gate) };
   }
+  const declared = builder.command;
+  if (!declared) {
+    const tool = builder.owner === 'agent' ? 'agent-owned' : builder.owner;
+    const reason = builder.projectCommand ? describeMissingCommand(gate) : describeGateRefusal(gate);
+    return { command: null, tool, automated: false, reason };
+  }
+
+  const configured = declared.policyKey ? policy?.[declared.policyKey] : null;
+  if (configured) {
+    return declared.tool === 'unity-analyzer'
+      ? { command: `unity run ${projectPath} --command ${configured} --format json`, tool: declared.tool, automated: true }
+      : { command: configured, tool: declared.tool, automated: true };
+  }
+  if (declared.fallback) {
+    return { command: declared.fallback, tool: declared.tool, automated: true };
+  }
+  if (declared.unityBuild) {
+    if (!unityAvailable) {
+      return { command: null, tool: 'manual-confirmation', automated: false, reason: 'Unity CLI unavailable' };
+    }
+    return {
+      command: `unity build ${projectPath} --target StandaloneWindows64 -o "${join(projectPath, 'Temp', 'cadet-build')}" --format json`,
+      tool: declared.tool,
+      automated: true,
+    };
+  }
+  if (declared.tool === 'unity-analyzer') {
+    return { command: null, tool: 'unity-analyzer', automated: false, reason: 'analyzer command not declared in .cadet/harness.json' };
+  }
+  return { command: null, tool: 'agent-owned', automated: false, reason: describeMissingCommand(gate) };
 }
 
 /** Detect zero `UNT*` diagnostics in a Unity analyzer JSON envelope. */
@@ -678,6 +687,7 @@ export function manualConfirmation({
   gate, workItemId, phase, projectPath, editorVersion, scope, acceptanceCriterionId = null,
   relevantFiles = [], criteria = [], rootDir = process.cwd(), approvedBy = 'user', at = new Date(),
   reason = null, expiresAt = null, environment = null, expiresInMs = null, commit = null,
+  witness = null, limitations = null,
 } = {}) {
   const inputTreeHash = computeInputTreeHash(rootDir, relevantFiles);
   // v3 quality fields. `scope` is declared both as the free-text `result` line
@@ -689,6 +699,8 @@ export function manualConfirmation({
   // Redaction has no bypass (contract §8).
   const scopeList = (Array.isArray(scope) ? scope : (scope ? [scope] : [])).map(redactString);
   const safeReason = reason === null || reason === undefined ? null : redactString(String(reason));
+  const safeWitness = witness === null || witness === undefined ? null : redactString(String(witness));
+  const safeLimitations = limitations === null || limitations === undefined ? null : redactString(String(limitations));
   const env = Object.fromEntries(
     Object.entries(environment || (projectPath || editorVersion
       ? { projectPath: projectPath || null, editorVersion: editorVersion || null }
@@ -728,8 +740,19 @@ export function manualConfirmation({
     ...(safeReason !== null ? { reason: safeReason } : {}),
     ...(hasEnv ? { environment: env } : {}),
     ...(scopeList.length ? { scope: scopeList } : {}),
+    // A human acceptance states what was witnessed and what was accepted as missing.
+    // Both are free prose from a person, so both are redacted like every other field
+    // that reaches state.json. `state` validation requires them for
+    // `humanAcceptanceConfirmed`, which is why they are recorded rather than folded
+    // into `reason`: `reason` says why automation could not answer, these say what the
+    // person actually accepted.
+    ...(safeWitness !== null ? { witness: safeWitness } : {}),
+    ...(safeLimitations !== null ? { limitations: safeLimitations } : {}),
   };
-  return { evidence, approvedBy, projectPath, editorVersion, scope: scopeList, reason: safeReason, environment: env, recordedAt: timestamp(at) };
+  return {
+    evidence, approvedBy, projectPath, editorVersion, scope: scopeList, reason: safeReason,
+    environment: env, witness: safeWitness, limitations: safeLimitations, recordedAt: timestamp(at),
+  };
 }
 
 /** Convenience: is the verification result an exhaustion that must not read as success? */

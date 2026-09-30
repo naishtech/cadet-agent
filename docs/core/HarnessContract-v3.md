@@ -103,23 +103,31 @@ Lives in `.cadet/harness.json`. Absent block == disabled == v2 behaviour.
 | `manualConfirmation.requireScope` | boolean | `true` | Must carry a non-empty `scope` array, not just free text. |
 | `manualConfirmation.maxValidityMs` | integer or null | `86400000` (24 h) | Upper bound on the validity window. Enforced from **both** `createdAt` and the present, so a record cannot be post-dated to stay valid. `null` disables the bound. |
 | `manualConfirmation.clockSkewToleranceMs` | integer | `60000` (60 s) | Tolerance applied before rejecting a future-dated `createdAt`, so a writer on a slightly fast clock is not rejected. |
-| `disallowManualFor` | string[] | `["testsPassed"]` | Gates that may **never** be satisfied by `manual-confirmation` once `enabled` is true. |
+| `disallowManualFor` | string[] | `["testsPassed", "acceptanceCriteriaValidated", "reachabilityAddressed"]` | Gates whose `manual-confirmation` is refused once `enabled` is true. Appended after v3, never reordered: `reachabilityAddressed` by contract v6 §2, `acceptanceCriteriaValidated` by the 2026-09-30 owner decision (the seeded policy file and this fallback must name one set). |
 
 **Rejected at policy load time** (not silently ignored): unknown `strictClosure` keys,
 unknown keys inside `manualConfirmation`, a `disallowManualFor` entry that is not a known
 gate name, and `revalidateOnClosure: true` with `enabled: false` (a contradiction that would
 otherwise be inert — the exact `budgets.default` failure mode from Dolven's history).
 
-### 2.1 Why `disallowManualFor` defaults to `testsPassed` but not `compileCheckConfirmed`
+### 2.1 Why `disallowManualFor` names these gates and not `compileCheckConfirmed`
 
 `testsPassed` is automatable in every environment Cadet supports (`npm test`, `unity test`);
 a manual confirmation for it is always a substitute for something available. It therefore has
 no legitimate unscoped use.
 
+`acceptanceCriteriaValidated` is the same case: `harness verify-acs` derives a test inventory
+from the run report in every environment, so a hand record would skip the coverage rule that
+gives the gate its meaning.
+
 `compileCheckConfirmed` legitimately *requires* manual confirmation when the Unity CLI is
 absent — that is the documented v2 fallback (§6). Disallowing it by default would break the
 supported no-CLI workflow, so it is left out of the default list and may be added per
-repository.
+repository. The same reasoning keeps `unityAnalyzerClean` and `storyTrackingUpdated` out: the
+analyzer needs the editor, and the tracking check needs the repository's own script.
+
+The list and the framework's gate registry must agree: `auditGateRegistry` fails if a gate is
+declared `manual: false` in the registry and absent from this list, or the reverse.
 
 ## 3. Manual-confirmation quality constraints
 

@@ -1,0 +1,54 @@
+#!/usr/bin/env sh
+# Cadet-Agent pre-commit hook — the portable control.
+#
+# WHY THIS EXISTS. No host here can be relied on to block a commit: the PreToolUse hook is one
+# host's mechanism, and every other client has no interception API at all. Git, however, runs a
+# repository hook for every client, so this is the one control that protects a commit regardless
+# of which agent (or human) is driving.
+#
+# WHAT IT CHECKS. `.cadet/state.json` is readable and valid. A malformed state document is the one
+# defect that makes every gate claim in the repository unreadable, and it is cheap to catch. When the
+# local CLI is present it runs the full `state validate`; when it is absent, a JSON parse still
+# catches the case that matters — so the hook never depends on a tool to do anything at all.
+#
+# WHAT IT DELIBERATELY DOES NOT DO.
+#   - It does not run the test suite. A suite in a commit hook is slow enough that people disable
+#     the hook, and a disabled hook protects nothing.
+#   - It does not refuse a commit because gates are unmet. Work in progress is committed all the
+#     time; the gate system refuses the TRANSITION, which is the thing that should be refused. A
+#     hook that blocked WIP commits would be turned off within a week.
+#
+# INSTALLATION (one line, and the framework does not do it for you — it changes your git config):
+#   git config core.hooksPath .githooks
+
+set -u
+
+REPO="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$REPO" || exit 0
+
+STATE=".cadet/state.json"
+[ -f "$STATE" ] || exit 0
+
+fail() {
+  echo "cadet pre-commit: $1" >&2
+  echo "  Fix $STATE, or commit with --no-verify if you know what you are doing." >&2
+  exit 1
+}
+
+command -v node >/dev/null 2>&1 || {
+  echo "cadet pre-commit: node is not on PATH, so state.json was not validated (this is not a failure)."
+  exit 0
+}
+
+if [ -x "./node_modules/.bin/cadet-agent" ]; then
+  if ! ./node_modules/.bin/cadet-agent state validate --target "$REPO" >/dev/null 2>&1; then
+    ./node_modules/.bin/cadet-agent state validate --target "$REPO" 2>&1 | sed 's/^/  /' >&2
+    fail "state.json is not valid."
+  fi
+  exit 0
+fi
+
+node -e "JSON.parse(require('node:fs').readFileSync('$STATE','utf-8'))" >/dev/null 2>&1 \
+  || fail "state.json is not readable JSON."
+
+exit 0

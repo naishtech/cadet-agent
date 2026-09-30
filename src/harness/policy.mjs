@@ -41,6 +41,16 @@ export const GATES = Object.freeze([
   // name must keep its meaning. This one is additionally OPT-IN — see
   // REACHABILITY_GATE and DEFAULT_REACHABILITY below.
   'reachabilityAddressed',
+  // APPENDED by the design-review change. Also OPT-IN, and required on exactly one
+  // edge — see DESIGN_REVIEW_GATE / DESIGN_REVIEW_TRANSITION_FROM.
+  'designReviewCompleted',
+  // APPENDED by the human-acceptance change. HUMAN-OWNED: no reviewer's record can
+  // stand in for the person who accepts the work. OPT-IN, and required only when an
+  // epic closes — see HUMAN_ACCEPTANCE_GATE.
+  'humanAcceptanceConfirmed',
+  // APPENDED by the architecture-fitness change. OPT-IN, and required only when the
+  // project has declared checks — see ARCHITECTURE_GATE.
+  'architectureFitnessPassed',
 ]);
 
 /**
@@ -81,6 +91,183 @@ export const DEFAULT_REACHABILITY = Object.freeze({
   enabled: false,
   command: null,
 });
+
+/**
+ * The formal design-review gate.
+ *
+ * It guards ONE edge: from a completed design into story breakdown. A review that
+ * runs after the work items exist cannot remove work; a review that runs before them
+ * is the last point at which "do not build this" is still cheap, which is the whole
+ * reason the gate exists.
+ */
+export const DESIGN_REVIEW_GATE = 'designReviewCompleted';
+
+/** The `from` phase the design-review gate attaches to (`-> story-breakdown`). */
+export const DESIGN_REVIEW_TRANSITION_FROM = 'architectureComplete';
+
+/**
+ * Default design-review policy.
+ *
+ * `enabled: false` keeps adopting this framework version a no-op for a repository
+ * that has not asked for the review gate — the same property `reachability` and
+ * `strictClosure` have. The shipped policy file for a NEW consumer turns it on,
+ * which is where a new project meets the review; an existing consumer owns its own
+ * file and therefore its own answer.
+ */
+export const DEFAULT_DESIGN_REVIEW = Object.freeze({
+  enabled: false,
+});
+
+/**
+ * The human-acceptance gate.
+ *
+ * It answers a question no test can: did a person accept what was built. It is
+ * required on `validation -> closed` — epic closure — and never on
+ * `validation -> implementation`, the next-story loop, because a story moving on to
+ * the next one is not a release and the loop must stay unblocked.
+ */
+export const HUMAN_ACCEPTANCE_GATE = 'humanAcceptanceConfirmed';
+
+/** The `from` phase the human-acceptance gate attaches to (`-> closed`). */
+export const HUMAN_ACCEPTANCE_TRANSITION_FROM = 'validation';
+
+/**
+ * Default human-acceptance policy. Opt-in, on the same reasoning as every other
+ * switch in this file: adopting a framework version must not add a requirement to a
+ * repository that did not ask for it. The shipped policy file turns it on for a new
+ * consumer.
+ */
+export const DEFAULT_HUMAN_ACCEPTANCE = Object.freeze({
+  enabled: false,
+});
+
+/**
+ * The architecture-fitness gate.
+ *
+ * The project declares executable constraints — dependency direction, forbidden
+ * references — as registered checks, and a failing required check blocks review. The
+ * gate is opt-in, and it is doubly so: it joins `implementation -> review` only when
+ * the block is enabled AND at least one check is declared, so a repository that
+ * declares nothing sees exactly the transition matrix it saw before.
+ */
+export const ARCHITECTURE_GATE = 'architectureFitnessPassed';
+
+/** The transition the gate joins: `implementation -> review`. */
+export const ARCHITECTURE_TRANSITION_FROM = 'implementation';
+export const ARCHITECTURE_TRANSITION_TO = 'review';
+
+/**
+ * Default architecture-fitness policy.
+ *
+ * `checks` may be declared while `enabled` is false: the block is then documentation of
+ * what the project intends to enforce, and nothing runs. The reverse — enabled with no
+ * checks — is inert as well, which is the property that keeps this gate out of the
+ * frozen gate lists of every project that has not declared one.
+ */
+export const DEFAULT_ARCHITECTURE_FITNESS = Object.freeze({
+  enabled: false,
+  checks: Object.freeze([]),
+});
+
+/** Severities a check may declare. `advisory` failures are reported, never blocking. */
+export const CHECK_SEVERITIES = Object.freeze(['required', 'advisory']);
+
+/** Check keys, and their defaults. One table, so a new key cannot be half-wired. */
+const CHECK_FIELDS = Object.freeze({
+  id: null, command: null, cwd: '.', files: null, timeoutMs: null,
+  severity: 'required', refs: null, artifact: null, artifactFormat: 'text',
+});
+
+/** A repository-relative path: no absolute paths, no walks out of the tree. */
+function assertRelativePath(value, field, id) {
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new PolicyError(`"architectureFitness.checks[].${field}" must be a non-empty string (check "${id}").`);
+  }
+  const normalised = value.replace(/\\/g, '/');
+  if (normalised.startsWith('/') || /^[A-Za-z]:/.test(normalised) || normalised.split('/').includes('..')) {
+    throw new PolicyError(`"architectureFitness.checks[].${field}" must be repository-relative and must not walk out of the tree (check "${id}", value "${value}").`);
+  }
+  return normalised;
+}
+
+function resolveArchitectureCheck(raw, seenIds) {
+  if (!isPlainObject(raw)) throw new PolicyError('"architectureFitness.checks[]" must be an object.');
+  for (const key of Object.keys(raw)) {
+    if (!(key in CHECK_FIELDS)) throw new PolicyError(`Unknown "architectureFitness.checks[]" key "${key}".`);
+  }
+  if (typeof raw.id !== 'string' || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(raw.id)) {
+    throw new PolicyError('"architectureFitness.checks[].id" must be a stable lowercase slug (a-z, 0-9, hyphen), so a report can name the same check across runs.');
+  }
+  if (seenIds.has(raw.id)) {
+    throw new PolicyError(`duplicate "architectureFitness.checks[].id" "${raw.id}": a check id must identify one check, or a report cannot say which one failed.`);
+  }
+  seenIds.add(raw.id);
+  if (typeof raw.command !== 'string' || raw.command.trim() === '') {
+    throw new PolicyError(`"architectureFitness.checks[].command" is required (check "${raw.id}"): a check without a command cannot prove anything.`);
+  }
+  const cwd = raw.cwd === undefined ? '.' : assertRelativePath(raw.cwd, 'cwd', raw.id);
+  const severity = raw.severity === undefined ? 'required' : raw.severity;
+  if (!CHECK_SEVERITIES.includes(severity)) {
+    throw new PolicyError(`"architectureFitness.checks[].severity" must be one of ${CHECK_SEVERITIES.join(', ')} (check "${raw.id}").`);
+  }
+  let timeoutMs = null;
+  if (raw.timeoutMs !== undefined && raw.timeoutMs !== null) {
+    if (!Number.isInteger(raw.timeoutMs) || raw.timeoutMs <= 0) {
+      throw new PolicyError(`"architectureFitness.checks[].timeoutMs" must be a positive integer (check "${raw.id}").`);
+    }
+    timeoutMs = raw.timeoutMs;
+  }
+  const files = raw.files === undefined || raw.files === null ? [] : raw.files;
+  if (!Array.isArray(files)) throw new PolicyError(`"architectureFitness.checks[].files" must be an array of repository-relative paths (check "${raw.id}").`);
+  const scopes = files.map((f) => assertRelativePath(f, 'files', raw.id));
+  const refs = raw.refs === undefined || raw.refs === null ? [] : raw.refs;
+  if (!Array.isArray(refs) || refs.some((r) => typeof r !== 'string' || r.trim() === '')) {
+    throw new PolicyError(`"architectureFitness.checks[].refs" must be an array of non-empty strings — the design or ADR identifiers this check enforces (check "${raw.id}").`);
+  }
+  let artifact = null;
+  let artifactFormat = 'text';
+  if (raw.artifact !== undefined && raw.artifact !== null) {
+    artifact = assertRelativePath(raw.artifact, 'artifact', raw.id);
+    if (raw.artifactFormat !== undefined) {
+      if (!['json', 'text'].includes(raw.artifactFormat)) {
+        throw new PolicyError(`"architectureFitness.checks[].artifactFormat" must be "json" or "text" (check "${raw.id}").`);
+      }
+      artifactFormat = raw.artifactFormat;
+    }
+  } else if (raw.artifactFormat !== undefined && raw.artifactFormat !== null && raw.artifactFormat !== 'text') {
+    throw new PolicyError(`"architectureFitness.checks[].artifactFormat" needs an "artifact": there is no file to read as ${raw.artifactFormat} (check "${raw.id}").`);
+  }
+  return { id: raw.id, command: raw.command, cwd, files: scopes, timeoutMs, severity, refs: [...refs], artifact, artifactFormat };
+}
+
+function resolveArchitectureFitness(raw) {
+  if (raw === undefined) return { enabled: false, checks: [] };
+  if (!isPlainObject(raw)) throw new PolicyError('"architectureFitness" must be an object.');
+  for (const key of Object.keys(raw)) {
+    if (!['enabled', 'checks'].includes(key)) throw new PolicyError(`Unknown "architectureFitness" key "${key}".`);
+  }
+  if (raw.enabled !== undefined && typeof raw.enabled !== 'boolean') {
+    throw new PolicyError('"architectureFitness.enabled" must be a boolean.');
+  }
+  if (raw.checks !== undefined && !Array.isArray(raw.checks)) {
+    throw new PolicyError('"architectureFitness.checks" must be an array of checks.');
+  }
+  const seenIds = new Set();
+  const checks = (raw.checks || []).map((c) => resolveArchitectureCheck(c, seenIds));
+  return { enabled: raw.enabled === true, checks };
+}
+
+/**
+ * Is the block doing anything? Enabled AND given a check.
+ *
+ * Both halves are required, and this is the single definition the evaluator, the CLI and
+ * the tests share: a project with no checks must not see this gate in any list, and a
+ * block that is declared but disabled must behave as though it were absent.
+ */
+export function architectureFitnessActive(policy) {
+  const block = policy?.architectureFitness;
+  return block?.enabled === true && Array.isArray(block.checks) && block.checks.length > 0;
+}
 
 /**
  * Legal phase transitions (compatibility invariant C4, revised in contract v3).
@@ -206,6 +393,11 @@ export const EXCEPTION_CATEGORIES = Object.freeze([
   'documentation-only',
   'tooling-gap',
   'pre-harness-story',
+  // Work a user cannot reach or observe: framework internals, tooling, refactors that
+  // change no behaviour. It is a property of the work item rather than a gap in the
+  // evidence, so it carries no default expiry (see below) and it must name who
+  // accepted the judgement (EXCEPTION_REQUIRES_REVIEW_NOTE).
+  'non-user-facing',
 ]);
 
 /** Default expiry (in days) per category. `null` means "no default bound". */
@@ -221,6 +413,10 @@ export const EXCEPTION_EXPIRY_DAYS = Object.freeze({
   // The gap will never close on its own, so a time-bounded exception would only
   // re-raise the same finding every N days without anything having changed.
   'pre-harness-story': null,
+  // Scoped to the work item, like `documentation-only`: "this epic is not
+  // user-facing" is not a fact that expires, it is a statement about the epic, and a
+  // time bound would only re-raise a finding that nothing has changed.
+  'non-user-facing': null,
 });
 
 /** Categories whose exception must carry a closure review note. */
@@ -230,14 +426,40 @@ export const EXCEPTION_REQUIRES_REVIEW_NOTE = Object.freeze([
   'analyzer-fallback',
   'unscoped-freshness',
   'tooling-gap',
+  // Who decided that this work is not user-facing, and what would change that
+  // judgement. Without the note the exception is an unattributed claim that the
+  // acceptance gate did not apply, which is exactly the claim a reviewer must see.
+  'non-user-facing',
 ]);
 
 /**
- * Gates that are agent-owned and can never be satisfied by a human assertion,
- * so listing them in `disallowManualFor` would be meaningless. Rejecting them
- * keeps the flag's intent legible (contract v3 §2).
+ * Gates with no automated builder: no command can produce their evidence, so a
+ * record someone makes is the only route.
+ *
+ * The class is named for that fact alone. It holds two kinds of gate, and the
+ * distinction between them is `owner` in the registry: an **agent** gate records a
+ * judgement a reviewer made (`codeReviewCompleted`), and a **human** gate records a
+ * person's own decision (`humanAcceptanceConfirmed`), which no reviewer's record can
+ * stand in for. Either way a human may write the record — the framework never forces
+ * a judgement onto an agent — so `harness confirm` accepts every gate in this list.
+ *
+ * Why they are refused in `strictClosure.disallowManualFor`: that flag forbids manual
+ * confirmation, and for these gates manual confirmation is the ONLY route. Listing one
+ * would leave the gate unsatisfiable rather than stricter, so the refusal protects a
+ * consumer from a policy it cannot satisfy. (The earlier name and wording said
+ * "agent-owned … can never be satisfied by a human assertion", which the code never
+ * enforced, a consumer's own records contradicted, and a human-owned gate would have
+ * made nonsense of. Corrected 2026-09-30 by owner decision.)
+ *
+ * The set must agree with the registry's non-automated gates
+ * (`src/harness/gates.mjs`); `auditGateRegistry` fails if the two drift.
  */
-export const AGENT_OWNED_GATES = Object.freeze(['codeReviewCompleted']);
+export const MANUAL_ONLY_GATES = Object.freeze([
+  'codeReviewCompleted',
+  'securityReviewPassed',
+  'designArtifactSyncConfirmed',
+  'humanAcceptanceConfirmed',
+]);
 
 /**
  * Strict-closure policy (contract v3 §2). Absent or `enabled: false` means
@@ -264,7 +486,21 @@ export const DEFAULT_STRICT_CLOSURE = Object.freeze({
   // probe configured — so a manual assertion can add nothing and can skip the
   // declaration entirely (contract v6 §2). With strictClosure off the refusal
   // does not apply, matching how `testsPassed` is treated.
-  disallowManualFor: Object.freeze(['testsPassed', 'reachabilityAddressed']),
+  // Every gate here has an automated path in EVERY environment Cadet supports, so
+  // a manual confirmation is always a substitute for something available.
+  // `compileCheckConfirmed`, `unityAnalyzerClean` and `storyTrackingUpdated` are
+  // deliberately absent: their automated path can be missing (no Unity CLI, no
+  // project script), so forbidding manual confirmation would leave them
+  // unsatisfiable instead of stricter. `acceptanceCriteriaValidated` joined in
+  // 2026-09-30 (owner decision) — `harness verify-acs` is its path everywhere, and
+  // the two lists (this fallback and the seeded policy file) must name one set.
+  // A gate joins this list when a command can always prove it, so a hand record would
+  // substitute for something available. `architectureFitnessPassed` belongs here for the
+  // same reason: the check that proves it is declared in the project's own policy.
+  disallowManualFor: Object.freeze([
+    'testsPassed', 'acceptanceCriteriaValidated', 'reachabilityAddressed',
+    'architectureFitnessPassed',
+  ]),
 });
 
 const STRICT_CLOSURE_KEYS = new Set([
@@ -435,10 +671,10 @@ function resolveStrictClosure(raw) {
     if (!GATES.includes(gate)) {
       throw new PolicyError(`"strictClosure.disallowManualFor" contains unknown gate "${gate}".`);
     }
-    // A gate that is agent-owned can never be manual, so listing it is a no-op
-    // that would mislead a reader into thinking a restriction was added.
-    if (AGENT_OWNED_GATES.includes(gate)) {
-      throw new PolicyError(`"strictClosure.disallowManualFor" cannot contain agent-owned gate "${gate}"; it is never satisfied by manual confirmation.`);
+    // No command produces this gate's evidence, so forbidding manual confirmation
+    // would make the gate unsatisfiable instead of stricter.
+    if (MANUAL_ONLY_GATES.includes(gate)) {
+      throw new PolicyError(`"strictClosure.disallowManualFor" cannot contain "${gate}": no command produces its evidence, so forbidding manual confirmation would leave the gate unsatisfiable.`);
     }
   }
   out.disallowManualFor = [...out.disallowManualFor];
@@ -490,6 +726,37 @@ function resolveReachability(raw) {
 }
 
 /**
+ * Resolve and validate the `designReview` policy block.
+ *
+ * One key, and unknown keys are rejected so a typo fails loudly: a misspelled
+ * `enable` would leave the gate off while reading as if it were on, which is the
+ * failure mode this whole registry exists to remove.
+ */
+function resolveHumanAcceptance(raw) {
+  if (raw === undefined) return { ...DEFAULT_HUMAN_ACCEPTANCE };
+  if (!isPlainObject(raw)) throw new PolicyError('"humanAcceptance" must be an object.');
+  for (const key of Object.keys(raw)) {
+    if (key !== 'enabled') throw new PolicyError(`Unknown "humanAcceptance" key "${key}".`);
+  }
+  if (raw.enabled !== undefined && typeof raw.enabled !== 'boolean') {
+    throw new PolicyError('"humanAcceptance.enabled" must be a boolean.');
+  }
+  return { enabled: raw.enabled === true };
+}
+
+function resolveDesignReview(raw) {
+  if (raw === undefined) return { ...DEFAULT_DESIGN_REVIEW };
+  if (!isPlainObject(raw)) throw new PolicyError('"designReview" must be an object.');
+  for (const key of Object.keys(raw)) {
+    if (key !== 'enabled') throw new PolicyError(`Unknown "designReview" key "${key}".`);
+  }
+  if (raw.enabled !== undefined && typeof raw.enabled !== 'boolean') {
+    throw new PolicyError('"designReview.enabled" must be a boolean.');
+  }
+  return { enabled: raw.enabled === true };
+}
+
+/**
  * Parse and validate a repository harness policy document.
  * Unknown top-level keys are rejected so misconfiguration fails loudly.
  */
@@ -502,7 +769,7 @@ export function validatePolicy(raw, defaults = DEFAULT_BUDGETS) {
     'budgets', 'archive', 'output', 'retention', 'estimation', 'hook',
     'allowBudgetCeilingOverride', 'scopes', 'model', 'analyzerCommand',
     'compileCommand', 'testCommand', 'allowEmptyFreshness', 'strictClosure',
-    'reachability',
+    'reachability', 'designReview', 'humanAcceptance', 'architectureFitness',
   ]);
   for (const key of Object.keys(raw)) {
     if (!allowed.has(key)) {
@@ -570,6 +837,9 @@ export function validatePolicy(raw, defaults = DEFAULT_BUDGETS) {
   const allowCeilingOverride = raw.allowBudgetCeilingOverride === true;
   const strictClosure = resolveStrictClosure(raw.strictClosure);
   const reachability = resolveReachability(raw.reachability);
+  const designReview = resolveDesignReview(raw.designReview);
+  const humanAcceptance = resolveHumanAcceptance(raw.humanAcceptance);
+  const architectureFitness = resolveArchitectureFitness(raw.architectureFitness);
 
   const resolved = {
     budgets,
@@ -582,6 +852,9 @@ export function validatePolicy(raw, defaults = DEFAULT_BUDGETS) {
     allowEmptyFreshness: raw.allowEmptyFreshness === true,
     strictClosure,
     reachability,
+    designReview,
+    humanAcceptance,
+    architectureFitness,
     scopes: raw.scopes || { perRun: {}, perStory: {} },
     model: raw.model || null,
     analyzerCommand: raw.analyzerCommand || null,

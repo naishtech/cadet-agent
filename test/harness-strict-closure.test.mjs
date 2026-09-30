@@ -469,7 +469,8 @@ describe('strict closure — exception taxonomy', () => {
   it('defines the category set and per-category expiries', () => {
     assert.deepEqual([...EXCEPTION_CATEGORIES].sort(), [
       'analyzer-fallback', 'budget-override', 'documentation-only',
-      'manual-compile', 'pre-harness-story', 'tooling-gap', 'unscoped-freshness',
+      'manual-compile', 'non-user-facing', 'pre-harness-story', 'tooling-gap',
+      'unscoped-freshness',
     ]);
     assert.equal(EXCEPTION_EXPIRY_DAYS['manual-compile'], 7);
     assert.equal(EXCEPTION_EXPIRY_DAYS['unscoped-freshness'], 1);
@@ -479,6 +480,11 @@ describe('strict closure — exception taxonomy', () => {
     // Asserted explicitly so a future edit cannot quietly add an expiry and
     // turn a permanent record into a recurring chore.
     assert.equal(EXCEPTION_EXPIRY_DAYS['pre-harness-story'], null);
+    // `non-user-facing` is unbounded for a different reason: it states a property of
+    // the work item ("a user cannot reach this"), not a gap in the evidence, so there
+    // is nothing for a time bound to fix. It must name who accepted the judgement,
+    // which is asserted through EXCEPTION_REQUIRES_REVIEW_NOTE below.
+    assert.equal(EXCEPTION_EXPIRY_DAYS['non-user-facing'], null);
   });
 
   it('accepts a categorised exception with a closure review note', () => {
@@ -580,16 +586,26 @@ describe('strict closure — policy validation', () => {
     assert.throws(() => validatePolicy({ strictClosure: { enabled: true, disallowManualFor: ['notAGate'] } }), PolicyError);
   });
 
-  it('rejects a disallowManualFor entry that cannot ever be manual anyway', () => {
-    // codeReviewCompleted is agent-owned; listing it is meaningless and hides intent.
-    assert.throws(() => validatePolicy({ strictClosure: { enabled: true, disallowManualFor: ['codeReviewCompleted'] } }), PolicyError);
+  it('rejects a disallowManualFor entry for a gate whose only route is manual confirmation', () => {
+    // Each of these records a judgement that no command can produce. Forbidding
+    // manual confirmation would not make the gate stricter, it would make it
+    // unsatisfiable, so the policy refuses to accept the block.
+    for (const gate of ['codeReviewCompleted', 'securityReviewPassed', 'designArtifactSyncConfirmed']) {
+      assert.throws(
+        () => validatePolicy({ strictClosure: { enabled: true, disallowManualFor: [gate] } }),
+        PolicyError,
+        `${gate} must not be accepted in disallowManualFor`,
+      );
+    }
   });
 
   it('resolves a valid block with defaults filled in', () => {
     const p = validatePolicy({ strictClosure: { enabled: true } });
     assert.equal(p.strictClosure.revalidateOnClosure, true);
     assert.equal(p.strictClosure.requireFreshRevalidation, true);
-    assert.deepEqual(p.strictClosure.disallowManualFor, ['testsPassed', 'reachabilityAddressed']);
+    assert.deepEqual(p.strictClosure.disallowManualFor, [
+      'testsPassed', 'acceptanceCriteriaValidated', 'reachabilityAddressed', 'architectureFitnessPassed',
+    ]);
     assert.equal(p.strictClosure.manualConfirmation.requireReason, true);
   });
 });

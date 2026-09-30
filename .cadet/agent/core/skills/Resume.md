@@ -33,13 +33,19 @@ Inspect the current project state and resume the Cadet workflow from the last re
 1. Check whether `.cadet/state.json` exists in the workspace root.
 2. **If `state.json` is missing:**
    - Report: "No session state found — starting from the top of the workflow."
-   - Initialize `state.json` with:
-     - `version: 1`
-     - `session.currentPhase: "context-resolution"`
-     - `session.trackingMode: "markdown"` (ask the user to confirm or switch to `"github"`)
-     - `session.workflowPath: null` (will be classified after the first user request)
-     - All `gates` set to `false`
-     - Empty `epics`, `spikes`, `changeHistory`
+   - Ask the user which tracking mode they want, then run `cadet-agent state init` with the values
+     you resolved. Ask, then declare — the command writes what you tell it and nothing else:
+     - `--tracking-mode markdown|github` (ask; the default is `markdown`)
+     - `--workflow-path large|small|no_test_required` (**required by the schema** — classify from
+       the user's request, or ask. `large` is the default and the safe choice: it is the full
+       gated workflow)
+     - `--phase <phase>` (default `context-resolution`), `--learner-tier <tier>` and
+       `--operating-mode <mode>` when they have been resolved
+   - **Do not hand-write `state.json`.** It is the document every gate reads, and this skill used to
+     describe a legacy version-1 document whose workflow path was null — which
+     `state validate` rejects (`workflowPath is required`, and null is not one of its values).
+     `state init` refuses to overwrite an existing document, refuses an unknown value, and
+     validates before writing.
    - Prompt the user: "What would you like to work on?" and stop.
 3. **If `state.json` exists:**
    - Read and validate it against `.cadet/state.schema.json`.
@@ -178,7 +184,7 @@ Based on `currentPhase` (after any reconciliation from Phase 2), determine the n
 | `story-breakdown` | Invoke the Story Breakdown skill — epics need to be broken into stories. |
 | `implementation` | Identify the current in-progress story. If none is `in-progress`, pick the first `planned` story. Invoke the TDD skill for that story. |
 | `review` | Identify the story that just completed implementation. Invoke the Code Review skill — the review hard gate must be satisfied before advancing. |
-| `validation` | Run through the validation gates. If the epic has remaining stories, start the next one with `cadet-agent state begin --epic <epicId> --story <storyFile>` — it resets the gates, archives the finished story's evidence to `.cadet/archive/`, folds it into the coverage index, and records the finished story as complete in `storyCompletions` first. Then transition `validation → implementation` (the next-story loop). **Never set `activeWorkItem` by hand:** that leaves the previous story's evidence inline for ever, where no gate can read it — on the audited repository it was 63 records and ~3,000 lines of dead weight. Only when no stories remain, confirm `designArtifactSyncConfirmed` and transition to `closed`. |
+| `validation` | Run through the validation gates. **Seal the story's evidence before the boundary:** `cadet-agent state seal` writes the active work item's live records into `.cadet/seal.commit-msg` as `Cadet-*` trailers, and the commit that carries that message becomes the seal — editing a trailer afterwards changes the commit id, which is what makes a sealed record self-verifying. Cadet never commits (C5): give the message file to the user, or run `git commit -F .cadet/seal.commit-msg` when the user has asked for a commit. **Sealing after `state begin` is too late:** the boundary archives the records, so `state seal` will correctly report that there is nothing to seal, and the story's evidence is then a file in `.cadet/archive/` rather than part of the history that produced it. If the epic has remaining stories, start the next one with `cadet-agent state begin --epic <epicId> --story <storyFile>` — it resets the gates, archives the finished story's evidence to `.cadet/archive/`, folds it into the coverage index, and records the finished story as complete in `storyCompletions` first. Then transition `validation → implementation` (the next-story loop). **Never set `activeWorkItem` by hand:** that leaves the previous story's evidence inline for ever, where no gate can read it — on the audited repository it was 63 records and ~3,000 lines of dead weight. Only when no stories remain, confirm `designArtifactSyncConfirmed` — and, when `.cadet/harness.json` sets `humanAcceptance.enabled`, `humanAcceptanceConfirmed`, which only a person can record. The work is two commands, not a documentation task: `cadet-agent harness acceptance-form --epic <id>` writes a form already filled in from state, the person answers its three blank fields, and `cadet-agent harness confirm --gate humanAcceptanceConfirmed --artifact <the form> --reason "<why>" --expires-at <ISO-8601>` records it. Hand over the form path, not a checklist. Work a user cannot reach takes a `non-user-facing` exception naming who judged it instead — then transition to `closed`. Reporting a pending acceptance is the right outcome here: the agent cannot accept the work on the person's behalf, and `validation → implementation` stays open meanwhile, so the next story is never blocked by it. |
 | `closed` | Report: "All work is complete for the current epic(s)." `closed` is terminal — there is no transition out of it. To start new work, initialise a fresh session from `context-resolution` (or a new `story-breakdown` cycle) rather than transitioning from `closed`. Ask if the user wants to start a new epic or close the session. |
 
 ## Phase 4 — Resume

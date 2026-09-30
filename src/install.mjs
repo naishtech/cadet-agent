@@ -306,6 +306,7 @@ export async function install(targetDir, opts = {}) {
   // 4. Extract. Create-only paths (e.g. AGENTS.md) must never overwrite an
   // existing consumer file; if one is skipped, point the user at the source.
   console.log('📂 Extracting...');
+  const seededPolicy = willCreatePolicyFile(targetDir);
   const createOnly = readCreateOnlyPathsFromZip(zipBuf);
   const extracted = await extractZip(zipBuf, targetDir, {
     ...opts,
@@ -318,6 +319,11 @@ export async function install(targetDir, opts = {}) {
   // the marker lets later CLI/skill invocations say so instead of guessing.
   const roleMarker = writeRepoRoleMarker(targetDir, REPO_ROLES.CONSUMER);
   console.log(`   Repo role: consumer-project (${roleMarker})`);
+
+  // 4c. A new Unity consumer gets the reachability gate on. The seed declares it
+  // off, because the package cannot know the consumer's engine; this is the one
+  // edit made to a policy file the framework itself has just created.
+  if (seededPolicy) reportSeedReachability(targetDir);
 
   // 5. Report
   console.log(`\n✅ Cadet-Agent v${releaseVersion} installed! Extracted ${extracted.length} files.\n`);
@@ -554,6 +560,113 @@ export async function extractZipWithManifest(buf, targetDir, { preserved, manage
   return { updated, preserved: preserved_list, added, deleted, kept, zipFilenames };
 }
 
+// ── Unity detection and the seeded reachability block ───────────────────────
+
+/** The consumer's policy file — the create-only seed, once installed. */
+export function policyFilePath(targetDir) {
+  return join(targetDir, '.cadet', 'harness.json');
+}
+
+/**
+ * Will this run create the policy file, or does the consumer already own one?
+ *
+ * The answer decides whether the framework may touch it at all: a create-only path
+ * is the consumer's from the moment it exists.
+ */
+export function willCreatePolicyFile(targetDir) {
+  return !existsSync(policyFilePath(targetDir));
+}
+
+function isDirectory(path) {
+  try { return statSync(path).isDirectory(); } catch { return false; }
+}
+
+/**
+ * Is this tree a Unity project?
+ *
+ * Conservative on purpose. Turning reachability on for a project with no engine
+ * would ask every story to declare how a user reaches its deliverable in a
+ * repository where no user does, and the framework would be guessing. Two markers,
+ * the first authoritative:
+ *
+ *   1. `ProjectSettings/ProjectVersion.txt` — Unity writes it into every project it
+ *      creates or opens, so its presence is the strongest signal available offline.
+ *   2. `Assets/` together with `Packages/manifest.json` — both Unity-specific, used
+ *      only when the first is absent (a project whose ProjectSettings was not yet
+ *      committed, for example).
+ *
+ * Anything else is "not a Unity project", and the caller then leaves the policy
+ * file exactly as the package shipped it.
+ */
+export function detectUnityProject(targetDir) {
+  if (existsSync(join(targetDir, 'ProjectSettings', 'ProjectVersion.txt'))) {
+    return { unity: true, confidence: 'high', marker: 'ProjectSettings/ProjectVersion.txt' };
+  }
+  if (isDirectory(join(targetDir, 'Assets')) && existsSync(join(targetDir, 'Packages', 'manifest.json'))) {
+    return { unity: true, confidence: 'medium', marker: 'Assets/ + Packages/manifest.json' };
+  }
+  return { unity: false, confidence: 'none', marker: null };
+}
+
+/**
+ * Turn the seeded reachability block on, for a NEW Unity consumer.
+ *
+ * The package cannot know at build time whether the consumer is Unity, so the seed
+ * declares `reachability.enabled: false` and this is the one edit made to it after
+ * installation. `command` stays null on purpose: the declaration is then checked and
+ * the wiring is NOT proven, and `harness verify-reachability` records that fact
+ * instead of implying a guarantee it did not establish.
+ *
+ * The caller decides whether the file is this run's to edit (a consumer that owns a
+ * policy file keeps every byte of it — see `willCreatePolicyFile`).
+ *
+ * Never half-edits: the anchor must match exactly once and the result must still
+ * parse, or the file is left byte-identical and the reason is returned for the
+ * caller to report.
+ */
+export function enableReachabilitySeed(targetDir) {
+  const path = policyFilePath(targetDir);
+  if (!existsSync(path)) return { changed: false, reason: 'the consumer has no policy file to edit' };
+
+  const detection = detectUnityProject(targetDir);
+  if (!detection.unity) return { changed: false, reason: 'not a Unity project', detection };
+
+  let text;
+  try {
+    text = readFileSync(path, 'utf-8');
+  } catch (err) {
+    return { changed: false, reason: `the policy file could not be read (${err.message})`, detection };
+  }
+
+  // The seeded form, written by the package. A consumer's own file will not match,
+  // and that is the point: an unrecognised policy is left alone rather than guessed at.
+  const anchor = '"reachability": {\n    "enabled": false';
+  if (text.split(anchor).length - 1 !== 1) {
+    return { changed: false, reason: 'the reachability block is not in the seeded form, so it was left as it is', detection };
+  }
+
+  const next = text.replace(anchor, '"reachability": {\n    "enabled": true');
+  try {
+    JSON.parse(next);
+  } catch {
+    return { changed: false, reason: 'the edit would not parse, so the file was left as it is', detection };
+  }
+
+  writeFileSync(path, next, 'utf-8');
+  return { changed: true, reason: 'reachability is on for this Unity project', detection };
+}
+
+/** Apply the seed rule for a new consumer and report it in one line. */
+function reportSeedReachability(targetDir) {
+  const result = enableReachabilitySeed(targetDir);
+  if (result.changed) {
+    console.log(`   Reachability: on for this Unity project (${result.detection.marker}); no probe is configured, so a declaration is a claim rather than a proof`);
+  } else if (result.detection?.unity) {
+    console.log(`   Reachability: left as seeded (${result.reason})`);
+  }
+  return result;
+}
+
 // ── Removed-managed-path cleanup ─────────────────────────────────────────────
 
 export function findManagedPathsInZip(buf) {
@@ -666,6 +779,7 @@ export async function sync(targetDir, opts = {}) {
   // 4. Extract with manifest awareness. Create-only paths (e.g. AGENTS.md) are
   // never overwritten when the consumer already has them.
   console.log('📂 Extracting (preserving local policies and plans)...');
+  const seededPolicy = willCreatePolicyFile(targetDir);
   const createOnly = readCreateOnlyPathsFromZip(zipBuf);
   const result = await extractZipWithManifest(zipBuf, targetDir, {
     preserved: existingManifest.preservedPaths || [],
@@ -691,6 +805,11 @@ export async function sync(targetDir, opts = {}) {
   if (upgradeDeleted.length > 0) {
     result.deleted.push(...upgradeDeleted);
   }
+
+  // 4d. Same rule as `install`: a consumer that has just received the seed and is a
+  // Unity project gets the reachability gate on. A consumer that already owned the
+  // file is not touched, which is why this runs only when the seed was written.
+  if (seededPolicy) reportSeedReachability(targetDir);
 
   // 5. Report
   console.log('');

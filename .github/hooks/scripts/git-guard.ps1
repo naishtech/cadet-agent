@@ -1,4 +1,4 @@
-# Git Guard Hook — Cadet Agent
+﻿# Git Guard Hook — Cadet Agent
 # PreToolUse hook that enforces the rule:
 #   "Never run git commit, git push, or gh pr merge without explicit user approval."
 #

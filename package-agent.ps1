@@ -150,6 +150,21 @@ Copy-TreeIntoStaging -SourceRoot $promptsSource                        -StagingR
 Copy-TreeIntoStaging -SourceRoot $cursorSource -StagingRoot $staging -TargetRoot ".cursor"
 Copy-TreeIntoStaging -SourceRoot $continueSource -StagingRoot $staging -TargetRoot ".continue"
 
+# Stage the repository Git hook. It lives outside .cadet/ and outside the host
+# directories, so no other block here would carry it, and a create-only rule does not
+# apply: sync refreshes it so a consumer gets hook fixes.
+foreach ($managedPath in $manifest.managedPaths) {
+    if ($managedPath -notlike '.githooks/*') { continue }
+    $src = Join-Path $scriptDir ($managedPath -replace '/', '\')
+    $rel = $managedPath.Substring('.githooks/'.Length) -replace '/', '\'
+    $dest = Join-Path $staging (Join-Path '.githooks' $rel)
+    $destParent = Split-Path $dest -Parent
+    if (-not (Test-Path $destParent)) {
+        New-Item -ItemType Directory -Path $destParent -Force | Out-Null
+    }
+    Copy-Item -Path $src -Destination $dest -Force
+}
+
 # Stage only the managed .claude paths (from FrameworkManifest.json) so
 # orphaned files cannot leak into the package.
 foreach ($managedPath in $manifest.managedPaths) {
@@ -200,6 +215,26 @@ foreach ($managedPath in $manifest.managedPaths) {
     Copy-Item -Path $src -Destination (Join-Path $staging $managedPath) -Force
 }
 
+# Stage managed paths that live in a SUBDIRECTORY and are create-only at install
+# time (`.cadet/harness.json`). The top-level loop above skips anything with a
+# slash, and a create-only file that never reaches the package would never be
+# created for a new consumer — the failure mode this makes impossible.
+foreach ($managedPath in $manifest.managedPaths) {
+    if ($managedPath -notmatch '/') { continue }
+    if ($manifest.createOnlyPaths -notcontains $managedPath) { continue }
+    $src = Join-Path $scriptDir ($managedPath -replace '/', '\')
+    if (-not (Test-Path $src)) {
+        Write-Error "Create-only path not found: $src"
+        exit 1
+    }
+    $dest = Join-Path $staging ($managedPath -replace '/', '\')
+    $destParent = Split-Path $dest -Parent
+    if (-not (Test-Path $destParent)) {
+        New-Item -ItemType Directory -Path $destParent -Force | Out-Null
+    }
+    Copy-Item -Path $src -Destination $dest -Force
+}
+
 $fileCount = (Get-ChildItem -Path $staging -Recurse -File).Count
 
 Compress-Archive -Path (Join-Path $staging "*") -DestinationPath $outputZip
@@ -233,6 +268,7 @@ Write-Host "    .agents\skills\cadet-agent\SKILL.md (Deep Code / Hermes cross-cl
 Write-Host "    .agents\skills\cadet-agent-reviewer\SKILL.md"
 Write-Host "    .agents\skills\cadet-*\SKILL.md"
 Write-Host "    AGENTS.md (only if not already present)"
+Write-Host "    .cadet\harness.json (only if not already present)"
 if ($outputZip -ne $preferredZip) {
     Write-Host ""
     Write-Host "Note: The primary output zip was in use, so a fallback filename was used for this package."

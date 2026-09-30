@@ -9,10 +9,19 @@ export {
   PHASES, GATES, TRANSITIONS, EVIDENCE_STATUSES, RETRY_CLASSES, CONTEXT_TIERS,
   DEFAULT_BUDGETS, HARD_CEILINGS, DEFAULT_ARCHIVE_LIMITS, DEFAULT_OUTPUT_POLICY,
   DEFAULT_RETENTION, DEFAULT_ESTIMATION, DEFAULT_HOOK_POLICY, DEFAULT_STRICT_CLOSURE,
-  EXCEPTION_CATEGORIES, EXCEPTION_EXPIRY_DAYS, EXCEPTION_REQUIRES_REVIEW_NOTE, AGENT_OWNED_GATES,
+  EXCEPTION_CATEGORIES, EXCEPTION_EXPIRY_DAYS, EXCEPTION_REQUIRES_REVIEW_NOTE, MANUAL_ONLY_GATES,
   DEFAULT_REACHABILITY, REACHABILITY_GATE,
+  DEFAULT_DESIGN_REVIEW, DESIGN_REVIEW_GATE, DESIGN_REVIEW_TRANSITION_FROM,
+  DEFAULT_HUMAN_ACCEPTANCE, HUMAN_ACCEPTANCE_GATE, HUMAN_ACCEPTANCE_TRANSITION_FROM,
+  DEFAULT_ARCHITECTURE_FITNESS, ARCHITECTURE_GATE, ARCHITECTURE_TRANSITION_FROM,
+  ARCHITECTURE_TRANSITION_TO, CHECK_SEVERITIES, architectureFitnessActive,
   validatePolicy, defaultPolicy, loadPolicy, budgetForScope, policyPath, PolicyError,
 } from './policy.mjs';
+
+export {
+  GATE_OWNERS, GATE_BUILDERS, gateBuilder, gateContractId, gatesAcceptingProjectCommand,
+  manualOnlyGateNames, agentOwnedGateNames, describeGateRefusal, describeMissingCommand, auditGateRegistry,
+} from './gates.mjs';
 
 export {
   BudgetTracker, budgetExhaustedResult, budgetReport, evaluateHardStop,
@@ -34,9 +43,10 @@ export {
   STATE_VERSION, READABLE_STATE_VERSIONS, HISTORY_EXTERNAL_SINCE, isHistoryExternal,
   validateState, migrateStateV1toV2, migrateStateDocument, migrateStateFile, parseTargetVersion,
   toStateV4, splitEvidence, buildEvidenceCoverage, mergeEvidenceCoverage, sealWorkItem, recordEvidence, appendEvidence,
-  HISTORY_ENTRIES_KEPT, compactHistory, DEFAULT_MAX_LIVE_EVIDENCE, retainLiveRecords,
+  HISTORY_ENTRIES_KEPT, MAX_HISTORY_ENTRY_CHARS, historyEntryLength, compactHistory, DEFAULT_MAX_LIVE_EVIDENCE, retainLiveRecords,
   createEvidence, computeInputTreeHash, workItemIdOf, evidenceFreshness,
-  latestEvidenceForGate, activeExceptions, requiredGates, isUngatedForwardEdge, evaluateTransition, resolveStrict,
+  latestEvidenceForGate, activeExceptions, requiredGates, conditionalEdgeGates, isUngatedForwardEdge,
+  evaluateTransition, resolveStrict,
   applyTransition, resetGatesForNewWorkItem, statePathFor, readState, writeState, writeJsonAtomic, StateError,
 } from './state.mjs';
 
@@ -50,6 +60,33 @@ export {
   DEFAULT_FLAKY_SIGNATURES, classifyResult, classifyRepair, runCommand,
   commandForGate, analyzerClean, runVerificationLoop, manualConfirmation, isBudgetExhaustion,
 } from './verification.mjs';
+
+export {
+  FINDING_DISPOSITIONS, parseDesignReviewArtifact, describeDesignReviewGaps,
+} from './design-review.mjs';
+
+export {
+  INTERCEPTION_ACTIONS, ENFORCEMENT_LEVELS, ESTABLISHED_BY, HOSTS, REPO_HOOK, hostById,
+  probeHostHook, probeRepoGitHook, enforcementMatrix, describeEnforcement,
+} from './hosts.mjs';
+
+export {
+  CONTEXT_LEVELS, CONTEXT_DIR, CONTEXT_PLAN_FILE, CONTEXT_RECORD_FILE, PHASE_SKILL,
+  ContextProtocolError, planEntries, buildContextPlan, writeContextPlan, readContextPlan,
+  buildContextRecord, writeContextRecord, readContextRecord, parseTranscript,
+  validateContextRecord, describeContextState, declaresContextEnforcement,
+} from './context-protocol.mjs';
+
+export {
+  DEFAULT_CHECK_TIMEOUT_MS, CHECK_STATUSES, scopeMatches, applicableChecks,
+  runArchitectureChecks, summariseChecks, describeCheckResults,
+} from './architecture.mjs';
+
+export {
+  ACCEPTANCE_FORM_GATE, ACCEPTANCE_FORM_FILENAME, ACCEPTANCE_TEMPLATE_RELATIVE,
+  ACCEPTANCE_HUMAN_FIELDS, acceptanceFormPath, acceptanceCandidates, buildAcceptanceForm,
+  parseAcceptanceForm, writeAcceptanceForm, isUnfilled,
+} from './acceptance-form.mjs';
 
 export {
   ContextManifest, buildBaseManifest, tier0References, TIER_REASONS_REQUIRED,
