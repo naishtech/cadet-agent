@@ -640,12 +640,22 @@ export function enableReachabilitySeed(targetDir) {
 
   // The seeded form, written by the package. A consumer's own file will not match,
   // and that is the point: an unrecognised policy is left alone rather than guessed at.
-  const anchor = '"reachability": {\n    "enabled": false';
+  //
+  // The anchor follows the file's own line ending, and that is a product fix, not tidiness:
+  // `core.autocrlf=true` is the default on Windows, this file is matched as TEXT, and the package is
+  // built from a working tree — so a consumer installed from a Windows checkout gets CRLF in
+  // `.cadet/harness.json`, and the anchor written with `\n` never matched. The seeded Unity project
+  // then silently kept `reachability.enabled: false`, which is exactly the gate the seed exists to
+  // turn on. CI runs on Linux, where the file is LF, so the suite did not see it. The replacement
+  // keeps whichever ending the file already uses, so the edit does not rewrite every line of a
+  // consumer's policy file either.
+  const eol = text.includes('\r\n') ? '\r\n' : '\n';
+  const anchor = `"reachability": {${eol}    "enabled": false`;
   if (text.split(anchor).length - 1 !== 1) {
     return { changed: false, reason: 'the reachability block is not in the seeded form, so it was left as it is', detection };
   }
 
-  const next = text.replace(anchor, '"reachability": {\n    "enabled": true');
+  const next = text.replace(anchor, `"reachability": {${eol}    "enabled": true`);
   try {
     JSON.parse(next);
   } catch {

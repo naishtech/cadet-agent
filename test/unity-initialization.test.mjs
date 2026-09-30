@@ -123,12 +123,50 @@ describe('the seeded reachability block — one edit, never a half edit', () => 
       assert.equal(result.detection.marker, 'ProjectSettings/ProjectVersion.txt');
 
       const after = readFileSync(policyFilePath(dir), 'utf-8');
-      assert.equal(after, seedText().replace('"reachability": {\n    "enabled": false', '"reachability": {\n    "enabled": true'));
+      // The file's own ending, not a hardcoded `\n`: this expectation failed on any Windows
+      // checkout with `core.autocrlf=true`, because the working-tree seed is CRLF there.
+      const eol = seedText().includes('\r\n') ? '\r\n' : '\n';
+      assert.equal(after, seedText().replace(`"reachability": {${eol}    "enabled": false`, `"reachability": {${eol}    "enabled": true`));
       assert.equal(JSON.parse(after).reachability.enabled, true);
       assert.equal(JSON.parse(after).reachability.command, null, 'no probe is configured, by design');
       // Everything else survived byte-for-byte.
       assert.equal(JSON.parse(after).strictClosure.enabled, true);
       assert.equal(JSON.parse(after).budgets.maxContextTokens.hard, 64000);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('turns the gate on in a CRLF policy file, and keeps its CRLF', () => {
+    // The cross-platform pin: a Windows checkout (and a package built from one) has CRLF in this
+    // file, and the anchor was written with `\n`. The Unity consumer silently kept the gate OFF, and
+    // CI never saw it because CI is Linux. Forcing CRLF here means the check runs everywhere.
+    const dir = tmp('crlf');
+    try {
+      markUnity(dir);
+      mkdirSync(join(dir, '.cadet'), { recursive: true });
+      const crlf = seedText().replace(/\r?\n/g, '\r\n');
+      writeFileSync(policyFilePath(dir), crlf);
+
+      const result = enableReachabilitySeed(dir);
+      assert.equal(result.changed, true, 'the anchor must not depend on the line ending');
+      const after = readFileSync(policyFilePath(dir), 'utf-8');
+      assert.equal(after, crlf.replace('"reachability": {\r\n    "enabled": false', '"reachability": {\r\n    "enabled": true'));
+      assert.equal(JSON.parse(after).reachability.enabled, true);
+      assert.equal(after.split('\r\n').length > 10, true, 'the file stays CRLF rather than being half-rewritten');
+      assert.equal(after.includes('\n    "enabled": true'), true);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('keeps an LF policy file LF', () => {
+    const dir = tmp('lf');
+    try {
+      markUnity(dir);
+      mkdirSync(join(dir, '.cadet'), { recursive: true });
+      const lf = seedText().replace(/\r\n/g, '\n');
+      writeFileSync(policyFilePath(dir), lf);
+      assert.equal(enableReachabilitySeed(dir).changed, true);
+      const after = readFileSync(policyFilePath(dir), 'utf-8');
+      assert.equal(after.includes('\r'), false, 'no line ending is introduced where there was none');
+      assert.equal(JSON.parse(after).reachability.enabled, true);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
