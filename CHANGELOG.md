@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.56.0] — 2026-09-30
+
 ### Changed
 
 - **A change-log entry is a pointer, and the bound is enforced.** `changeHistory` was bounded by count and left unbounded in what each entry *contains*, so the prose came back: on the audited consumer the longest entry was a 1.2 KB retelling of a review report that it named in the same sentence, and four entries carried 2.9 KB of text between them — all of it already in `.cadet/reports/` and in git. The rule that said otherwise was written for `Handoff` after 116 handoff entries averaged 1.9 KB each, and it never applied anywhere else. An entry's text is now limited to 400 characters (`MAX_HISTORY_ENTRY_CHARS`), and `validateState` **errors** on a longer one in a v4 document rather than warning, because the documentation-only version is what let this drift back. The error is repairable in place: `state compact` archives an over-long entry wherever it sits — newest included, since recency is the wrong selector for an entry that should never have been written — into `.cadet/archive/history.jsonl`, and nothing is lost. A v1-v3 document is exempt (its log holds prose by design) and `state migrate` compacts it on the way to v4. Six skills that write to the log now state the rule the seventh already had.
