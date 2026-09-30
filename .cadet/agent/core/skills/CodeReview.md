@@ -22,6 +22,8 @@ After review, set `codeReviewCompleted`, `securityReviewPassed`, and `acceptance
 
 An epic whose work only becomes reachable at its last story is a review finding in its own right: name it, and say whether the owner has accepted that ordering.
 
+**This review does not accept the work.** A review finds; acceptance is a person's record (`humanAcceptanceConfirmed`, required at epic closure when `humanAcceptance.enabled` is set). A review that reports "no findings" has not satisfied that gate and must not claim to — the two answer different questions, and a review that reached for the acceptance gate is the failure mode the separate gate exists to prevent.
+
 Read `.cadet/agent/core/Harness.md`. Review the run ledger, gate evidence freshness, and budget status as first-class inputs.
 </instructions>
 
@@ -102,7 +104,7 @@ Identify defects, regressions, security concerns, and process drift before chang
 ## Completion
 
 After review:
-- Set `gates.codeReviewCompleted`, `gates.securityReviewPassed`, and `gates.acceptanceCriteriaValidated` to `true` in `.cadet/state.json` only with supporting evidence (agent-owned review decisions recorded as evidence or `changeHistory` entries). When `reachability.enabled` is set, also satisfy `gates.reachabilityAddressed` by running `cadet-agent harness verify-reachability --story <path>` **in this phase** — the record is bound to the phase it is created in, so one made during implementation is rejected as stale here.
+- Set `gates.codeReviewCompleted`, `gates.securityReviewPassed`, and `gates.acceptanceCriteriaValidated` to `true` in `.cadet/state.json` only with supporting evidence (agent-owned review decisions recorded as evidence or `changeHistory` entries). A review entry in the log is a pointer — the review file's path and the commit that carries the verdict — never a retelling of the review: the review file is the record, and it is in git (`.cadet/agent/core/Harness.md` §2c). When `reachability.enabled` is set, also satisfy `gates.reachabilityAddressed` by running `cadet-agent harness verify-reachability --story <path>` **in this phase** — the record is bound to the phase it is created in, so one made during implementation is rejected as stale here.
 - Set `currentPhase` to `validation` only when all review → validation gates are satisfied.
 - In markdown tracking mode, update the story and epic files to reflect completion.
 - The Change Report is written **in this phase**, before the transition: it is the reader-facing summary of what review just verified, and a report emitted later would describe a phase that has already moved on.

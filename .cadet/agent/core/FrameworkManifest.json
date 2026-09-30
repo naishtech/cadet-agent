@@ -15,6 +15,7 @@
   "managedPaths": [
     ".github/agents/cadet.agent.md",
     ".github/agents/cadet-agent-reviewer.agent.md",
+    ".githooks/pre-commit",
     ".github/hooks/git-guard.json",
     ".github/hooks/scripts/git-guard.sh",
     ".github/hooks/scripts/git-guard.ps1",
@@ -31,16 +32,19 @@
     ".github/prompts/cadet-handoff.prompt.md",
     ".github/prompts/cadet-visual-evidence.prompt.md",
     ".github/prompts/cadet-reconcile.prompt.md",
+    ".github/prompts/cadet-design-review.prompt.md",
     ".cursor/rules/cadet-agent.md",
     ".cursor/rules/cadet-agent-reviewer.md",
     ".cursor/rules/cadet-planning-review.md",
     ".cursor/rules/cadet-handoff.md",
     ".cursor/rules/cadet-reconcile.md",
+    ".cursor/rules/cadet-design-review.md",
     ".continue/rules/cadet-agent.md",
     ".continue/rules/cadet-agent-reviewer.md",
     ".continue/rules/cadet-planning-review.md",
     ".continue/rules/cadet-handoff.md",
     ".continue/rules/cadet-reconcile.md",
+    ".continue/rules/cadet-design-review.md",
     ".continue/config.yaml",
     ".claude/skills/cadet-agent",
     ".claude/skills/cadet-agent-reviewer",
@@ -57,6 +61,7 @@
     ".claude/skills/cadet-mcp-setup",
     ".claude/skills/cadet-visual-evidence",
     ".claude/skills/cadet-reconcile",
+    ".claude/skills/cadet-design-review",
     ".agents/skills/cadet-agent",
     ".agents/skills/cadet-agent-reviewer",
     ".agents/skills/cadet-handoff",
@@ -72,26 +77,29 @@
     ".agents/skills/cadet-planning-review",
     ".agents/skills/cadet-visual-evidence",
     ".agents/skills/cadet-reconcile",
+    ".agents/skills/cadet-design-review",
     ".cadet/agent/core",
     ".cadet/agent/core/templates",
     ".cadet/agent/core/skills",
     ".cadet/agent/core/state.schema.json",
     ".cadet/agent/core/Harness.md",
     ".cadet/agent/core/harness.schema.json",
+    ".cadet/harness.json",
     "AGENTS.md"
   ],
   "preservedPaths": [
     ".cadet/agent/policies",
     ".cadet/agent/project-plans",
     ".cadet/state.json",
-    ".cadet/harness.json",
     ".cadet/runs",
+    ".cadet/context",
     ".cadet/handoffs",
     ".cadet/reports",
     ".cadet/archive"
   ],
   "createOnlyPaths": [
-    "AGENTS.md"
+    "AGENTS.md",
+    ".cadet/harness.json"
   ],
   "notes": [
     "Use this manifest to decide which packaged files Cadet may update during bootstrap sync.",
@@ -100,6 +108,7 @@
     "As of v0.5.0, the agent instruction set is condensed into cadet-agent.md. Full rationale, guidance, standards, and templates are in the docs/ directory (GitHub Pages).",
     "As of the harness modernization, .cadet/harness.json (policy overrides) and .cadet/runs/ (sanitized run ledgers) are preserved by sync and never deleted.",
     "As of v0.28.0, install/sync write a .cadet/.repo-role marker (consumer-project|framework-source) so the framework-source vs consumer-project boundary is machine-checkable. It is neither a managed nor a preserved path.",
-    "As of contract v5 (state v4), .cadet/archive/ is preserved: it is the append-only home of evidence that has left state.json, so sync must never clobber it any more than it may clobber .cadet/handoffs/. Sealed evidence also lives in commit trailers, which sync never touches."
+    "As of contract v5 (state v4), .cadet/archive/ is preserved: it is the append-only home of evidence that has left state.json, so sync must never clobber it any more than it may clobber .cadet/handoffs/. Sealed evidence also lives in commit trailers, which sync never touches.",
+    "`.cadet/harness.json` is a create-only seed: the package carries the framework's own policy file so a new consumer starts from a declared policy instead of an unwritten default, and an existing file is never overwritten by init or sync. A consumer that already owns the file keeps its contents."
   ]
 }

@@ -15,87 +15,9 @@ const { findManagedPathsInZip, deleteRemovedManagedPaths, extractZip, extractZip
 const { runUpgrades } = await import(
   `file://${join(__dirname, '..', 'src', 'upgrades.mjs')}`
 );
+import { buildMinimalZip } from './helpers/zip.mjs';
 
-// ── Helper: build a minimal valid ZIP in memory ─────────────────────────────
-
-const SIG_LFH = 0x04034b50;
-const SIG_CD  = 0x02014b50;
-const SIG_EOCD = 0x06054b50;
-
-function buildMinimalZip(files) {
-  // files: [{ name: string, content: Buffer | string }]
-  const parts = [];
-  const cdEntries = [];
-  let cdOffset = 0;
-
-  for (const { name, content } of files) {
-    const data = Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf-8');
-    const nameBuf = Buffer.from(name, 'utf-8');
-
-    // Local file header
-    const lfh = Buffer.alloc(30 + nameBuf.length);
-    lfh.writeUInt32LE(SIG_LFH, 0);          // signature
-    lfh.writeUInt16LE(20, 4);                // version needed
-    lfh.writeUInt16LE(0, 6);                 // flags
-    lfh.writeUInt16LE(0, 8);                 // method (stored)
-    lfh.writeUInt16LE(0, 10);                // mod time
-    lfh.writeUInt16LE(0, 12);                // mod date
-    lfh.writeUInt32LE(0, 14);                // crc32
-    lfh.writeUInt32LE(data.length, 18);      // compressed size
-    lfh.writeUInt32LE(data.length, 22);      // uncompressed size
-    lfh.writeUInt16LE(nameBuf.length, 26);   // filename length
-    lfh.writeUInt16LE(0, 28);                // extra field length
-    nameBuf.copy(lfh, 30);
-
-    const lfhOffset = cdOffset;
-    parts.push(lfh, data);
-    cdOffset += lfh.length + data.length;
-
-    // Central directory entry
-    const cd = Buffer.alloc(46 + nameBuf.length);
-    cd.writeUInt32LE(SIG_CD, 0);              // signature
-    cd.writeUInt16LE(20, 4);                   // version made by
-    cd.writeUInt16LE(20, 6);                   // version needed
-    cd.writeUInt16LE(0, 8);                    // flags
-    cd.writeUInt16LE(0, 10);                   // method (stored)
-    cd.writeUInt16LE(0, 12);                   // mod time
-    cd.writeUInt16LE(0, 14);                   // mod date
-    cd.writeUInt32LE(0, 16);                   // crc32
-    cd.writeUInt32LE(data.length, 20);         // compressed size
-    cd.writeUInt32LE(data.length, 24);         // uncompressed size
-    cd.writeUInt16LE(nameBuf.length, 28);      // filename length
-    cd.writeUInt16LE(0, 30);                   // extra field length
-    cd.writeUInt16LE(0, 32);                   // comment length
-    cd.writeUInt16LE(0, 34);                   // disk number start
-    cd.writeUInt16LE(0, 36);                   // internal attrs
-    cd.writeUInt32LE(0, 38);                   // external attrs
-    cd.writeUInt32LE(lfhOffset, 42);           // local header offset
-    nameBuf.copy(cd, 46);
-
-    cdEntries.push(cd);
-  }
-
-  const cdStart = cdOffset;
-  for (const cd of cdEntries) {
-    parts.push(cd);
-    cdOffset += cd.length;
-  }
-  const cdSize = cdOffset - cdStart;
-
-  // EOCD
-  const eocd = Buffer.alloc(22);
-  eocd.writeUInt32LE(SIG_EOCD, 0);
-  eocd.writeUInt16LE(0, 4);             // disk number
-  eocd.writeUInt16LE(0, 6);             // cd disk
-  eocd.writeUInt16LE(files.length, 8);  // cd entries on disk
-  eocd.writeUInt16LE(files.length, 10); // cd entries total
-  eocd.writeUInt32LE(cdSize, 12);       // cd size
-  eocd.writeUInt32LE(cdStart, 16);      // cd offset
-  eocd.writeUInt16LE(0, 20);            // comment length
-
-  parts.push(eocd);
-  return Buffer.concat(parts);
-}
+// ── Helper: build a minimal valid ZIP in memory (shared, test/helpers/zip.mjs) ──
 
 // ── findManagedPathsInZip tests ─────────────────────────────────────────────
 
@@ -314,6 +236,21 @@ describe('runUpgrades', () => {
 
 // ── Harness preservation across sync (contract invariant C8) ────────────────
 
+/** A package whose installable policy content is the REAL seed the repo ships. */
+function seedZip() {
+  const manifest = JSON.stringify({
+    frameworkVersion: '0.56.0',
+    managedPaths: ['.cadet/agent/core', '.cadet/harness.json'],
+    preservedPaths: ['.cadet/state.json'],
+    createOnlyPaths: ['.cadet/harness.json'],
+  });
+  return buildMinimalZip([
+    { name: '.cadet/agent/core/FrameworkManifest.json', content: manifest },
+    { name: '.cadet/harness.json', content: readFileSync(join(__dirname, '..', '.cadet', 'harness.json')) },
+  ]);
+}
+
+
 describe('sync preserves harness policy and run ledgers', () => {
   let tmpDir;
 
@@ -355,15 +292,64 @@ describe('sync preserves harness policy and run ledgers', () => {
     assert.equal(readFileSync(join(tmpDir, '.cadet', 'runs', 'run-1.json'), 'utf-8'), '{"runId":"run-1"}');
   });
 
-  it('the real manifest preserves harness policy and runs', () => {
+  it('creates the seeded policy file for a consumer that has none', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cadet-seed-absent-'));
+    try {
+      const zip = seedZip();
+      const result = await extractZipWithManifest(zip, dir, {
+        preserved: ['.cadet/state.json'],
+        managed: ['.cadet/agent/core', '.cadet/harness.json'],
+        createOnly: ['.cadet/harness.json'],
+      });
+      assert.equal(existsSync(join(dir, '.cadet', 'harness.json')), true,
+        'a fresh consumer must receive the declared starting policy');
+      assert.equal(result.kept.includes('.cadet/harness.json'), false);
+      // The file that lands is the seed the repo ships, byte-for-byte, and it is a
+      // policy that turns strict closure on — the property the seed exists for.
+      assert.equal(
+        readFileSync(join(dir, '.cadet', 'harness.json'), 'utf-8'),
+        readFileSync(join(__dirname, '..', '.cadet', 'harness.json'), 'utf-8'),
+      );
+      assert.equal(JSON.parse(readFileSync(join(dir, '.cadet', 'harness.json'), 'utf-8')).strictClosure.enabled, true);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('never overwrites a policy file the consumer already owns', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cadet-seed-present-'));
+    try {
+      mkdirSync(join(dir, '.cadet'), { recursive: true });
+      // No trailing newline, and a CRLF inside: a rewrite that normalised the file
+      // would still "look right" while changing the consumer's bytes.
+      const own = '{\r\n  "strictClosure": { "enabled": true, "manualConfirmation": { "requireExpiresAt": false, "maxValidityMs": 604800000 } }\r\n}';
+      writeFileSync(join(dir, '.cadet', 'harness.json'), own);
+      const result = await extractZipWithManifest(seedZip(), dir, {
+        preserved: ['.cadet/state.json'],
+        managed: ['.cadet/agent/core', '.cadet/harness.json'],
+        createOnly: ['.cadet/harness.json'],
+      });
+      assert.equal(readFileSync(join(dir, '.cadet', 'harness.json'), 'utf-8'), own);
+      assert.ok(result.kept.includes('.cadet/harness.json'));
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('the real manifest ships the seed and keeps every consumer path intact', () => {
     const manifest = JSON.parse(readFileSync(join(__dirname, '..', '.cadet', 'agent', 'core', 'FrameworkManifest.json'), 'utf-8'));
-    const preserved = manifest.preservedPaths.map((p) => p.replace(/\\/g, '/'));
-    assert.ok(preserved.includes('.cadet/harness.json'));
-    assert.ok(preserved.includes('.cadet/runs'));
-    // Preserved paths must not be managed paths.
-    const managed = manifest.managedPaths.map((p) => p.replace(/\\/g, '/'));
-    for (const p of ['.cadet/harness.json', '.cadet/runs']) {
-      assert.equal(managed.includes(p), false, `${p} must not be managed`);
+    const norm = (list) => (list || []).map((p) => p.replace(/\\/g, '/'));
+    const preserved = norm(manifest.preservedPaths);
+    const managed = norm(manifest.managedPaths);
+    const createOnly = norm(manifest.createOnlyPaths);
+
+    // The policy file is a create-only SEED, not a preserved path: preserved
+    // paths are skipped at extraction, so a preserved policy file would never be
+    // created for a new consumer. Create-only is what makes "a new consumer
+    // starts from a declared policy" and "an existing policy is never
+    // overwritten" the same mechanism.
+    assert.ok(createOnly.includes('.cadet/harness.json'));
+    assert.ok(managed.includes('.cadet/harness.json'), 'a create-only path must also be managed, or the package lacks it');
+    assert.equal(preserved.includes('.cadet/harness.json'), false);
+
+    for (const p of ['.cadet/agent/policies', '.cadet/agent/project-plans', '.cadet/state.json', '.cadet/runs']) {
+      assert.ok(preserved.includes(p), `${p} must be preserved`);
     }
   });
 });

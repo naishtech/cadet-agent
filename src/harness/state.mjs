@@ -13,7 +13,12 @@ import {
   PHASES, GATES, TRANSITIONS, EVIDENCE_STATUSES, DEFAULT_STRICT_CLOSURE,
   EXCEPTION_CATEGORIES, EXCEPTION_EXPIRY_DAYS, EXCEPTION_REQUIRES_REVIEW_NOTE,
   REACHABILITY_GATE, REACHABILITY_TRANSITION_FROM,
+  DESIGN_REVIEW_GATE, DESIGN_REVIEW_TRANSITION_FROM,
+  HUMAN_ACCEPTANCE_GATE, HUMAN_ACCEPTANCE_TRANSITION_FROM,
+  ARCHITECTURE_GATE, ARCHITECTURE_TRANSITION_FROM, ARCHITECTURE_TRANSITION_TO,
+  architectureFitnessActive,
 } from './policy.mjs';
+import { gateContractId } from './gates.mjs';
 import { hashTree, hashFile, hashCriteria, timestamp, isUuid } from './util.mjs';
 import { encodeEvidenceTrailers } from './gitmemo.mjs';
 import {
@@ -194,6 +199,7 @@ export function validateState(state, context = {}) {
         });
       }
     }
+    const v4 = isHistoryExternal(state);
     // Gate exceptions are categorised under strict closure (contract v3 §4).
     //
     // v4 gives them their own field, because they are *live state* — scoped to a
@@ -203,6 +209,31 @@ export function validateState(state, context = {}) {
     // each is reported under the path it actually lives at.
     if (Array.isArray(state.changeHistory)) {
       state.changeHistory.forEach((entry, i) => {
+        if (entry?.type !== 'gate-exception') {
+          // A change-log entry is a pointer, not a record.
+          //
+          // An ERROR rather than the warning the other size rules get, because this is not a
+          // preference about tidiness: the entry duplicates an artifact git already holds, and
+          // the documentation-only version of this rule is what let it drift back in through
+          // every skill except the one it was written for. It is repairable in place —
+          // `state compact` moves the entry to the archive and loses nothing — so a document
+          // that predates the bound is not stranded by it.
+          //
+          // v4 only, for the same reason the foreign-record check below is v4 only: a v1-v3
+          // document records prose in the log by design, and an error there would cry wolf on
+          // documents that were correct when they were written. Their repair is
+          // `state migrate`, which compacts the log as it moves the document to v4.
+          const length = v4 ? historyEntryLength(entry) : 0;
+          if (length > MAX_HISTORY_ENTRY_CHARS) {
+            errors.push({
+              path: `changeHistory[${i}]`,
+              message: `change-log entry is ${length} characters of text across change/reason/rationale (limit ${MAX_HISTORY_ENTRY_CHARS}). `
+                + 'A change-log entry is a pointer: name the artifact path, and the commit when there is one, and let the artifact say the rest. '
+                + 'Prose has a home — the handoff, the review, the ADR, the policy file, or the commit message that carries the change — and the entry names it rather than repeating it. '
+                + 'Run "cadet-agent state compact --keep active" to move over-long entries to .cadet/archive/history.jsonl; nothing is lost.',
+            });
+          }
+        }
         if (entry?.type !== 'gate-exception') return;
         if (!strict) return;
         for (const e of validateGateException(entry, strict)) {
@@ -469,6 +500,37 @@ function validateEvidenceShape(ev, strict = null) {
   if (ev.evidenceId !== undefined && !isUuid(ev.evidenceId)) errors.push({ path: 'evidenceId', message: 'evidenceId must be a UUIDv4' });
   if (ev.phase !== undefined && !PHASES.includes(ev.phase)) errors.push({ path: 'phase', message: `unknown phase "${ev.phase}"` });
   if (ev.gate !== undefined && !GATES.includes(ev.gate)) errors.push({ path: 'gate', message: `unknown gate "${ev.gate}"` });
+  // A human acceptance with no witness, or with no statement of its limitations, is
+  // a signature on nothing. Checked at validation as well as at creation, because a
+  // hand-edited state.json is exactly what this gate must not be satisfiable by.
+  if (ev.gate === HUMAN_ACCEPTANCE_GATE) {
+    for (const field of ['witness', 'limitations']) {
+      const value = ev[field];
+      if (typeof value !== 'string' || value.trim() === '') {
+        errors.push({ path: field, message: `a ${HUMAN_ACCEPTANCE_GATE} record must carry a non-empty "${field}"` });
+      }
+    }
+  }
+  // The architecture record is a claim about checks, so it must say which checks. One
+  // entry per check, each with an id and an outcome, or the record would attest
+  // "constraints hold" while naming none of them.
+  if (ev.gate === ARCHITECTURE_GATE) {
+    if (!Array.isArray(ev.checks) || ev.checks.length === 0) {
+      errors.push({ path: 'checks', message: `a ${ARCHITECTURE_GATE} record must carry the checks it ran` });
+    } else {
+      ev.checks.forEach((check, i) => {
+        if (typeof check?.id !== 'string' || check.id === '') {
+          errors.push({ path: `checks[${i}].id`, message: 'an architecture check result must name the check id' });
+        }
+        if (!['passed', 'failed', 'blocked'].includes(check?.status)) {
+          errors.push({ path: `checks[${i}].status`, message: 'an architecture check result must be passed, failed or blocked' });
+        }
+      });
+    }
+  }
+  if (ev.gateContract !== undefined && ev.gateContract !== null && typeof ev.gateContract !== 'string') {
+    errors.push({ path: 'gateContract', message: 'gateContract must be a contract id such as "testsPassed@1", or null' });
+  }
   if (ev.status !== undefined && !EVIDENCE_STATUSES.includes(ev.status)) errors.push({ path: 'status', message: `unknown evidence status "${ev.status}"` });
   if (ev.relevantFiles !== undefined && !Array.isArray(ev.relevantFiles)) errors.push({ path: 'relevantFiles', message: 'relevantFiles must be an array' });
   if (ev.inputTreeHash !== undefined && !/^[0-9a-f]{64}$/.test(String(ev.inputTreeHash))) {
@@ -739,19 +801,60 @@ export function migrateStateV1toV2(v1) {
 export const HISTORY_ENTRIES_KEPT = 25;
 
 /**
+ * How long one change-log entry's text may be.
+ *
+ * An entry is a **pointer**: the artifact path, and the commit when there is one. It is not a
+ * record of what happened — the artifact is, and the artifact is in git. The rule was already
+ * written for `Handoff` ("a reference, not an essay") after 116 handoff entries averaging
+ * 1.9 KB each duplicated files already on disk, and it drifted straight back through the other
+ * skills: on the audited repository the longest entry was a 1.2 KB retelling of a review report
+ * that names its own path in the same sentence.
+ *
+ * 400 characters holds every legitimate entry measured — a path, a verdict word, a commit —
+ * with room to spare, and refuses the retelling. A `reason` field on the entry is where a *why*
+ * belongs, and it is bounded by the same discipline: if it needs more than a sentence, it
+ * belongs in the artifact.
+ */
+export const MAX_HISTORY_ENTRY_CHARS = 400;
+
+/**
+ * The text of a change-log entry, across every field it can sit in.
+ *
+ * Not `change` alone: measured on the audited consumer, `reason` held 12.3 KB of the 18.9 KB the
+ * surviving log occupied — 65% of the bytes, in the field the first version of this bound did not
+ * look at. A rule that bounds one field and not the others does not bound prose, it relocates it.
+ */
+export function historyEntryLength(entry) {
+  let total = 0;
+  for (const field of ['change', 'reason', 'rationale', 'closureReviewNote']) {
+    if (typeof entry?.[field] === 'string') total += entry[field].length;
+  }
+  return total;
+}
+
+/**
  * Split a change log into the tail that stays inline and the overflow to archive.
  *
  * Keeps the most recent entries, because that is what `Resume` reads and what a
  * handoff cross-checks against. The overflow is returned rather than discarded so
  * the caller can persist it: an audit trail may move, but it must not evaporate.
  */
-export function compactHistory(entries, { keepRecent = HISTORY_ENTRIES_KEPT } = {}) {
+export function compactHistory(entries, { keepRecent = HISTORY_ENTRIES_KEPT, maxEntryChars = MAX_HISTORY_ENTRY_CHARS } = {}) {
   const list = Array.isArray(entries) ? entries : [];
-  if (list.length <= keepRecent) return { kept: list, archived: [] };
-  return {
-    kept: list.slice(list.length - keepRecent),
-    archived: list.slice(0, list.length - keepRecent),
-  };
+  const boundary = Math.max(0, list.length - keepRecent);
+  const kept = [];
+  const archived = [];
+  list.forEach((entry, i) => {
+    // Live state is never archived, whatever it measures: a legacy gate exception still
+    // filed in the log is promoted by `toStateV4` before this runs, and this is the second
+    // guard against a caller that reaches compaction by another route.
+    if (entry?.type === 'gate-exception') { kept.push(entry); return; }
+    // Recency is the wrong selector for an over-bound entry: the newest one is exactly the
+    // one an agent just wrote, and it is the one that must not sit in the document.
+    if (i < boundary || historyEntryLength(entry) > maxEntryChars) archived.push(entry);
+    else kept.push(entry);
+  });
+  return { kept, archived };
 }
 
 /**
@@ -1026,6 +1129,12 @@ export function createEvidence({
     relevantFiles,
     toolVersion,
     commit: normalizedCommit,
+    // The builder contract this record was written under. Stamped only on
+    // automated evidence: a manual confirmation is not produced by a builder, so
+    // there is no contract for it to satisfy, and `evidenceFreshness` accepts a
+    // null contract rather than invalidating every record written before this
+    // field existed.
+    gateContract: source === 'automated' ? gateContractId(gate) : null,
     createdAt: timestamp(createdAt),
     expiresAt: expiresAt ? timestamp(expiresAt) : null,
     freshnessPolicy,
@@ -1062,6 +1171,7 @@ export function evidenceFreshness(evidence, context) {
     phase = null,
     inputTreeHash = null,
     criteriaHash = null,
+    gateContract = null,
   } = context || {};
 
   if (evidence.status === 'superseded') reasons.push('evidence was superseded');
@@ -1076,6 +1186,15 @@ export function evidenceFreshness(evidence, context) {
   }
   if (criteriaHash && evidence.criteriaHash && evidence.criteriaHash !== criteriaHash) {
     reasons.push('acceptance criteria changed since the evidence was recorded');
+  }
+  // A gate's evidence contract is part of the record's identity. When the builder's
+  // rules change, a record written under the old rules no longer answers the
+  // question the gate asks, so it is refused as stale rather than re-read as if
+  // nothing had changed. A record that declares no contract predates this check or
+  // is a manual confirmation; it is accepted, so no existing evidence is
+  // retroactively invalidated by the field arriving.
+  if (gateContract && evidence.gateContract && evidence.gateContract !== gateContract) {
+    reasons.push(`evidence was recorded against gate contract "${evidence.gateContract}", not the current "${gateContract}"`);
   }
   if (evidence.expiresAt && new Date(evidence.expiresAt).getTime() <= now.getTime()) {
     reasons.push('evidence expired');
@@ -1129,7 +1248,7 @@ export function appendEvidence(state, evidence) {
  * Centralised so `harness confirm`, `harness verify`, `harness verify-acs` and the
  * tests cannot drift.
  */
-export function recordEvidence(state, evidence) {
+export function recordEvidence(state, evidence, { setGate = true } = {}) {
   const gate = evidence?.gate;
   const superseding = { ...state };
   if (gate) {
@@ -1139,7 +1258,12 @@ export function recordEvidence(state, evidence) {
         : e));
   }
   const next = appendEvidence(superseding, evidence);
-  if (gate) next.gates = { ...(state.gates || {}), [gate]: true };
+  // `setGate` exists because a run that did NOT pass must not leave the gate true. The default
+  // keeps every existing caller's behaviour (they record evidence that passed, and the gate they
+  // satisfy). A caller recording a failure passes false, which also clears a gate an earlier pass
+  // had set — the claim is no longer supported by anything, and `state validate` rejects a true
+  // gate whose latest record is not a pass, so leaving it true wrote an invalid document.
+  if (gate) next.gates = { ...(state.gates || {}), [gate]: setGate === true };
   return next;
 }
 
@@ -1193,7 +1317,26 @@ export function activeExceptions(state, { workItemId, now = new Date() } = {}) {
 // ── Transitions ─────────────────────────────────────────────────────────────
 
 /** Required gates for a transition target, or null when the target is not gated. */
-export function requiredGates(toPhase, { reachability = false } = {}) {
+/**
+ * Gates required on an edge that carries no entry in `TRANSITIONS`.
+ *
+ * Why this exists: `requiredGates` resolves a transition by its TARGET phase, so a
+ * gate that belongs to one specific `(from, to)` pair has nowhere to live in that
+ * table — and `story-breakdown` is reached from two places (`architectureComplete`
+ * and `spikes`), so an entry keyed by target would gate the wrong route as well.
+ * The design review belongs to the design route only: a spike that produced a
+ * finding and went straight to breakdown is not a design being approved.
+ *
+ * Returns `[]` when the edge carries nothing, so the caller can treat "no gates"
+ * and "no conditional gates" the same way.
+ */
+export function conditionalEdgeGates(fromPhase, toPhase, policy = null) {
+  if (fromPhase !== DESIGN_REVIEW_TRANSITION_FROM) return [];
+  if (toPhase !== 'story-breakdown') return [];
+  return policy?.designReview?.enabled === true ? [DESIGN_REVIEW_GATE] : [];
+}
+
+export function requiredGates(toPhase, { reachability = false, humanAcceptance = false, architectureFitness = false } = {}) {
   for (const [from, spec] of Object.entries(TRANSITIONS)) {
     if (spec.to === toPhase) {
       const gates = [...spec.gates];
@@ -1210,7 +1353,25 @@ export function requiredGates(toPhase, { reachability = false } = {}) {
       //     single-argument call — and every existing caller and test — sees
       //     unchanged behaviour. See REACHABILITY_GATE.
       if (reachability && from === REACHABILITY_TRANSITION_FROM) gates.push(REACHABILITY_GATE);
-      return { from, gates, revalidate: spec.revalidate || [] };
+      // Human acceptance joins only the closure transition, and only when the
+      // repository has asked for it. It is deliberately NOT in `revalidate`: the
+      // closure transition is where it belongs, so it is a primary gate there, and a
+      // revalidated gate is judged without its phase stamp — which for this one would
+      // mean accepting a record written in any phase at all.
+      if (humanAcceptance && from === HUMAN_ACCEPTANCE_TRANSITION_FROM) gates.push(HUMAN_ACCEPTANCE_GATE);
+      // Architecture fitness joins `implementation -> review`, and only when the project
+      // has declared checks. It is appended at evaluation time rather than written into
+      // the transition table, so a project that declares nothing keeps the frozen lists
+      // exactly as the contract states them.
+      if (architectureFitness && from === ARCHITECTURE_TRANSITION_FROM && spec.to === ARCHITECTURE_TRANSITION_TO) {
+        gates.push(ARCHITECTURE_GATE);
+      }
+      // And it is re-examined at closure, because a dependency it governs can be broken
+      // by a LATER story inside the same epic — by the time the epic closes, the check
+      // that passed during implementation may describe a tree that no longer exists.
+      const revalidate = [...(spec.revalidate || [])];
+      if (architectureFitness && spec.to === 'closed') revalidate.push(ARCHITECTURE_GATE);
+      return { from, gates, revalidate };
     }
   }
   return null;
@@ -1312,6 +1473,7 @@ function checkGate({ gate, state, gates, exceptions, now, workItemId, fromPhase,
     phase: phaseScoped ? fromPhase : null,
     inputTreeHash: currentTreeHash,
     criteriaHash: critHash,
+    gateContract: gateContractId(gate),
   });
 
   const allReasons = [...reasons];
@@ -1413,8 +1575,16 @@ export function evaluateTransition(state, toPhase, context = {}) {
 
   // The reachability gate joins the requirement only when the repository has
   // opted in, so a project that has not sees the pre-existing gate list exactly.
-  const spec = requiredGates(toPhase, { reachability: context.policy?.reachability?.enabled === true });
-  if (!spec) {
+  const spec = requiredGates(toPhase, {
+    reachability: context.policy?.reachability?.enabled === true,
+    humanAcceptance: context.policy?.humanAcceptance?.enabled === true,
+    architectureFitness: architectureFitnessActive(context.policy),
+  });
+  // An edge with no `TRANSITIONS` entry can still carry a gate. It is resolved HERE,
+  // before the ungated-edge shortcut below, because that shortcut is what would
+  // otherwise let the edge through with the gate never consulted at all.
+  const conditional = spec ? [] : conditionalEdgeGates(fromPhase, toPhase, context.policy);
+  if (!spec && conditional.length === 0) {
     // Ungated transitions are legal ONLY along the declared forward edges
     // (bootstrap + planning progression). A target that is neither gated nor a
     // declared forward edge is rejected — most importantly, this makes `closed`
@@ -1425,7 +1595,7 @@ export function evaluateTransition(state, toPhase, context = {}) {
     errors.push(`illegal transition "${fromPhase}" → "${toPhase}" (not a gated transition, and not a declared forward edge)`);
     return { allowed: false, fromPhase, toPhase, missingGates, staleEvidence, errors, revalidated: [] };
   }
-  if (spec.from !== fromPhase) {
+  if (spec && spec.from !== fromPhase) {
     errors.push(`illegal transition "${fromPhase}" → "${toPhase}" (expected from "${spec.from}")`);
     return { allowed: false, fromPhase, toPhase, missingGates: [...spec.gates], staleEvidence, errors, revalidated: [] };
   }
@@ -1442,7 +1612,7 @@ export function evaluateTransition(state, toPhase, context = {}) {
 
   const shared = { state, gates, exceptions, now, workItemId, fromPhase, rootDir, computeTreeHash, inputTreeHash, critHash };
 
-  for (const gate of spec.gates) {
+  for (const gate of (spec ? spec.gates : conditional)) {
     const r = checkGate({ ...shared, gate });
     missingGates.push(...r.missingGates);
     staleEvidence.push(...r.staleEvidence);
@@ -1463,7 +1633,7 @@ export function evaluateTransition(state, toPhase, context = {}) {
     const recencyFloor = strict.requireFreshRevalidation !== false && state?.lastTransition?.at
       ? new Date(state.lastTransition.at)
       : null;
-    for (const gate of spec.revalidate) {
+    for (const gate of (spec?.revalidate || [])) {
       if (spec.gates.includes(gate)) continue; // already checked as a primary gate
       revalidated.push(gate);
       const r = checkGate({ ...shared, gate, recencyFloor, phaseScoped: false });

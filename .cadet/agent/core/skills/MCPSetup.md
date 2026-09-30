@@ -58,5 +58,5 @@ Establish Cadet's connection to Unity so the phase skills (TDD, Debugging, Code 
 <completion>
 ## Completion
 
-After the skill completes, record the setup in `.cadet/state.json` `changeHistory` (phase unchanged). Direct the agent to `.cadet/agent/core/UnityCli.md` for the exact gate → command → state contract — the phase skills use that contract when running tests, checking compilation, or querying the analyzer.
+After the skill completes, record the setup in `.cadet/state.json` `changeHistory` (phase unchanged), as a pointer to what was configured and committed — not a description of the setup (`.cadet/agent/core/Harness.md` §2c). Direct the agent to `.cadet/agent/core/UnityCli.md` for the exact gate → command → state contract — the phase skills use that contract when running tests, checking compilation, or querying the analyzer.
 </completion>

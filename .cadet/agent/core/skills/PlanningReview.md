@@ -119,7 +119,7 @@ After reaching shared understanding, report:
 - **Status:** ✅ / 🚫 markers on the journey.
 
 Update `.cadet/state.json`:
-- Record the shared-understanding document path in `changeHistory`.
+- Record the shared-understanding document path in `changeHistory`. Record it as a pointer — the artifact path, and the commit when there is one, never a summary of what the artifact says (`.cadet/agent/core/Harness.md` §2c).
 - Keep `currentPhase` at `requirements` (do not advance past a completed phase without its gate).
 - Reset gates for the next phase.
 </completion>

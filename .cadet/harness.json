@@ -36,6 +36,26 @@
     "mode": "ask-on-recognized-write"
   },
   "allowEmptyFreshness": false,
+  "strictClosure": {
+    "enabled": true,
+    "revalidateOnClosure": true,
+    "requireFreshRevalidation": false,
+    "manualConfirmation": {
+      "requireReason": true,
+      "requireExpiresAt": true,
+      "requireEnvironment": true,
+      "requireScope": true,
+      "maxValidityMs": 86400000
+    },
+    "disallowManualFor": ["testsPassed", "acceptanceCriteriaValidated", "reachabilityAddressed", "architectureFitnessPassed"]
+  },
+  "reachability": {
+    "enabled": false,
+    "command": null
+  },
+  "designReview": { "enabled": true },
+  "humanAcceptance": { "enabled": true },
+  "architectureFitness": { "enabled": false, "checks": [] },
   "scopes": {
     "perRun": {},
     "perStory": {}

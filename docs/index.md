@@ -14,6 +14,9 @@ For the condensed agent instruction set, see [cadet-agent.md](https://github.com
 - [Repository Role](core/RepositoryRole.md) — Framework-source vs consumer-project boundary and how it is detected
 - [Operating Rules](core/OperatingRules.md) — Mandatory constraints for all Cadet behavior
 - [Hard Gates](core/HardGates.md) — Non-skippable checkpoint system enforced via state.json
+- [Architecture Fitness](core/ArchitectureFitness.md) — Executable architecture constraints, and the line between them and a design review
+- [Host Interception](core/HostInterception.md) — What each host can actually stop, measured per action rather than assumed
+- [Capability Demonstrations](core/CapabilityDemonstrations.md) — Every claim with the command that demonstrates it, and the limitations stated
 - [Policy & Guidance Rules](core/PolicyAndGuidanceRules.md) — How policies and guidance interact
 - [Technology Introduction Rule](core/TechnologyIntroductionRule.md) — Rules for introducing new tech
 
@@ -24,6 +27,7 @@ Cadet skills are phase-scoped instruction files. When invoked (via `/cadet-<skil
 - [Planning Review](https://github.com/naishtech/cadet-agent/blob/main/.cadet/agent/core/skills/PlanningReview.md) (canonical skill file)
 - [Requirements](core/skills/Requirements.md)
 - [Architecture](core/skills/Architecture.md)
+- [Design Review](core/skills/DesignReview.md)
 - [Spike](core/skills/Spike.md)
 - [Story Breakdown](core/skills/StoryBreakdown.md)
 - [TDD](core/skills/TDD.md)

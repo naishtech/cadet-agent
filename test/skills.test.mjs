@@ -16,6 +16,7 @@ const directivePath = join(coreDir, 'cadet-agent.md');
 const expectedSkills = [
   'Requirements.md',
   'Architecture.md',
+  'DesignReview.md',
   'Spike.md',
   'StoryBreakdown.md',
   'TDD.md',
@@ -31,6 +32,7 @@ const expectedSkills = [
 const expectedPrompts = [
   'cadet-requirements.prompt.md',
   'cadet-architecture.prompt.md',
+  'cadet-design-review.prompt.md',
   'cadet-spike.prompt.md',
   'cadet-breakdown.prompt.md',
   'cadet-tdd.prompt.md',
@@ -188,7 +190,8 @@ describe('state.schema.json', () => {
     const strict = harnessSchema.$defs.policy.properties.strictClosure;
     assert.ok(strict, 'harness.schema.json must define policy.strictClosure');
     assert.equal(strict.properties.enabled.default, false, 'strictClosure must default to off (opt-in)');
-    assert.deepEqual(strict.properties.disallowManualFor.default, ['testsPassed', 'reachabilityAddressed']);
+    assert.deepEqual(strict.properties.disallowManualFor.default,
+      ['testsPassed', 'acceptanceCriteriaValidated', 'reachabilityAddressed', 'architectureFitnessPassed']);
     // The manual-confirmation quality fields must be expressible.
     for (const field of ['reason', 'environment', 'scope']) {
       assert.ok(harnessSchema.$defs.evidence.properties[field], `evidence schema must define ${field}`);
@@ -203,6 +206,7 @@ describe('state.schema.json', () => {
     assert.deepEqual(changeEntry.category.enum, [
       'manual-compile', 'budget-override', 'analyzer-fallback',
       'unscoped-freshness', 'documentation-only', 'tooling-gap', 'pre-harness-story',
+      'non-user-facing',
     ]);
     // v4 keeps the same taxonomy on its dedicated field.
     assert.deepEqual(
@@ -233,11 +237,19 @@ describe('harness artifacts', () => {
     assert.ok(normalized.includes('.cadet/agent/core/harness.schema.json'), 'harness.schema.json must be managed');
   });
 
-  it('lists .cadet/harness.json and .cadet/runs as preserved paths', () => {
+  it('lists .cadet/harness.json as a create-only seed and .cadet/runs as preserved', () => {
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
-    const normalized = manifest.preservedPaths.map(p => p.replace(/\\/g, '/'));
-    assert.ok(normalized.includes('.cadet/harness.json'), 'harness.json must be preserved');
-    assert.ok(normalized.includes('.cadet/runs'), 'runs must be preserved');
+    const norm = (list) => (list || []).map((p) => p.replace(/\\/g, '/'));
+    const preserved = norm(manifest.preservedPaths);
+    const managed = norm(manifest.managedPaths);
+    const createOnly = norm(manifest.createOnlyPaths);
+    // The policy file is shipped and created when absent, never overwritten: that
+    // is create-only, not preserved. A preserved path is skipped at extraction,
+    // so it would never be created for a new consumer.
+    assert.ok(createOnly.includes('.cadet/harness.json'), 'harness.json must be create-only');
+    assert.ok(managed.includes('.cadet/harness.json'), 'harness.json must be managed so the package carries it');
+    assert.equal(preserved.includes('.cadet/harness.json'), false, 'a preserved path is never created');
+    assert.ok(preserved.includes('.cadet/runs'), 'runs must be preserved');
   });
 
   it('has a valid harness schema with the required definitions', () => {
@@ -277,6 +289,32 @@ describe('Skill harness contract', () => {
       );
     });
   }
+
+  it('the story-close instruction seals the evidence, and seals it before the boundary', () => {
+    // The gap this pins: `state seal` existed, `Harness.md` documented it, and no skill
+    // mentioned it — so on a real project nothing was ever sealed and the evidence piled up
+    // outside git instead of travelling in the commit that closed the story. The ORDER matters
+    // as much as the step: `state begin` archives the records, and an archived record can no
+    // longer be sealed.
+    const resume = readFileSync(join(skillsDir, 'Resume.md'), 'utf-8');
+    const sealAt = resume.indexOf('state seal');
+    const boundaryAt = resume.indexOf('state begin');
+    assert.ok(sealAt > -1, 'Resume must include the seal step at story close');
+    assert.ok(boundaryAt > -1, 'Resume must still describe the boundary');
+    assert.ok(sealAt < boundaryAt, 'the seal step must be described before the boundary step');
+    assert.match(resume, /Cadet-/, 'the trailer prefix must be named');
+    assert.match(resume, /git commit -F/, "the commit stays the user's action (C5) and the command must be given");
+    // Stated anywhere in the row, not only between the two mentions: the reason is the part a
+    // reader has to meet, and where it sits in the sentence is not the rule.
+    assert.match(resume, /too late|nothing to seal/,
+      'the reason the order matters must be stated, not just the order');
+
+    const harness = readFileSync(join(coreDir, 'Harness.md'), 'utf-8');
+    assert.match(harness, /before `state begin`/, 'Harness.md must state when the seal happens');
+
+    const handoff = readFileSync(join(skillsDir, 'Handoff.md'), 'utf-8');
+    assert.match(handoff, /does not seal/i, 'a handoff must not be mistaken for the seal');
+  });
 
   it('TDD requires red/green evidence for testsPassed', () => {
     const content = readFileSync(join(skillsDir, 'TDD.md'), 'utf-8');

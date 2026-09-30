@@ -125,7 +125,15 @@ a correctly compacted repository of having closed stories with no evidence.
   **65% of the log was 116 handoff entries averaging 1.9 KB each, every one duplicating a file
   already written to `.cadet/handoffs/`.** So v4 does three things instead of removing the field:
   1. **A transition writes no history line.** It is already in `lastTransition` and in the sealing
-     commit; 162 redundant lines in that one repository.
+     commit; 162 redundant lines in that one repository. **An entry is also bounded in length: 400
+     characters (`MAX_HISTORY_ENTRY_CHARS`) summed across `change`, `reason` and `rationale` — bounding
+     one field only relocates the prose, and on the audited repository `reason` alone held 65% of the
+     surviving log's bytes — and a longer entry in a v4 document is a validation ERROR** — the documentation-only version of this rule drifted back in through every skill
+     except the one it was written for, and the longest entry on the audited repository was a
+     1.2 KB retelling of a report it named in the same sentence. `state compact` archives an
+     over-long entry wherever it sits, newest included, so the error is repairable in place and
+     nothing is lost; a v1-v3 document is exempt, and `state migrate` compacts its prose on the
+     way to v4.
   2. **A handoff entry is a reference, not an essay** — the path and the phase, which is what the
      `Handoff` skill always specified. The prose belongs in the handoff file.
   3. **Compaction keeps the most recent `HISTORY_ENTRIES_KEPT` (25) entries inline and appends the

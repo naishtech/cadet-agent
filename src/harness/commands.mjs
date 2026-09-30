@@ -128,6 +128,52 @@ export const COMMANDS = {
     writes: ['.cadet/runs/**', '.cadet/state.json'],
     unattended: true,
   },
+  'harness verify-design-review': {
+    mutates: true,
+    summary: 'Check the design-review artifact and record designReviewCompleted.',
+    // Like verify-acs and verify-reachability: it records evidence for its gate, so it
+    // writes the ledger and state. The artifact itself is the reviewer's, and this
+    // command never writes it — a check that authored the thing it checks would prove
+    // nothing.
+    writes: ['.cadet/runs/**', '.cadet/state.json'],
+    unattended: true,
+  },
+  'harness context plan': {
+    mutates: true,
+    summary: 'Write the context plan for the current phase: what must be loaded, and why.',
+    writes: ['.cadet/context/plan.json'],
+    unattended: true,
+  },
+  'harness context record': {
+    mutates: true,
+    summary: 'Record what the host loaded, and the level it can claim for that record.',
+    writes: ['.cadet/context/record.json'],
+    unattended: true,
+  },
+  'harness context validate': {
+    mutates: false,
+    summary: 'Compare the plan, the record and the files as they are now. Read-only.',
+    unattended: true,
+  },
+  'harness verify-architecture': {
+    mutates: true,
+    summary: 'Run the project\'s declared architecture checks and record the gate.',
+    // Same posture as verify-acs, verify-reachability and verify-design-review: it
+    // records evidence for its gate, so it writes the ledger and state. The checks
+    // themselves are the project's, declared in the policy — this command never writes
+    // them, and it accepts no command-line override of what they run.
+    writes: ['.cadet/runs/**', '.cadet/state.json'],
+    unattended: true,
+  },
+  'harness acceptance-form': {
+    mutates: true,
+    summary: 'Write a human-acceptance form for an epic, pre-filled from state.',
+    // It writes exactly one file, and only when that file does not exist: a form is a
+    // person's worksheet once they have touched it, and a regeneration would discard
+    // what they wrote. It never writes state — recording the gate is `harness confirm`.
+    writes: ['.cadet/agent/project-plans/**'],
+    unattended: true,
+  },
   'harness report': {
     mutates: false,
     summary: 'Summarize budget consumption and failures.',
@@ -197,6 +243,14 @@ export function resolveCommand(argv) {
   if (top === 'state' || top === 'harness') {
     const sub = argv[3];
     if (!sub || sub.startsWith('-')) return null;
+    // Longest key first: `harness context validate` must resolve to its own entry — a read —
+    // rather than to the group entry that also covers the two commands that write. Otherwise a
+    // read-only command would inherit the group's write declaration and lose its guard.
+    const action = argv[4] && !argv[4].startsWith('-') ? argv[4] : null;
+    if (action) {
+      const nested = `${top} ${sub} ${action}`;
+      if (Object.hasOwn(COMMANDS, nested)) return nested;
+    }
     const key = `${top} ${sub}`;
     return Object.hasOwn(COMMANDS, key) ? key : null;
   }

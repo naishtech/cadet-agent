@@ -63,6 +63,10 @@ const READ_ONLY_INVOCATIONS = {
   'harness matrix-check': ['harness', 'matrix-check'],
   'harness changes': ['harness', 'changes'],
   'harness reconcile': ['harness', 'reconcile'],
+  // The context validator reads the plan, the record and the files. It is the command a host
+  // runs to ask "may I claim a context-complete checkpoint?", so a write here would be the
+  // framework answering its own question.
+  'harness context validate': ['harness', 'context', 'validate'],
 };
 
 describe('command registry', () => {
@@ -144,6 +148,9 @@ describe('declared read-only commands write nothing', () => {
       ['--story', 'story.md'],
       ['--format', 'json'],
       ['--dry-run'],
+      // The host probe runs mechanisms where it is safe to do so, and "safe" includes writing
+      // nothing in the repository being measured: it works in a scratch directory of its own.
+      ['--verify-host'],
     ];
 
     for (const key of Object.keys(COMMANDS).filter((k) => !COMMANDS[k].mutates)) {
@@ -296,4 +303,32 @@ describe('a failed migrate leaves the tree exactly as it found it', () => {
       assert.ok(existsSync(join(dir, '.cadet', 'state.json.v1.bak')), 'a successful migration must write its backup');
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
+});
+
+describe('commands whose evidence comes from a file refuse --command', () => {
+  // The defect this pins: `--command` was parsed globally and then ignored by these four commands,
+  // so `harness verify-architecture --command "<anything>"` exited 0 having done nothing with the
+  // flag — the silently swallowed option this CLI's own parser comments warn about ("a silently
+  // swallowed option is worse than a rejected one because the command still reports success"), and
+  // a direct contradiction of C17 ("runs the checks declared under architectureFitness and accepts
+  // no --command"). `harness verify --gate <g>` already refused it with `gate-not-overridable`.
+  const cases = [
+    ['harness', 'verify-architecture'],
+    ['harness', 'verify-acs'],
+    ['harness', 'verify-reachability'],
+    ['harness', 'verify-design-review'],
+  ];
+
+  for (const command of cases) {
+    it(`refuses --command on ${command.join(' ')}`, () => {
+      const dir = mkdtempSync(join(tmpdir(), 'cadet-cmd-override-'));
+      try {
+        mkdirSync(join(dir, '.cadet'), { recursive: true });
+        const r = runCli([...command, '--command', 'node -e "process.exit(0)"', '--target', dir, '--format', 'json']);
+        assert.notEqual(r.status, 0, `${command.join(' ')} must refuse --command`);
+        assert.match(r.stdout + r.stderr, /takes no --command/);
+        assert.match(r.stdout + r.stderr, /command-not-accepted/);
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    });
+  }
 });

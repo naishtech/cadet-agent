@@ -102,4 +102,20 @@ Run `npm test` to validate:
 
 ## Harness pointers
 
-Adapters do not restate harness rules. Each adapter's `Read First` pointer to `.cadet/agent/core/cadet-agent.md` leads to the Harness rules; the canonical harness contract is `.cadet/agent/core/Harness.md`. Capability-limited IDEs (Cursor, Continue, Claude Code) have no native PreToolUse hook — their adapters must state that limitation, and the harness reports it (`cadet-agent harness capabilities`). Deep Code also has no hook; its adapter directs users to `.deepcode/settings.json` `permissions.ask` (`mutate-git-log`) instead. Hermes has no hook either; its users enable command approval policies for commit/push (see `docs/guidance/Hermes.md`). Copilot hooks (`git-guard.sh` / `git-guard.ps1`) fail closed on malformed input by default; `fail-open` is opt-in only.
+Adapters do not restate harness rules. Each adapter's `Read First` pointer to `.cadet/agent/core/cadet-agent.md` leads to the Harness rules; the canonical harness contract is `.cadet/agent/core/Harness.md`.
+
+**Interception is measured, not inferred.** `cadet-agent harness capabilities --verify-host` probes the
+configured mechanisms and reports a level — `native`, `external` or `advisory` — for each host and each
+action (`git-write`, `shell-command`, `filesystem-write`, `unity-mutation`, `context-load`,
+`harness-routing`). A configured hook is not an active control: the probe feeds it a git write and a
+read-only command and requires the answers its contract promises, and a mechanism that fails drops its
+action to `advisory` with the reason attached. The level is never read from the presence of an adapter or
+hook file — the framework ships those, so presence is true everywhere and measures nothing.
+
+Where a host has no interception API, the external route is a client setting (Deep Code:
+`.deepcode/settings.json` → `permissions.ask` with `mutate-git-log`; Hermes: command approval policies;
+Cursor and Continue: their own approval settings), and it is documented rather than assumed. The portable
+control that works for every host is the repository Git hook: `git config core.hooksPath .githooks`.
+Copilot hooks (`git-guard.sh` / `git-guard.ps1`) fail closed on malformed input by default; `fail-open` is
+opt-in only. The full matrix, the probes and what cannot be intercepted at all are in
+`docs/core/HostInterception.md`.

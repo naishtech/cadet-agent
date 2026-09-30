@@ -28,7 +28,7 @@ Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished g
 
 ## Cross-IDE Support
 
-Cadet-Agent provides full workflow parity across six IDEs. The same 11 skills + reviewer are available in each:
+Cadet-Agent provides the **same skills** across six IDEs — one canonical file per skill, read through thin per-host pointers. It does **not** provide equal *enforcement*, and it does not claim to: no host here can block what it has no API to intercept, so enforcement is measured per action and published. Run `cadet-agent harness capabilities --verify-host` for the measured matrix on your repository, or read [Host Interception](docs/core/HostInterception.md).
 
 | Feature | GitHub Copilot | Cursor | Continue | Claude Code | Deep Code | Hermes |
 |---|---|---|---|---|---|---|
@@ -46,7 +46,11 @@ Cadet-Agent provides full workflow parity across six IDEs. The same 11 skills + 
 | MCP Setup | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Reconciliation | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Reviewer mode | Agent picker | Rule toggle | `/cadet-agent-reviewer` | `/cadet-agent-reviewer` | `cadet-agent-reviewer` skill | `/cadet-agent-reviewer` |
-| Git guard | PreToolUse hook | Manual | Manual | Manual | `permissions.ask` (`mutate-git-log`) | Command approval policies |
+| Git guard (declared; measured by `--verify-host`) | `native` — PreToolUse hook | `external` via the repository Git hook, else `advisory` | `external` / `advisory` | `advisory` until a hook is configured | `external` (declared: `permissions.ask`) | `external` (declared: approval policies) |
+
+Every other row is a capability: the skills are the same, the interception is not, and the difference is
+measured rather than assumed (see [Host Interception](docs/core/HostInterception.md)). The portable control
+that works for every host is the repository Git hook: `git config core.hooksPath .githooks`.
 
 All adapters delegate to the canonical files under `.cadet/agent/core/` — no duplicated rules or skills. See `ADAPTERS.md` for the full inventory, `docs/guidance/DeepCode.md` for Deep Code setup, and `docs/guidance/Hermes.md` for Hermes setup.
 
@@ -165,9 +169,19 @@ Hard gates are enforced at every phase transition. The agent reads `.cadet/state
 
 | Transition | Required Gates |
 |---|---|
-| implementation → review | `testsPassed`, `compileCheckConfirmed`, `unityAnalyzerClean`, `storyTrackingUpdated` |
+| architectureComplete → story-breakdown | `designReviewCompleted` when `designReview.enabled` is set — the formal design review, recorded by `harness verify-design-review` |
+| implementation → review | `testsPassed`, `compileCheckConfirmed`, `unityAnalyzerClean`, `storyTrackingUpdated`, and `architectureFitnessPassed` when the project declares architecture checks and enables them |
 | review → validation | `codeReviewCompleted`, `securityReviewPassed`, `acceptanceCriteriaValidated`, and `reachabilityAddressed` when `reachability.enabled` is set |
-| validation → closed | `designArtifactSyncConfirmed` |
+### Runtime context protocol (opt-in, and the framework's own claim discipline)
+
+`harness context plan` states what a phase requires (with a reason and a hash for each reference),
+`harness context record` captures what the host loaded and the level it can claim, and
+`harness context validate` decides whether a context-complete checkpoint may be claimed. The level is
+reported as it is — a run reported as `recorded` is never reported as `enforced`, and `enforced` needs
+a hook that declares it enforces context. A required reference that was never loaded, or that changed
+after the record, blocks the checkpoint. See `.cadet/agent/core/Harness.md` §2d.
+
+| validation → closed | `designArtifactSyncConfirmed`, and `humanAcceptanceConfirmed` when `humanAcceptance.enabled` is set — a person's own record (`harness acceptance-form` writes the form, `harness confirm --artifact` records it); no command can produce it |
 
 **`closed` is end-of-epic, not per-story.** `validation → closed` is taken only when no stories remain (`NEXT_STORY → no → CLOSED` above). When an epic still has stories, the next story re-enters from `validation → implementation` (`NEXT_STORY → yes → IMPL`). Do not close a story individually: `closed` is terminal, and there is no transition out of it.
 

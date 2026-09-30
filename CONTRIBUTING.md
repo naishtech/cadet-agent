@@ -43,7 +43,16 @@ All changes must happen on a feature branch. Direct commits to `main` are not pe
 - `.cadet/agent/policies/`
 - `.cadet/agent/project-plans/`
 
-If you add a new managed path, update `FrameworkManifest.json → managedPaths` in the same PR.
+**Create-only paths** (shipped in the package, written only when absent, never overwritten):
+- `AGENTS.md`
+- `.cadet/harness.json` — the framework's own policy file, so a new consumer starts from a declared policy.
+  Edit it here to change a default for new consumers: this file is the seed. A consumer that already owns
+  the file keeps its own values, and that is the override path.
+
+If you add a new managed path, update `FrameworkManifest.json → managedPaths` in the same PR. A create-only
+path must be listed in `managedPaths` **and** in `createOnlyPaths`, and must **not** be listed in
+`preservedPaths`. A preserved path is skipped during extraction, so a preserved policy file would never be
+created for a new consumer; a managed-but-not-create-only path would overwrite the consumer's own policy.
 
 ## Version bump rules
 Follow the policy defined in [.cadet/agent/core/README.md](.cadet/agent/core/README.md#version-bump-policy):

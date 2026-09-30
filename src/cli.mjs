@@ -7,8 +7,19 @@ import {
   workItemIdOf, loadPolicy, RunLedger, loadRun, listRuns, cleanupRuns, buildReport, formatReport,
   runVerificationLoop, commandForGate, detectCapabilities, runsDir, gitChangedFiles, PolicyError, StateError,
   detectRepoRole, describeRepoRole, GATES, PHASES, manualConfirmation, computeStatus,
+  gateBuilder, describeGateRefusal,
   gitChangeSet, DEFAULT_REPORT_DIR,
   reconcileArtifacts, PLANS_DEFAULT_DIR,
+  parseDesignReviewArtifact, describeDesignReviewGaps, FINDING_DISPOSITIONS,
+  DESIGN_REVIEW_GATE, HUMAN_ACCEPTANCE_GATE,
+  CONTEXT_LEVELS, buildContextPlan, writeContextPlan, readContextPlan, buildContextRecord,
+  writeContextRecord, readContextRecord, parseTranscript, validateContextRecord,
+  describeContextState, ContextProtocolError,
+  enforcementMatrix, describeEnforcement, INTERCEPTION_ACTIONS,
+  ARCHITECTURE_GATE, architectureFitnessActive, runArchitectureChecks, summariseChecks,
+  describeCheckResults, DEFAULT_CHECK_TIMEOUT_MS,
+  ACCEPTANCE_TEMPLATE_RELATIVE, buildAcceptanceForm, parseAcceptanceForm, writeAcceptanceForm,
+  acceptanceFormPath, ACCEPTANCE_HUMAN_FIELDS,
   parseTestInventory, parseStoryCriteria, compareCoverage, describeCoverageGaps,
   parseReachabilityDeclaration, validateReachabilityDeclaration, collectWorkItems,
   findDeferralCycles, readSiblingDeclarations, normalizeWorkItemRef, describeReachabilityGaps,
@@ -45,6 +56,7 @@ function showHelp() {
     npx cadet-agent@latest sync     Update framework, preserving local policies/plans
     npx cadet-agent@latest sync --target <dir>   Sync a specific directory
 
+    cadet-agent state init          Create the first .cadet/state.json (never overwrites one)
     cadet-agent state validate      Validate .cadet/state.json against the schema
     cadet-agent state validate --verify-sealed   Also read sealed evidence from commit trailers
     cadet-agent state migrate       Atomically migrate state to the current version (backup on write)
@@ -60,6 +72,12 @@ function showHelp() {
     cadet-agent harness verify      Run a bounded, classified verification loop
     cadet-agent harness verify-acs  Verify declared AC↔test coverage against a test report
     cadet-agent harness verify-reachability  Verify a story's declared reachability (opt-in)
+    cadet-agent harness verify-design-review  Check the design-review artifact and record the gate (opt-in)
+    cadet-agent harness acceptance-form  Write a human-acceptance form for an epic, filled in from state
+    cadet-agent harness verify-architecture  Run the project's declared architecture checks (opt-in)
+    cadet-agent harness context plan  Write what the phase requires, and why (opt-in protocol)
+    cadet-agent harness context record  Record what the host loaded, and the level it can claim
+    cadet-agent harness context validate  Compare plan, record and current files (read-only)
     cadet-agent harness report      Summarize budget consumption and failures
     cadet-agent harness changes     List the files a story changed, with status, counts, and links
     cadet-agent harness reconcile   Reconcile the planning chain against state.json (read-only)
@@ -82,6 +100,10 @@ function showHelp() {
     --environment  key=value,... describing what was verified (harness confirm)
     --scope        Comma-separated scope of the confirmation (harness confirm)
     --story        Story markdown declaring the acceptance criteria or reachability (harness verify-acs|verify-reachability)
+    --artifact     Design-review artifact to check (verify-design-review), or the acceptance form to record from (confirm --gate humanAcceptanceConfirmed)
+    --epic         Epic a generated form belongs to (harness acceptance-form)
+    --out          Where to write the form (default: the epic's plan directory)
+
     --report       Test report to derive the inventory from (harness verify-acs|matrix-check)
     --matrix       TDD matrix markdown to check (harness matrix-check)
     --inventory    Newline-separated test names, when no report is available (harness matrix-check)
@@ -96,6 +118,7 @@ function showHelp() {
     --epic         Epic id of the work item being started (state begin)
     --commit-msg   Path to write the prepared commit message to (state seal)
     --verify-sealed  Also verify evidence sealed in commit trailers (state validate)
+    --verify-host  Probe the configured host controls and report the measured level (harness capabilities)
     --dry-run      Report what a mutating command would do and write nothing (all mutating commands)
     --yes, -y      Never prompt; keep existing files (non-interactive installs)
     --help, -h    Show this help (valid at any depth; never writes)
@@ -174,7 +197,10 @@ function parseArgs(argv) {
       // working-tree scan (which could bind evidence to Cadet's own files).
       case '--files': opts.filesGiven = true; opts.files = value(a).split(',').map((s) => s.trim()).filter(Boolean); break;
       case '--story': opts.story = value(a); break;
-      // state begin: the epic the new work item belongs to.
+      case '--artifact': opts.artifact = value(a); break;
+      case '--out': opts.out = value(a); break;
+      // The epic the command acts on: `state begin`'s new work item, and the epic an
+      // acceptance form is generated for.
       case '--epic': opts.epicId = value(a); break;
       // state compact: keep every record inline instead of applying the
       // within-work-item retention rule. Made explicit at the call site, because
@@ -202,6 +228,27 @@ function parseArgs(argv) {
       case '--commit-msg': opts.commitMsgPath = value(a); break;
       // state validate: read commit trailers too, not just the live document.
       case '--verify-sealed': opts.verifySealed = true; break;
+      // The two flags the acceptance form replaced. They are PARSED so that they can be refused by
+      // name: without a case here they fell through into `opts.rest`, the command exited 0, and the
+      // values went nowhere — which contradicts this parser's own rule, written a few lines above,
+      // that a silently swallowed option is worse than a rejected one because the command still
+      // reports success. `harness confirm` refuses them (see the acceptance gate).
+      case '--witness': opts.witness = value(a); break;
+      case '--limitations': opts.limitations = value(a); break;
+      // state init: the first document's declared values. Each is validated before anything is
+      // written, so a typo cannot become a state file the rest of the framework then refuses.
+      case '--workflow-path': opts.workflowPath = value(a); break;
+      case '--tracking-mode': opts.trackingMode = value(a); break;
+      case '--learner-tier': opts.learnerTier = value(a); break;
+      case '--operating-mode': opts.operatingMode = value(a); break;
+      // `--phase` is declared once, above: state init and harness record both read opts.phase.
+      case '--verify-host': opts.verifyHost = true; break;
+      // The context protocol: what the host loaded, and what it can claim about it.
+      case '--level': opts.contextLevel = value(a); break;
+      case '--loaded': opts.contextLoaded = value(a).split(',').map((s) => s.trim()).filter(Boolean); break;
+      case '--enforced-by': opts.enforcedBy = value(a); break;
+      case '--transcript': opts.transcript = value(a); break;
+      case '--host': opts.host = value(a); break;
       case '--agents-md': opts.agentsMd = value(a); break;
       case '--yes': case '-y': opts.yes = true; break;
       default: opts.rest.push(a);
@@ -565,6 +612,80 @@ async function cmdState(opts) {
     return;
   }
 
+  if (sub === 'init') {
+    // The first state document, as a command.
+    //
+    // It had no command. `cadet-agent init` installs the framework, and then EVERY entry point
+    // refuses: `state begin` says "Initialise state before starting a work item", `state
+    // transition` says the same, `harness confirm` says the same — and there was no way to
+    // initialise it. The only route was a hand-written document, which is the pattern this
+    // framework condemns everywhere else, and the instruction that described it
+    // (`skills/Resume.md`) wrote `version: 1` with `session.workflowPath: null` — a document
+    // `state validate` REJECTS ("workflowPath is required", "unknown workflowPath \"null\"").
+    // So a new consumer's first document was unaudited and, followed literally, invalid; and
+    // every later gate reads that document.
+    const existing = readState(opts.targetDir);
+    if (existing.exists) {
+      fail(
+        opts,
+        'A state document already exists. state init never overwrites one: '
+        + 'it is the document every gate reads, and rewriting it silently would discard the '
+        + 'evidence those gates were satisfied with. Delete or archive it first if that is '
+        + 'really what you want.',
+        () => 1,
+        { ok: false, code: 'state-exists', path: '.cadet/state.json' },
+      );
+    }
+
+    const workflowPath = opts.workflowPath || 'large';
+    const trackingMode = opts.trackingMode || 'markdown';
+    const currentPhase = opts.phase || PHASES[0];
+    const values = [
+      ['--workflow-path', workflowPath, ['large', 'small', 'no_test_required']],
+      ['--tracking-mode', trackingMode, ['markdown', 'github']],
+      ['--phase', currentPhase, PHASES],
+    ];
+    if (opts.learnerTier !== undefined) values.push(['--learner-tier', opts.learnerTier, ['beginner', 'intermediate', 'advanced', 'guided']]);
+    if (opts.operatingMode !== undefined) values.push(['--operating-mode', opts.operatingMode, ['instruction-first', 'implementation-first', 'hybrid']]);
+    for (const [flag, value, allowed] of values) {
+      if (!allowed.includes(value)) {
+        fail(opts, `unknown ${flag} value "${value}" (expected one of: ${allowed.join(', ')})`, () => 1, { ok: false, code: 'unknown-value', flag, value, allowed });
+      }
+    }
+
+    const initial = {
+      version: STATE_VERSION,
+      stateVersion: STATE_VERSION,
+      session: {
+        workflowPath,
+        currentPhase,
+        trackingMode,
+        ...(opts.learnerTier !== undefined ? { learnerTier: opts.learnerTier } : {}),
+        ...(opts.operatingMode !== undefined ? { operatingMode: opts.operatingMode } : {}),
+      },
+      activeWorkItem: null,
+      gates: Object.fromEntries(GATES.map((g) => [g, false])),
+      gateEvidence: [],
+      epics: {},
+    };
+
+    // Validate before writing, like every other writer here. A document that the framework
+    // would refuse must never reach disk: it is the file every gate reads.
+    const { errors } = validateState(initial, { rootDir: opts.targetDir });
+    if (errors.length > 0) {
+      fail(opts, `refusing to write an invalid state document: ${errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`, () => 1, { ok: false, code: 'invalid-state', errors });
+    }
+
+    const written = writeState(opts.targetDir, initial);
+    emit(
+      opts,
+      `✅ Created .cadet/state.json (v${STATE_VERSION}): workflowPath "${workflowPath}", phase "${currentPhase}", trackingMode "${trackingMode}".\n`
+      + '   The framework is installed and the workflow starts here; nothing is tracked until the first work item ("cadet-agent state begin").',
+      { ok: true, version: STATE_VERSION, workflowPath, currentPhase, trackingMode, gates: Object.keys(initial.gates).length, appended: written?.appended ?? 0 },
+    );
+    return;
+  }
+
   if (sub === 'begin') {
     // The story boundary, as a command.
     //
@@ -760,16 +881,27 @@ async function cmdHarness(opts) {
     // depend on the agent reading it, because the dispatcher enforces the
     // registry regardless.
     const commands = describeAllCommands();
-    if (opts.format === 'json') emit(opts, '', { ok: true, capabilities: caps, commands });
+    // What the host can actually stop, per action. `--verify-host` runs the probes; without it the
+    // declared position is printed and marked "declared", so a reader can always tell a measurement
+    // from a declaration — and never from the presence of a file.
+    const matrix = enforcementMatrix(opts.targetDir, { verify: opts.verifyHost === true });
+    if (opts.verifyHost === true) caps.hook.verified = matrix.hostHook.verified;
+    if (opts.format === 'json') emit(opts, '', { ok: true, capabilities: caps, enforcement: matrix, commands });
     else {
       console.log('Cadet-Agent capability report');
       console.log(`  CLI:            ${caps.cli ? 'available' : 'unavailable'}`);
       console.log(`  Unity CLI:      ${caps.unityCli.available ? `available (${caps.unityCli.version || 'version unknown'})` : 'unavailable — compile/analyzer gates fall back to manual confirmation'}`);
       console.log(`  MCP:            ${caps.mcp.available ? 'configured' : 'unavailable — live inspection not available'}`);
-      console.log(`  Copilot hook:   ${caps.hook.copilot ? 'installed' : 'not installed'}`);
       console.log(`  Token telemetry:${caps.tokenTelemetry.provider ? ' provider' : ' estimate/unknown'}`);
       console.log(`  Cost telemetry: ${caps.costTelemetry.available ? 'available' : `unavailable (${caps.costTelemetry.reason})`}`);
-      console.log(`  Note: ${caps.hook.note}`);
+      console.log(`  Host interception (${matrix.verified ? 'measured' : 'declared — pass --verify-host to measure'}):`);
+      for (const line of describeEnforcement(matrix)) console.log(line);
+      if (matrix.verified) {
+        console.log(`  Host hook:      ${matrix.hostHook.verified ? `verified — ${matrix.hostHook.reason}` : `not verified — ${matrix.hostHook.reason}`}`);
+        console.log(`  Repo git hook:  ${matrix.repoHook.verified ? `verified — ${matrix.repoHook.reason}` : `not verified — ${matrix.repoHook.reason}`}`);
+      } else {
+        console.log(`  Note: ${caps.hook.note}`);
+      }
       console.log('  Commands (mutating commands honour --dry-run; nothing writes without it being declared):');
       for (const c of commands) {
         const bound = c.requiresForUnattended.length ? ` [unattended requires ${c.requiresForUnattended.join(', ')}]` : '';
@@ -788,6 +920,23 @@ async function cmdHarness(opts) {
     if (!exists) fail(opts, 'No .cadet/state.json found. Initialise state before recording confirmation.', () => 2);
     assertExpectedPhase(opts, state);
 
+    // A caller that passes the removed flags is refused by name. The acceptance is recorded from
+    // the form and from nothing else (see below); a witness or a limitation typed here would be
+    // discarded, and a discarded field that looked accepted is exactly the failure this framework
+    // is built to prevent.
+    const removedFlags = ['witness', 'limitations'].filter((k) => opts[k] !== undefined && opts[k] !== null);
+    if (removedFlags.length > 0) {
+      const flags = removedFlags.map((k) => `--${k}`);
+      fail(
+        opts,
+        `${flags.join(' and ')} no longer exist, so nothing was recorded. A human acceptance is recorded from its form: `
+        + 'run "cadet-agent harness acceptance-form --epic <epicId>", fill it in, and pass it back with --artifact <the form>. '
+        + 'The witness and the limitations live in that file, where a reviewer can read them.',
+        () => 1,
+        { ok: false, gate, code: 'flag-removed', flags },
+      );
+    }
+
     const strict = policy.strictClosure?.enabled === true ? policy.strictClosure : null;
     const mc = strict?.manualConfirmation || null;
     // One reference instant for the whole command, captured before any work.
@@ -798,17 +947,75 @@ async function cmdHarness(opts) {
 
     // Collect EVERY missing field so the caller fixes the record in one pass,
     // rather than discovering one omission per invocation.
+    //
+    // The two fields the acceptance ARTIFACT supplies are exempt when it is present. The check
+    // below refuses `--scope` and `--environment` beside `--artifact` (they would be a second,
+    // competing source for the same claim), so demanding them here made the command unsatisfiable
+    // in both directions under the shipped policy: with them it was `artifact-conflicts-with-flags`,
+    // without them `strict-metadata-missing`. A gate no caller can satisfy is not a strict gate.
+    // The form carries both, and its completeness is checked when it is parsed.
+    const artifactSuppliesScope = typeof opts.artifact === 'string' && opts.artifact !== '';
     const missing = [];
     if (mc?.requireReason !== false && strict && (!opts.reason || String(opts.reason).trim() === '')) missing.push('--reason');
     if (mc?.requireExpiresAt !== false && strict) {
       if (!opts.expiresAt) missing.push('--expires-at');
       else if (Number.isNaN(Date.parse(opts.expiresAt))) missing.push('--expires-at (not an ISO-8601 date-time)');
     }
-    if (mc?.requireEnvironment !== false && strict && (!opts.environment || String(opts.environment).trim() === '')) missing.push('--environment');
-    if (mc?.requireScope !== false && strict && (!opts.scope || opts.scope.length === 0)) missing.push('--scope');
+    if (mc?.requireEnvironment !== false && strict && !artifactSuppliesScope && (!opts.environment || String(opts.environment).trim() === '')) missing.push('--environment');
+    if (mc?.requireScope !== false && strict && !artifactSuppliesScope && (!opts.scope || opts.scope.length === 0)) missing.push('--scope');
     if (missing.length) {
       fail(opts, `strictClosure requires manual-confirmation metadata. Missing: ${missing.join(', ')}.`, () => 1, { ok: false, gate, code: 'strict-metadata-missing', missing });
     }
+
+    // A human acceptance is recorded from a form, and from nothing else.
+    //
+    // There is no flag route. Two routes to one gate means the weaker route defines the
+    // gate, and the flag route's only advantage was skipping the file — at the cost of a
+    // record no person can read later. The form costs two commands, leaves the acceptance
+    // somewhere a reviewer can open, and removes the second copy that could disagree with
+    // the record. `--witness` and `--limitations` no longer exist; a caller that passes
+    // them is refused here rather than silently recorded, which is why the check is on
+    // the missing artifact rather than on the flags.
+    if (gate === HUMAN_ACCEPTANCE_GATE && !opts.artifact) {
+      fail(opts, `a human acceptance is recorded from a form: run "cadet-agent harness acceptance-form --epic <epicId>" to write one pre-filled from state, fill in its blank fields, then pass it back with --artifact <the form>.`, () => 1, { ok: false, gate, code: 'acceptance-form-required' });
+    }
+
+    // `harness acceptance-form` writes the form pre-filled from state; this reads it back.
+    if (opts.artifact) {
+      if (gate !== HUMAN_ACCEPTANCE_GATE) {
+        fail(opts, `--artifact is only for ${HUMAN_ACCEPTANCE_GATE}: every other gate's evidence comes from its own command or from explicit fields.`, () => 1, { ok: false, gate, code: 'artifact-not-applicable' });
+      }
+      const conflicting = ['scope', 'environment'].filter((k) => opts[k]);
+      if (conflicting.length > 0) {
+        fail(opts, `--artifact already carries the acceptance, so ${conflicting.map((k) => `--${k}`).join(' and ')} would be a second, competing source. Pass the artifact alone.`, () => 1, { ok: false, gate, code: 'artifact-conflicts-with-flags', conflicting });
+      }
+      let formText;
+      try {
+        formText = readFileSync(opts.artifact, 'utf-8');
+      } catch (err) {
+        fail(opts, `the acceptance form could not be read (${err.message}).`, () => 1, { ok: false, gate, code: 'artifact-unreadable' });
+      }
+      const form = parseAcceptanceForm(formText);
+      if (form.incomplete.length > 0) {
+        fail(opts, `the form still has unfilled fields: ${form.incomplete.join(', ')}. Fill them in ${opts.artifact} and run the command again — an acceptance nobody wrote down is not an acceptance.`, () => 1, { ok: false, gate, code: 'acceptance-form-incomplete', missing: form.incomplete });
+      }
+      if (state && form.epic && state.epics && !state.epics[form.epic]) {
+        fail(opts, `the form accepts epic "${form.epic}", which does not exist in state.json. Fix the form, or accept the epic the repository actually has.`, () => 1, { ok: false, gate, code: 'acceptance-form-epic-unknown', epic: form.epic });
+      }
+      opts.witness = form.witness;
+      opts.limitations = form.limitations;
+      opts.environment = form.environment || null;
+      opts.scope = [form.epic];
+      if (!opts.files || opts.files.length === 0) opts.files = form.fileList;
+      opts.files = opts.files && opts.files.length ? opts.files : null;
+      opts.filesGiven = opts.files !== null;
+      opts.acceptedBy = form.acceptor;
+    }
+
+    // No check for empty witness/limitations is needed here: the form is the only route
+    // to this gate, and `parseAcceptanceForm` refuses a form whose fields are blank or
+    // still placeholders, so an empty value cannot reach this point. A second check would
+    // be a guard that cannot fire, and the one that cannot fire is the one that rots.
 
     // A gate listed in disallowManualFor may never be satisfied by a human
     // assertion; point at the automated path instead of accepting the record.
@@ -874,6 +1081,8 @@ async function cmdHarness(opts) {
       rootDir: opts.targetDir,
       approvedBy: opts.approvedBy || 'user',
       commit: opts.commit || null,
+      witness: opts.witness || null,
+      limitations: opts.limitations || null,
       at,
     });
 
@@ -943,6 +1152,20 @@ async function cmdHarness(opts) {
   if (sub === 'verify') {
     const gate = opts.gate;
     if (!gate) fail(opts, 'harness verify requires --gate <gate>');
+    // The gate NAME selects the evidence contract, so an unknown name is refused
+    // before anything runs. A made-up gate used to be accepted with --command and
+    // recorded as an automated pass, which put evidence into state.json for a name
+    // no transition can read.
+    if (!GATES.includes(gate)) {
+      fail(opts, describeGateRefusal(gate), () => 1, { ok: false, gate, code: 'unknown-gate' });
+    }
+    // A project command may fill only the slots whose evidence IS a project
+    // command. Anywhere else it would let an unrelated exit-zero command attest a
+    // claim it does not prove — which is how `codeReviewCompleted` could be
+    // satisfied by `node -e "process.exit(0)"`.
+    if (opts.command && gateBuilder(gate)?.projectCommand !== true) {
+      fail(opts, describeGateRefusal(gate), () => 1, { ok: false, gate, code: 'gate-not-overridable' });
+    }
     const { state } = readState(opts.targetDir);
     assertExpectedPhase(opts, state);
     const caps = detectCapabilities({ targetDir: opts.targetDir });
@@ -1084,10 +1307,12 @@ async function cmdHarness(opts) {
   }
 
   if (sub === 'verify-acs') {
+    refuseCommandOverride('harness verify-acs', 'the acceptance criteria in the story and the test report');
     // Mechanical AC↔test verification (contract v4). Declared tests must appear
     // in the inventory of a run that actually executed them; a name that was
     // never written cannot be asserted into coverage.
     if (!opts.story) fail(opts, 'harness verify-acs requires --story <path>');
+    const storyPath = resolve(opts.targetDir, opts.story);
     const { exists, state } = readState(opts.targetDir);
     assertExpectedPhase(opts, state);
     const strict = policy.strictClosure?.enabled === true;
@@ -1096,7 +1321,14 @@ async function cmdHarness(opts) {
 
     let criteria;
     try {
-      ({ criteria } = parseStoryCriteria(opts.story));
+      // The story is READ from the target repository, exactly as verify-reachability reads it, and
+      // not from the process working directory. Reading it from the CWD while the record below
+      // binds `<target>/<story>` was two defects in one line: the command was unusable from
+      // outside the project (`--target` with a CWD elsewhere), and — worse — when a file of that
+      // name happened to exist under the CWD it parsed THAT file's criteria and wrote a record
+      // attesting them against the target's path, which is the silently-inert binding the comment
+      // below warns about.
+      ({ criteria } = parseStoryCriteria(storyPath));
     } catch (err) {
       fail(opts, `cannot parse story "${opts.story}": ${err.message}`, () => 1, { ok: false, code: 'story-parse', story: opts.story });
     }
@@ -1112,7 +1344,10 @@ async function cmdHarness(opts) {
     let reportPath = null;
     if (opts.report) {
       try {
-        reportText = readFileSync(opts.report, 'utf-8');
+        // Resolved against the target, like `--story` above and like every other path flag in this
+        // CLI (matrix-check, harness changes). CWD-relative reads made the command unusable from
+        // outside the project and could have read a report from a different tree.
+        reportText = readFileSync(resolve(opts.targetDir, opts.report), 'utf-8');
         reportSource = 'explicit';
         reportPath = opts.report;
       } catch (err) {
@@ -1213,11 +1448,10 @@ async function cmdHarness(opts) {
     // the same treatment and is kept as `artifactPath` for audit, where nothing
     // re-hashes it.
     //
-    // The story path is made repo-relative for the same reason verify-reachability
-    // does it: an absolute path never resolves under the root when freshness is
-    // re-derived at transition time, so both hashes would be computed over a
-    // missing file and match — a binding that is silently inert.
-    const storyPath = resolve(opts.targetDir, opts.story);
+    // The story path is made repo-relative (see the read above: it resolves against the target,
+    // never the working directory) for the same reason verify-reachability does it: an absolute
+    // path never resolves under the root when freshness is re-derived at transition time, so both
+    // hashes would be computed over a missing file and match — a binding that is silently inert.
     const storyRel = relative(opts.targetDir, storyPath).replace(/\\/g, '/') || basename(storyPath);
     const evidence = createEvidence({
       evidenceId: newId(),
@@ -1288,6 +1522,7 @@ async function cmdHarness(opts) {
   }
 
   if (sub === 'verify-reachability') {
+    refuseCommandOverride('harness verify-reachability', "the story's reachability declaration and the repository's own probe");
     // Mechanical reachability verification (contract v6 §2). A story declares how
     // its deliverable becomes witnessable, or which work item will make it so;
     // this checks that declaration against the work items that exist, and runs
@@ -1444,6 +1679,427 @@ async function cmdHarness(opts) {
     return;
   }
 
+  if (sub === 'acceptance-form') {
+    if (!opts.epicId) {
+      fail(opts, 'harness acceptance-form needs --epic <epicId>: the form belongs to the epic being accepted.', () => 1, { ok: false, code: 'epic-required' });
+    }
+    const { exists, state } = readState(opts.targetDir);
+    if (!exists) {
+      fail(opts, 'No .cadet/state.json found. The form is generated from state, so there is nothing to fill it from yet.', () => 1, { ok: false, code: 'no-state' });
+    }
+    if (state.epics && !state.epics[opts.epicId]) {
+      fail(opts, `epic "${opts.epicId}" does not exist in state.json. Known epics: ${Object.keys(state.epics).join(', ') || '(none)'}.`, () => 1, { ok: false, code: 'epic-unknown', epic: opts.epicId });
+    }
+    const templatePath = join(opts.targetDir, ...ACCEPTANCE_TEMPLATE_RELATIVE.split('/'));
+    let template;
+    try {
+      template = readFileSync(templatePath, 'utf-8');
+    } catch (err) {
+      fail(opts, `the acceptance template is missing (${ACCEPTANCE_TEMPLATE_RELATIVE}). Run "cadet-agent sync" to restore it — the form is generated from that file so the template and the form cannot drift apart.`, () => 1, { ok: false, code: 'template-missing' });
+    }
+    const { text } = buildAcceptanceForm({ template, state, epicId: opts.epicId, targetDir: opts.targetDir });
+    const result = writeAcceptanceForm(opts.targetDir, opts.epicId, text, { out: opts.out });
+    if (!result.written) {
+      fail(opts, `harness acceptance-form refuses to overwrite an existing form: ${result.reason} (${result.path}).`, () => 1, { ok: false, code: 'form-exists', path: result.path });
+    }
+    const shown = result.path.slice(opts.targetDir.length + 1).replace(/\\/g, '/');
+    if (opts.format === 'json') {
+      emit(opts, '', { ok: true, path: shown, epic: opts.epicId, next: `cadet-agent harness confirm --gate ${HUMAN_ACCEPTANCE_GATE} --artifact ${shown}` });
+    } else {
+      console.log(`Acceptance form written: ${shown}`);
+      console.log(`   Fill in the three unfilled fields, then run:`);
+      console.log(`   cadet-agent harness confirm --gate ${HUMAN_ACCEPTANCE_GATE} --artifact ${shown}`);
+    }
+    return;
+  }
+
+  if (sub === 'context') {
+    // The runtime context boundary: plan, record, validate.
+    //
+    // WHY THIS EXISTS. Cadet does not inject context into a model — hosts own model context — so
+    // the honest thing to build is a protocol rather than a claim: say what a phase requires,
+    // let the host report what it loaded, and compare the two. Without the record, "the agent
+    // read the skill file" is an assertion nothing can check, and a framework whose whole point
+    // is that claims carry evidence should not make an exception for its own central act.
+    const action = opts.rest[1];
+    if (!['plan', 'record', 'validate'].includes(action)) {
+      fail(opts, `harness context needs an action: plan, record or validate (got "${action || '(none)'}").`, () => 1, { ok: false, code: 'context-action-required' });
+    }
+    const { exists, state } = readState(opts.targetDir);
+
+    if (action === 'plan') {
+      const plan = buildContextPlan({ targetDir: opts.targetDir, policy, state });
+      const planPath = writeContextPlan(opts.targetDir, plan);
+      const shown = relative(opts.targetDir, planPath).replace(/\\/g, '/');
+      const fit = plan.budget.fits === null ? 'no context budget declared'
+        : plan.budget.fits ? `fits the ${plan.budget.hardContextTokens}-token budget`
+          : `DOES NOT fit the ${plan.budget.hardContextTokens}-token budget (required ${plan.budget.requiredTokens})`;
+      if (opts.format === 'json') {
+        emit(opts, '', { ok: true, path: shown, phase: plan.phase, workItemId: plan.workItemId, required: plan.required, advisory: plan.advisory, absent: plan.absent, budget: plan.budget });
+      } else {
+        console.log(`Context plan for ${plan.phase}${plan.workItemId ? ` (${plan.workItemId})` : ''}: ${plan.required.length} required, ${plan.advisory.length} advisory — ${fit}`);
+        for (const item of plan.required) {
+          console.log(`  ${item.present ? '📌' : '⚠️ '} ${item.reference} [${item.tier}] ${item.reason}${item.present ? ` — ${item.bytes} B, ~${item.estimatedTokens} tokens` : ' — MISSING'}`);
+        }
+        for (const item of plan.advisory) {
+          console.log(`  ·  ${item.reference} [${item.tier}] ${item.reason}${item.present ? '' : ' (absent)'}`);
+        }
+        console.log(`   Written: ${shown}`);
+      }
+      return;
+    }
+
+    if (action === 'record') {
+      const plan = readContextPlan(opts.targetDir);
+      let loaded = opts.contextLoaded || [];
+      const notes = [];
+      if (opts.transcript) {
+        let text;
+        try {
+          text = readFileSync(opts.transcript, 'utf-8');
+        } catch (err) {
+          fail(opts, `the transcript could not be read (${err.message}).`, () => 1, { ok: false, code: 'transcript-unreadable' });
+        }
+        const parsed = parseTranscript(text);
+        if (parsed.problems.length > 0) {
+          fail(opts, `the transcript has ${parsed.problems.length} unusable line(s): ${parsed.problems.slice(0, 3).join('; ')}. Each line is one JSON object naming a reference.`, () => 1, { ok: false, code: 'transcript-malformed', problems: parsed.problems });
+        }
+        loaded = parsed.loaded;
+        notes.push(`loads taken from the transcript at ${opts.transcript}`);
+      }
+      let record;
+      try {
+        record = buildContextRecord({
+          targetDir: opts.targetDir, policy, state, plan,
+          level: opts.contextLevel || 'recorded',
+          loaded, enforcedBy: opts.enforcedBy || null, host: opts.host || null, notes,
+        });
+      } catch (err) {
+        if (err instanceof ContextProtocolError) fail(opts, err.message, () => 1, { ok: false, code: err.code });
+        throw err;
+      }
+      const recordPath = writeContextRecord(opts.targetDir, record);
+      const shown = relative(opts.targetDir, recordPath).replace(/\\/g, '/');
+      if (opts.format === 'json') {
+        emit(opts, '', { ok: true, path: shown, level: record.level, enforcedBy: record.enforcedBy, workItemId: record.workItemId, loaded: record.loaded, notes: record.notes });
+      } else {
+        console.log(`Context record: level "${record.level}"${record.enforcedBy ? ` (enforced by ${record.enforcedBy})` : ''}, ${record.loaded.length} reference(s) reported`);
+        console.log(`   ${describeContextState({ plan, record }).line}`);
+        console.log(`   Written: ${shown}`);
+        if (record.level === 'estimated' || record.level === 'unavailable') {
+          console.log('   This level cannot certify a context-complete checkpoint: nobody observed what was loaded.');
+        }
+      }
+      return;
+    }
+
+    // validate — read-only, so it must write nothing.
+    const plan = readContextPlan(opts.targetDir);
+    const record = readContextRecord(opts.targetDir);
+    if (!plan) {
+      fail(opts, 'no context plan exists: run "cadet-agent harness context plan" first — a record with nothing to compare against cannot be validated.', () => 1, { ok: false, code: 'no-plan' });
+    }
+    // Rebuild the plan against the CURRENT phase and work item: a plan written for a phase the
+    // session has since left describes context this turn does not need, and validating against it
+    // would pass a checkpoint for the wrong turn.
+    const current = buildContextPlan({ targetDir: opts.targetDir, policy, state });
+    const verdict = validateContextRecord({ targetDir: opts.targetDir, plan: current, record });
+    const state_ = describeContextState({ plan: current, record, verdict });
+
+    if (opts.format === 'json') {
+      emit(opts, '', {
+        ok: verdict.ok, code: verdict.code, level: verdict.level,
+        workItemId: current.workItemId, phase: current.phase,
+        required: current.required.length, loaded: (record?.loaded || []).length,
+        missingRequired: verdict.missingRequired, staleRequired: verdict.staleRequired,
+        advisoryMissing: verdict.advisoryMissing, absentRequired: verdict.absentRequired || [],
+        reasons: verdict.reasons, plannedFor: record?.phase || null,
+      });
+    } else {
+      console.log(`${verdict.ok ? '✅' : '❌'} ${state_.line}`);
+      for (const reason of verdict.reasons) console.log(`   ${reason}`);
+      if (verdict.ok) console.log('   Required context is loaded and unchanged: a context-complete checkpoint can be claimed.');
+    }
+    process.exit(verdict.ok ? 0 : 1);
+  }
+
+  /**
+   * Refuse `--command` on a command whose evidence comes from somewhere else.
+   *
+   * The same rule the gate registry states for a gate: a command supplied at the call site proves
+   * nothing about the repository, because the caller chooses both the question and the answer. The
+   * flag was PARSED globally and then ignored by these commands, so it exited 0 having done
+   * nothing with it — the silently swallowed option this CLI's own parser comments warn about.
+   * `harness verify --gate <g>` refuses it with `gate-not-overridable` for the gates that take no
+   * command; these refuse it with `command-not-accepted`.
+   */
+  // Declared as a function, not a const arrow: the two `verify-acs`/`verify-reachability` branches
+  // run before this point in the dispatch, and a const would leave them in the temporal dead zone.
+  function refuseCommandOverride(command, instead) {
+    if (opts.command === undefined) return;
+    fail(
+      opts,
+      `${command} takes no --command: it reads its evidence from ${instead}, and a command supplied here would `
+      + 'let the caller choose both the question and the answer. Pass the artifact or the declaration instead.',
+      () => 1,
+      { ok: false, code: 'command-not-accepted', command },
+    );
+  }
+
+  if (sub === 'verify-architecture') {
+    refuseCommandOverride('harness verify-architecture', 'the checks declared under architectureFitness in .cadet/harness.json');
+    // The project's declared executable constraints, run and recorded.
+    //
+    // WHY THE POLICY IS THE ONLY SOURCE OF THE COMMANDS. A gate whose command can be
+    // supplied at the call site proves nothing about the repository: the caller chooses
+    // both the question and the answer. Here the questions are declared in
+    // `.cadet/harness.json` — with ids, scopes and severities — and this command only runs
+    // them and writes down what happened. There is deliberately no `--command`.
+    //
+    // NOT OPTED IN: report and write nothing, the compatibility rule every opt-in gate in
+    // this repository follows.
+    if (!architectureFitnessActive(policy)) {
+      const declared = policy.architectureFitness?.checks?.length ?? 0;
+      const detail = {
+        ok: true, gateSet: false, enabled: policy.architectureFitness?.enabled === true,
+        declared, checks: [], note: declared === 0
+          ? 'architectureFitness declares no checks: nothing to verify, nothing recorded.'
+          : 'architectureFitness.enabled is false: the checks are declared but nothing runs.',
+      };
+      if (opts.format === 'json') emit(opts, '', detail);
+      else {
+        console.log(`ℹ️  ${detail.note}`);
+        console.log('   Declare checks under architectureFitness in .cadet/harness.json and set "enabled": true to require them.');
+      }
+      return;
+    }
+
+    const { exists, state } = readState(opts.targetDir);
+    assertExpectedPhase(opts, state);
+
+    // Which files do the checks judge? The same answer `harness verify` and `harness
+    // confirm` give, for the same reason: a record that does not know what it judged
+    // cannot go stale.
+    const allowEmpty = policy?.allowEmptyFreshness === true;
+    let relevantFiles;
+    if (opts.files && opts.files.length) {
+      relevantFiles = opts.files.map((f) => String(f).replace(/\\/g, '/'));
+    } else {
+      const changed = gitChangedFiles(opts.targetDir);
+      if (!changed.available) {
+        if (!allowEmpty) {
+          const scoped = (policy.architectureFitness.checks || []).some((c) => c.files?.length);
+          fail(opts, `cannot establish which files the checks should judge: ${changed.reason}.`
+            + (scoped
+              ? ' Pass --files <paths> — a project that scopes its checks needs to know which files changed, or a scoped check would silently skip.'
+              : ' Pass --files <paths>, or enable allowEmptyFreshness in .cadet/harness.json.'), () => 1, { ok: false, code: 'freshness-unavailable' });
+        }
+        relevantFiles = [];
+      } else {
+        relevantFiles = changed.files;
+      }
+    }
+
+    const { results, skipped } = await runArchitectureChecks({
+      checks: policy.architectureFitness.checks,
+      relevantFiles,
+      rootDir: opts.targetDir,
+      defaultTimeoutMs: DEFAULT_CHECK_TIMEOUT_MS,
+      evidenceDir: join(opts.targetDir, '.cadet', 'runs', 'architecture'),
+    });
+    const summary = summariseChecks(results, { declared: policy.architectureFitness.checks.length, skipped });
+
+    const workItemId = state ? workItemIdOf(state) : 'unscoped';
+    const phase = state?.session?.currentPhase || 'implementation';
+    const status = summary.gatePassed ? 'passed' : (summary.blocked.length > 0 && summary.failed.length === 0 ? 'blocked' : 'failed');
+    const resultText = results.length === 0
+      ? summary.note
+      : `${results.filter((r) => r.status === 'passed').length}/${results.length} check(s) passed`
+        + (summary.failed.length ? `; failed: ${summary.failed.join(', ')}` : '')
+        + (summary.blocked.length ? `; blocked: ${summary.blocked.join(', ')}` : '')
+        + (summary.advisoryFailed.length ? `; advisory (not blocking): ${summary.advisoryFailed.join(', ')}` : '');
+
+    // The artifacts a check declared are part of what this record attests, and they are bound
+    // per check (`checks[].artifactPath` + `artifactHash`) — NOT folded into `relevantFiles` and
+    // NOT hashed into `inputTreeHash`: a check that rewrites its own report would otherwise stale
+    // a record that describes an unchanged tree.
+    //
+    // Folding them into `relevantFiles` was a defect, and a self-inconsistent one: `inputTreeHash`
+    // covers `relevantFiles` as it was BEFORE the artifact paths were added, while the record then
+    // stored the union. Freshness re-derives the hash from the record's own `relevantFiles`, so
+    // every record from a check that declared an artifact read as stale the moment it was written
+    // ("input tree hash changed since the evidence was recorded"), and the gate it satisfied could
+    // never be used again — which made `implementation -> review` unreachable for any project whose
+    // checks write a report. The record now hashes exactly the set it stores, and the artifacts stay
+    // bound where they were already recorded: in the check entries.
+    const artifactPaths = results.map((r) => r.artifactPath).filter(Boolean);
+    const boundFiles = relevantFiles;
+
+    const evidence = createEvidence({
+      evidenceId: newId(),
+      workItemId,
+      acceptanceCriterionId: null,
+      phase,
+      gate: ARCHITECTURE_GATE,
+      status,
+      command: `harness verify-architecture (${results.map((r) => r.id).join(',') || 'none applicable'})`,
+      result: resultText,
+      exitCode: 0,
+      inputTreeHash: computeInputTreeHash(opts.targetDir, relevantFiles),
+      criteriaHash: hashCriteria([]),
+      relevantFiles,
+      createdAt: new Date(),
+    });
+    evidence.checks = results.map((r) => ({
+      id: r.id, severity: r.severity, status: r.status, exitCode: r.exitCode,
+      artifactPath: r.artifactPath, artifactHash: r.artifactHash, refs: r.refs,
+    }));
+
+    const ledger = new RunLedger({ targetDir: opts.targetDir, policy, runId: state?.activeRunId || null, workItemId, phase });
+    ledger.addEvidence(evidence);
+    for (const r of results) {
+      ledger.addDecision({ kind: 'check', reason: `architecture check ${r.id}: ${r.status}${r.reason ? ` (${r.reason})` : ''}`, scope: r.cwd });
+    }
+    ledger.finalize({ status: summary.gatePassed ? 'ok' : 'failed' });
+    const ledgerPath = ledger.persist();
+
+    // The gate follows the outcome. `recordEvidence` used to be called unconditionally, so a
+    // failed or blocked run wrote `gates.architectureFitnessPassed = true` beside a `failed` record
+    // — a document `state validate` then rejects ("gate is true but has no supporting evidence
+    // record"), which the shipped pre-commit hook turns into a refused commit. A run that did not
+    // pass now clears the gate, so a failure invalidates an earlier pass instead of leaving it
+    // standing.
+    if (exists) writeState(opts.targetDir, recordEvidence(state, evidence, { setGate: summary.gatePassed }));
+
+    const detail = {
+      ok: summary.gatePassed, gateSet: exists && summary.gatePassed, gate: ARCHITECTURE_GATE,
+      inputTreeHash: evidence.inputTreeHash,
+      status, passed: summary.passed, failed: summary.failed, blocked: summary.blocked,
+      advisoryFailed: summary.advisoryFailed, skipped: summary.skipped, note: summary.note,
+      checks: results.map((r) => ({ id: r.id, severity: r.severity, status: r.status, exitCode: r.exitCode, artifactPath: r.artifactPath })),
+      relevantFiles: boundFiles, evidenceId: evidence.evidenceId, runId: ledger.runId, path: ledgerPath,
+    };
+    if (opts.format === 'json') {
+      emit(opts, '', detail);
+    } else {
+      const head = summary.gatePassed ? `✅ ${ARCHITECTURE_GATE}` : `❌ ${ARCHITECTURE_GATE}`;
+      console.log(`${head}: ${resultText}`);
+      for (const line of describeCheckResults(results, summary)) console.log(line);
+      if (summary.note) console.log(`   ${summary.note}`);
+      console.log(`   Bound to ${boundFiles.length} judged file(s), so a change to one stales this record.`
+        + (artifactPaths.length ? ` Plus ${artifactPaths.length} artifact(s), bound per check and deliberately unhashed.` : ''));
+      console.log(`   Ledger: ${ledgerPath}`);
+      if (!summary.gatePassed) {
+        console.log('   Review cannot start until every required check passes. A check that cannot run is a tooling-gap exception, not a manual record.');
+      }
+    }
+    process.exit(summary.gatePassed ? 0 : 1);
+  }
+
+  if (sub === 'verify-design-review') {
+    refuseCommandOverride('harness verify-design-review', 'the design-review artifact it is handed');
+    // The formal design review: checked, then recorded.
+    //
+    // WHY THE ARTIFACT IS WHAT PROVES IT. Cadet cannot read a design and decide
+    // whether it is good, so it does not pretend to. The reviewer's judgement lives
+    // in the artifact; this command checks the properties an artifact must have to be
+    // readable as a review at all, and blocks the one case the gate exists for — a
+    // contested decision with nobody's name against it. The bound inputs give the
+    // record its freshness, which is the only honest way to say "this review was of
+    // THAT design".
+    if (!opts.artifact) fail(opts, 'harness verify-design-review requires --artifact <path>');
+    const { exists, state } = readState(opts.targetDir);
+    assertExpectedPhase(opts, state);
+
+    const artifactPath = resolve(opts.targetDir, opts.artifact);
+    const artifactRel = relative(opts.targetDir, artifactPath).replace(/\\/g, '/') || basename(artifactPath);
+    let artifactText;
+    try {
+      artifactText = readFileSync(artifactPath, 'utf-8');
+    } catch (err) {
+      fail(opts, `cannot read the design-review artifact "${opts.artifact}": ${err.message}`, () => 1, { ok: false, code: 'artifact-unreadable', artifact: opts.artifact });
+    }
+
+    // The review must bind what it reviewed. Without this the record would attest
+    // "a review happened" while naming nothing it was a review OF.
+    if (!opts.files || opts.files.length === 0) {
+      fail(opts, 'the review must bind its inputs: pass --files <technical-design,requirements,ADRs,...> alongside --artifact.', () => 1, { ok: false, code: 'no-inputs-bound' });
+    }
+
+    const parsed = parseDesignReviewArtifact(artifactText);
+    const enabled = policy.designReview?.enabled === true;
+
+    if (parsed.errors.length > 0) {
+      const detail = {
+        ok: false,
+        artifact: opts.artifact,
+        code: parsed.errors[0].code,
+        errors: parsed.errors,
+        findings: parsed.findings.length,
+        contested: parsed.contested,
+        gateSet: false,
+        enabled,
+      };
+      if (opts.format === 'json') emit(opts, '', detail);
+      else {
+        console.error(`❌ Cannot set ${DESIGN_REVIEW_GATE} from ${opts.artifact}:`);
+        for (const line of describeDesignReviewGaps(parsed)) console.error(line);
+      }
+      process.exit(1);
+    }
+
+    // NOT OPTED IN: report and write nothing, the same compatibility rule the other
+    // opt-in gates follow. A caller who ran the command asked the question, so a
+    // failure still exits nonzero.
+    if (!enabled) {
+      const summary = `design review readable: ${parsed.findings.length} finding(s), reviewer ${parsed.reviewer}`;
+      if (opts.format === 'json') emit(opts, '', { ok: true, artifact: opts.artifact, review: { reviewer: parsed.reviewer, inputs: parsed.inputs, findings: parsed.findings.length, contested: parsed.contested }, gateSet: false, enabled: false });
+      else {
+        console.log(`✅ ${summary}`);
+        console.log('   designReview.enabled is false — reported only, state.json unchanged.');
+      }
+      return;
+    }
+
+    const workItemId = state ? workItemIdOf(state) : 'unscoped';
+    const phase = state?.session?.currentPhase || 'implementation';
+    const inputs = opts.files.map((f) => String(f).replace(/\\/g, '/'));
+    const relevantFiles = [artifactRel, ...inputs.filter((f) => f !== artifactRel)];
+
+    const evidence = createEvidence({
+      evidenceId: newId(),
+      workItemId,
+      acceptanceCriterionId: null,
+      phase,
+      gate: DESIGN_REVIEW_GATE,
+      status: 'passed',
+      command: `harness verify-design-review --artifact ${artifactRel}`,
+      result: `design review complete: ${parsed.findings.length} finding(s), ${parsed.contested.length} contested with a named resolution; reviewer ${parsed.reviewer}`,
+      exitCode: 0,
+      inputTreeHash: computeInputTreeHash(opts.targetDir, relevantFiles),
+      criteriaHash: hashCriteria([]),
+      relevantFiles,
+      createdAt: new Date(),
+    });
+
+    const ledger = new RunLedger({ targetDir: opts.targetDir, policy, runId: state?.activeRunId || null, workItemId, phase });
+    ledger.addEvidence(evidence);
+    ledger.addDecision({ kind: 'stop', reason: `design review checked (${parsed.findings.length} finding(s))`, scope: artifactRel });
+    ledger.finalize({ status: 'ok' });
+    const ledgerPath = ledger.persist();
+
+    if (exists) writeState(opts.targetDir, recordEvidence(state, evidence));
+
+    if (opts.format === 'json') {
+      emit(opts, '', { ok: true, artifact: opts.artifact, review: { reviewer: parsed.reviewer, inputs: parsed.inputs, findings: parsed.findings.length, contested: parsed.contested }, relevantFiles, evidenceId: evidence.evidenceId, gateSet: exists, runId: ledger.runId, path: ledgerPath });
+    } else {
+      console.log(`✅ ${DESIGN_REVIEW_GATE} for ${artifactRel}: ${parsed.findings.length} finding(s), reviewer ${parsed.reviewer}`);
+      console.log(`   Bound to ${relevantFiles.length} file(s), so a change to the design or the review stales this record.`);
+      console.log(`   Ledger: ${ledgerPath}`);
+    }
+    return;
+  }
+
   // The health line. This command exists so the framework's one line of output is
   // DERIVED rather than asserted: an agent composing its own `ok` is a claim, and
   // this repository's whole complaint about itself is claims that nothing checks.
@@ -1465,8 +2121,17 @@ async function cmdHarness(opts) {
     if (!target) fail(opts, 'No run records found in .cadet/runs/.', () => 2);
     const run = loadRun(opts.targetDir, target);
     if (!run) fail(opts, `Run ${target} not found.`, () => 2);
-    if (opts.format === 'json') emit(opts, '', { ok: true, report: buildReport(run) });
-    else console.log(formatReport(run));
+    // The run report carries the context level, because it is the one place a reader looks to
+    // ask what happened in a run. The level is reported as recorded — never upgraded: a report
+    // that calls advisory loading "enforced" is worse than no report, because the reader stops
+    // looking. Reading the plan and record writes nothing, which is what this command promises.
+    const contextLine = describeContextState({
+      plan: buildContextPlan({ targetDir: opts.targetDir, policy, state: readState(opts.targetDir).state }),
+      record: readContextRecord(opts.targetDir),
+    });
+    if (opts.format === 'json') emit(opts, '', { ok: true, report: { ...buildReport(run), context: contextLine } });
+    else console.log(`${formatReport(run)}
+${contextLine.line}`);
     return;
   }
 
@@ -1676,7 +2341,7 @@ async function cmdHarness(opts) {
     return;
   }
 
-  fail(opts, `Unknown harness subcommand: ${sub || '(none)'}. Use record|confirm|verify|verify-acs|verify-reachability|matrix-check|report|status|changes|reconcile|cleanup|capabilities.`);
+  fail(opts, `Unknown harness subcommand: ${sub || '(none)'}. Use record|confirm|verify|verify-acs|verify-reachability|verify-design-review|matrix-check|report|status|changes|reconcile|cleanup|capabilities.`);
 }
 
 export async function run(argv) {

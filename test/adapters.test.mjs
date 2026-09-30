@@ -1117,6 +1117,26 @@ describe('Adapter inventory', () => {
         assert.deepEqual(missing, [], `FrameworkManifest.json missing managed paths: ${missing.join(', ')}`);
       });
 
+      it('is carried by a staging rule in package-agent.ps1', () => {
+        // The gap this closes: `.githooks/pre-commit` was listed in the manifest, validated as
+        // present by the packager, and then silently never staged — because the packager has one
+        // block per root and a new root needs a new block. Nothing caught it, and the file that was
+        // supposed to protect every commit simply did not ship. This asserts every managed path
+        // lands under one of the roots the packager stages.
+        const STAGED_ROOTS = [
+          '.cadet/agent/core/', '.github/agents/', '.github/hooks/', '.github/prompts/',
+          '.cursor/', '.continue/', '.claude/', '.agents/', '.githooks/',
+        ];
+        for (const managedPath of manifest.managedPaths) {
+          const carried = STAGED_ROOTS.some((root) => managedPath === root.replace(/\/$/, '') || managedPath.startsWith(root))
+            || !managedPath.includes('/')
+            || (manifest.createOnlyPaths || []).includes(managedPath);
+          assert.ok(carried,
+            `${managedPath} is in managedPaths but no staging rule in package-agent.ps1 carries it: `
+            + 'add the root to that script, or the file will validate as present and never ship');
+        }
+      });
+
       it(`every managed path under ${skillsRoot} exists on disk`, () => {
         const declared = managed.filter((m) => m.startsWith(`${skillsRoot}/`));
         const absent = declared.filter((m) => !existsSync(resolvePath(m)));

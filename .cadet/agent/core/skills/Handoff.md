@@ -53,7 +53,7 @@ Collect, without changing anything:
 
 This is the core discipline of a handoff. An incoming agent inherits your mistakes unless you mark the boundary.
 
-1. For every claimed `true` gate, check whether it is backed by fresh, non-superseded evidence for the current work item.
+1. For every claimed `true` gate, check whether it is backed by fresh, non-superseded evidence for the current work item. Name a pending `humanAcceptanceConfirmed` explicitly under what remains — when `humanAcceptance.enabled` is set and the epic is otherwise ready to close, the person's acceptance is the one step left, and the next agent must not read "all gates green" as "the work is accepted". Make that step as small as it can be: generate the form with `cadet-agent harness acceptance-form --epic <id>` and name its path, so the next person answers three fields rather than working out what the record needs.
 2. Separate the handoff into two explicit lists:
    - **Verified** — done and evidence-backed (tests green with a red record, compile confirmed, review completed).
    - **Claimed / unverified** — believed done but not yet proven, not yet compiled, or not yet reviewed.
@@ -112,6 +112,7 @@ This is the core discipline of a handoff. An incoming agent inherits your mistak
 
 ## Phase 4 — Register and Summarize
 
+0. **A handoff does not seal.** A work item's evidence is sealed when it closes (`cadet-agent state seal`, before the story boundary — see `Resume.md`), not when a session ends. So a handoff taken mid-story leaves the live records unsealed on purpose: say so in the handoff under what remains, so the next agent seals them at the close rather than assuming they already travelled with a commit.
 1. Append a `handoff` entry to `.cadet/state.json → changeHistory` **naming the handoff file path and the current phase — a reference, not a copy of the summary.** The record is `{ date, change: "Handoff recorded at .cadet/handoffs/<file>.md", phase, workItem }`. Do **not** paste the summary, decisions, or blockers into `changeHistory`: the file is where that belongs, and duplicating it is what made one project's state document 2 MB, with 65% of its change log being 116 pasted handoff summaries that each duplicated a file already on disk. A `changeHistory` entry is a pointer so the next agent can find the record; it is never the record. Do not otherwise modify state: no gate changes, no phase transition.
 2. If the handoff file cannot be written, say so explicitly and print the full summary in chat instead — never report a handoff as recorded when it is not.
 3. Print the summary in chat, including the handoff file path, so the user can paste the path into the new chat.

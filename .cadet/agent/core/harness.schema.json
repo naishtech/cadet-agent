@@ -39,7 +39,10 @@
         "acceptanceCriteriaValidated",
         "securityReviewPassed",
         "designArtifactSyncConfirmed",
-        "reachabilityAddressed"
+        "reachabilityAddressed",
+        "designReviewCompleted",
+        "humanAcceptanceConfirmed",
+        "architectureFitnessPassed"
       ]
     },
     "evidenceStatus": {
@@ -172,9 +175,53 @@
             "disallowManualFor": {
               "type": "array",
               "items": { "$ref": "#/$defs/gate" },
-              "default": ["testsPassed", "reachabilityAddressed"],
-              "description": "Gates that may never be satisfied by a manual confirmation. `testsPassed` because it is always mechanically checkable; `reachabilityAddressed` because the declaration check runs even with no probe configured (contract v6 §2)."
+              "default": ["testsPassed", "acceptanceCriteriaValidated", "reachabilityAddressed", "architectureFitnessPassed"],
+              "description": "Gates that may never be satisfied by a manual confirmation: every one of them has an automated path in every environment Cadet supports. `testsPassed` because the suite always runs somewhere; `acceptanceCriteriaValidated` because `harness verify-acs` derives the test inventory from the run report; `reachabilityAddressed` because the declaration check runs even with no probe configured (contract v6 §2). `compileCheckConfirmed`, `unityAnalyzerClean` and `storyTrackingUpdated` are absent on purpose — their automated path can be missing, so forbidding manual confirmation would leave the gate unsatisfiable."
             }
+          },
+          "additionalProperties": false
+        },
+        "architectureFitness": {
+          "type": "object",
+          "description": "The project's declared executable constraints. Each check has a stable id, a command, the files it governs, a severity, and optionally an artifact it must write. The gate `architectureFitnessPassed` is required on implementation -> review only when `enabled` is true AND at least one check is declared — declared but off, or enabled with no checks, is inert, which is what keeps the frozen transition lists unchanged for a project that declares nothing. There is no command-line override: the checks are the repository's own declaration. A check with severity `advisory` never blocks; its failure is reported and recorded. Samples for C# dependency direction and forbidden Unity references: docs/core/ArchitectureFitness.md.",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "checks": {
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "object",
+                "required": ["id", "command"],
+                "additionalProperties": false,
+                "properties": {
+                  "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$", "description": "Stable slug, unique in the file: a report has to name the same check across runs." },
+                  "command": { "type": "string", "description": "Run through the shell, in `cwd`. A non-zero exit is a violation." },
+                  "cwd": { "type": "string", "default": ".", "description": "Repository-relative working directory." },
+                  "files": { "type": "array", "items": { "type": "string" }, "default": [], "description": "Repository-relative paths the check governs. Empty means it always applies. Matching is at a directory boundary, so `src/Core` does not govern `src/CoreX`." },
+                  "timeoutMs": { "type": ["integer", "null"], "default": null, "description": "Positive integer. A check that times out is `blocked`, not failed: nothing was disproved." },
+                  "severity": { "type": "string", "enum": ["required", "advisory"], "default": "required" },
+                  "refs": { "type": "array", "items": { "type": "string" }, "default": [], "description": "Design sections or ADR identifiers this check enforces, carried into the record so a reader can ask why the constraint exists." },
+                  "artifact": { "type": ["string", "null"], "default": null, "description": "Repository-relative file the check must write. A declared artifact that is missing, or unparseable as JSON when artifactFormat is json, leaves the check blocked rather than passed — an exit-zero command that wrote nothing proved nothing." },
+                  "artifactFormat": { "type": "string", "enum": ["json", "text"], "default": "text" }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "humanAcceptance": {
+          "type": "object",
+          "description": "The human-acceptance gate. Absent or enabled:false is byte-identical pre-change behaviour — the gate is not required. When true, `humanAcceptanceConfirmed` is required on `validation -> closed` at evaluation time, not in the transitions table, so the next-story loop (`validation -> implementation`) stays unblocked. The shipped policy file for a new consumer sets it true.",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false }
+          },
+          "additionalProperties": false
+        },
+        "designReview": {
+          "type": "object",
+          "description": "The formal design-review gate. Absent or enabled:false is byte-identical pre-change behaviour — the gate is not required. When true, `designReviewCompleted` is required on ONE edge, architectureComplete -> story-breakdown, appended at evaluation time rather than declared in the transitions table, so the spikes route into story breakdown is unaffected. The shipped policy file for a new consumer sets it true.",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false }
           },
           "additionalProperties": false
         }
@@ -227,6 +274,26 @@
         "freshnessPolicy": { "oneOf": [{ "$ref": "#/$defs/freshnessPolicy" }, { "type": "null" }] },
         "supersededBy": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
         "source": { "type": "string", "enum": ["automated", "manual-confirmation", "provider"] },
+        "checks": {
+          "type": ["array", "null"],
+          "description": "Architecture fitness only. One entry per check that ran: id, severity, status (passed/failed/blocked), exit code, and the artifact the check declared with its hash. Required on an architectureFitnessPassed record, because a record that attests 'the constraints hold' must name which checks proved it.",
+          "items": {
+            "type": "object",
+            "required": ["id", "status"],
+            "properties": {
+              "id": { "type": "string" },
+              "severity": { "type": "string", "enum": ["required", "advisory"] },
+              "status": { "type": "string", "enum": ["passed", "failed", "blocked"] },
+              "exitCode": { "type": ["integer", "null"] },
+              "artifactPath": { "type": ["string", "null"] },
+              "artifactHash": { "type": ["string", "null"] },
+              "refs": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "witness": { "type": ["string", "null"], "description": "Human acceptance only. What a person did and what they saw — the user-observable witness the acceptance rests on. Required (non-empty) on a humanAcceptanceConfirmed record; state validation refuses a record without it." },
+        "limitations": { "type": ["string", "null"], "description": "Human acceptance only. What the person accepted as missing, or the literal \"none\". Required (non-empty) on a humanAcceptanceConfirmed record, so a limitation nobody wrote down cannot be discovered later by surprise." },
+        "gateContract": { "type": ["string", "null"], "pattern": "^[A-Za-z]+@[0-9]+$", "description": "The gate's evidence contract when the record was written, e.g. \"testsPassed@1\" (registry: src/harness/gates.mjs). Automated records carry it; a manual confirmation carries null, because no builder produced it. evidenceFreshness refuses a record whose contract differs from the gate's current one, so a change to a builder's rules cannot silently re-read old evidence as if nothing had changed. A record that declares null predates the field and stays valid, which keeps v2-shaped records valid." },
         "sealedCommit": {
           "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }],
           "description": "v5 read-time only. The commit whose trailers carried this record, stamped by `sealedEvidence`. Never written by hand: the commit id is the seal, so a record cannot name the commit it is stored in without being self-referential."

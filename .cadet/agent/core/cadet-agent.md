@@ -92,12 +92,13 @@ If the user's skill level or game type is unclear, check `.cadet/cadet-local-con
 
 The agent maintains a session state file at `.cadet/state.json` conforming to `.cadet/state.schema.json`. This file is committed to git — it provides an auditable trail of workflow progress.
 
-- **Initialize state** on first substantive action: resolve learner tier, operating mode, workflow path, tracking mode, and current phase. Write `state.json`. The default `trackingMode` is `"markdown"`.
+- **Initialize state** on first substantive action: resolve learner tier, operating mode, workflow path, tracking mode, and current phase, then run `cadet-agent state init` with them (`--workflow-path`, `--tracking-mode`, `--phase`, `--learner-tier`, `--operating-mode`). **Do not hand-write `state.json`** — it is the document every gate reads, and `state init` validates before writing and refuses to overwrite an existing document. The default `trackingMode` is `"markdown"`; `workflowPath` is required by the schema, and `large` is the default.
 - **Tracking modes:**
   - `"markdown"` (default): Epics and stories are managed as markdown files in epic directories. State reflects canonical status; markdown files are updated alongside state.
   - `"github"`: Epics and stories are tracked via GitHub Projects/Issues. The agent uses `gh issue` commands to create, update, and close issues that represent stories. State.json reflects the canonical status synced from GitHub.
 - Ask the user once during initialization which tracking mode they prefer. Persist the choice in `state.json → session.trackingMode`.
 - **Update state** at every checkpoint: when a phase transitions, when a story is completed, when an epic is done. In `"markdown"` mode, also update the corresponding markdown files. In `"github"` mode, update the corresponding GitHub issue.
+- **Seal a story's evidence when it closes, before the boundary.** `cadet-agent state seal` writes the active work item's records into `.cadet/seal.commit-msg` as `Cadet-*` trailers; the commit that carries that message is the seal, and `state validate --verify-sealed` reads it back. Do this **before** `cadet-agent state begin` moves to the next story — the boundary archives the records, and an archived record can no longer be sealed. Cadet never commits: hand the message to the user, or commit it when the user has asked for one. Rationale and the three homes of evidence: `.cadet/agent/core/Harness.md` §2c.
 - **Read state** on session start: if `state.json` exists, resume from the last recorded phase, active story, and tracking mode.
 - **Never lose state**: if a state update fails, retry or ask the user for help before continuing work. The state file is the single source of truth for what has been completed.
 
@@ -112,6 +113,7 @@ Cadet workflows are implemented as scoped skills. The global directive decides *
 | **Planning Review** | `/cadet-planning-review` | When a plan is fuzzy, ambiguous, or contested — before Requirements/Architecture. |
 | **Requirements** | `/cadet-requirements` | Large changes, after workflow classification. |
 | **Architecture** | `/cadet-architecture` | Large changes, after requirements are finalized. |
+| **Design Review** | `/cadet-design-review` | At the end of `architectureComplete`, before story breakdown. Challenges the design — traceability, assumptions, unnecessary architecture, reachability, verification — and records `designReviewCompleted`. Required on that edge when `designReview.enabled` is set. |
 | **Spike** | `/cadet-spike` | When requirements or design contain unverified assumptions. |
 | **Story Breakdown** | `/cadet-breakdown` | Large changes, after architecture and any spikes. |
 | **TDD** | `/cadet-tdd` | Per story for large changes; per change for small changes. |
@@ -133,6 +135,13 @@ Cadet workflows are implemented as scoped skills. The global directive decides *
    - For GitHub Copilot, use the `/cadet-<skill>` slash-command prompt when available.
 4. Do not mix skill instructions with unrelated tasks in the same turn.
 5. After the skill completes, update `.cadet/state.json` before dispatching the next skill or ending the session.
+5a. **Record the context you loaded, at skill dispatch and at kickoff.** `cadet-agent harness context plan`
+   says what this phase requires; `cadet-agent harness context record` says what you loaded, at the level
+   you can honestly claim; `cadet-agent harness context validate` answers whether a context-complete
+   checkpoint may be claimed at all. The level is reported as it is: a run reported as `recorded` is never
+   called `enforced`, and `enforced` needs a hook that declares it enforces context. A required reference
+   that was never loaded, or that changed after the record, blocks the checkpoint — the same rule as every
+   other claim this framework accepts only with evidence. See `.cadet/agent/core/Harness.md` §2d.
 6. IDE adapter files (`.github/prompts/`, `.claude/skills/`, `.continue/config.yaml`, `.cursor/rules/`) must reference canonical skill files and must not re-state gate checks, process steps, or completion steps.
 
 ### Skill Gate Checks
@@ -218,7 +227,28 @@ These files define specific operational workflows. Read them on session start or
 ### Gate Definitions
 
 <gates>
+  <transition from="architectureComplete" to="story-breakdown">
+    <gate id="designReviewCompleted">
+      The design was challenged before the work items exist, and every finding carries a disposition.
+      Required on this edge only, and only when `.cadet/harness.json` sets `designReview.enabled`.
+      Satisfied by `cadet-agent harness verify-design-review --artifact <path> --files <technical-design,requirements,ADRs>`:
+      the artifact names its reviewer and inputs, every finding has a disposition, and a contested
+      decision names the person who resolved it — an unresolved contested finding blocks the gate.
+    </gate>
+  </transition>
   <transition from="implementation" to="review">
+    <gate id="architectureFitnessPassed">
+      The project's declared executable constraints hold for the changed files.
+      REQUIRED ONLY WHEN `.cadet/harness.json` declares checks under `architectureFitness` and sets
+      `enabled: true`; a project that declares none sees this transition exactly as it was.
+      Satisfied by `cadet-agent harness verify-architecture`, which runs the checks the repository
+      declared — there is no `--command`, because a gate whose command is chosen at the call site
+      proves nothing about the repository.
+      This proves executable constraints (a core assembly with no engine reference, a layer that may
+      not import another). It does NOT prove the design is good: that is `designReviewCompleted`.
+      A required check that fails blocks review. A check that cannot complete is `blocked` — not a
+      red — and its remedy is a `tooling-gap` exception naming who accepted it, never a hand record.
+    </gate>
     <gate id="testsPassed">All tests for the current story pass — red/green confirmed.</gate>
     <gate id="compileCheckConfirmed">User confirmed Unity compiles without errors.</gate>
     <gate id="unityAnalyzerClean">Zero Unity analyzer diagnostics (UNT*) in changed files. Use `get_errors` tool to verify.</gate>
@@ -240,6 +270,19 @@ These files define specific operational workflows. Read them on session start or
   </transition>
   <transition from="validation" to="closed">
     <gate id="designArtifactSyncConfirmed">Requirements, design, plan, epics mutually consistent.</gate>
+    <gate id="humanAcceptanceConfirmed">
+      A person accepted the delivered work. Human-owned: no command and no reviewer's record can
+      stand in for them, so `harness verify` refuses this gate outright.
+      Required only when `.cadet/harness.json` sets `humanAcceptance.enabled`, and NEVER on
+      `validation -> implementation` — a story moving to the next one is not a release, and the
+      next-story loop must stay unblocked.
+      Two commands: `cadet-agent harness acceptance-form --epic <id>` writes a form filled in
+      from state, the person answers its three blank fields (accepted by, witness, accepted
+      limitations), and `cadet-agent harness confirm --gate humanAcceptanceConfirmed --artifact
+      <the form>` records it. Nothing is retyped and a form still holding a placeholder is
+      refused. Work a user cannot reach or observe takes a `non-user-facing` exception naming who
+      judged it, not a silent pass.
+    </gate>
   </transition>
 </gates>
 

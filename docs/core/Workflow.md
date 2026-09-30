@@ -198,6 +198,8 @@ Security and quality gates apply to all paths:
 - Confirm no sensitive data is introduced into version-controlled files.
 - Surface any security concerns immediately.
 
+**Design review (Step 3, before story breakdown):** when `.cadet/harness.json` sets `designReview.enabled`, the transition from `architectureComplete` to `story-breakdown` requires `designReviewCompleted`. Run the Design Review skill: it challenges the design (requirements traceability, unverified assumptions, unnecessary architecture, reachability, verification plans) and records the gate with `cadet-agent harness verify-design-review --artifact <path> --files <design,requirements,ADRs>`. The shipped policy file turns this on for a new project, so story breakdown follows a review rather than preceding it.
+
 **Hard Gates (Step 4):** Before transitioning from `validation` to `closed`, the following gate in `.cadet/state.json` must be `true`:
 
 - `designArtifactSyncConfirmed` — all planning artifacts (requirements, technical design, project plan, epics) are mutually consistent.

@@ -8,7 +8,7 @@ import {
   migrateStateDocument, migrateStateFile, parseTargetVersion, applyTransition,
   resetGatesForNewWorkItem, workItemIdOf, sealWorkItem, isHistoryExternal, compactHistory,
   retainLiveRecords, DEFAULT_MAX_LIVE_EVIDENCE,
-  STATE_VERSION, GATES, HISTORY_ENTRIES_KEPT, StateError,
+  STATE_VERSION, GATES, HISTORY_ENTRIES_KEPT, MAX_HISTORY_ENTRY_CHARS, StateError,
 } from '../src/harness/state.mjs';
 import { runVerificationLoop } from '../src/harness/verification.mjs';
 import { defaultPolicy } from '../src/harness/policy.mjs';
@@ -663,5 +663,106 @@ describe('state v4 — growth warnings', () => {
     };
     const { warnings } = validateState(state, { rootDir: null });
     assert.equal(warnings.some((w) => /not the active one/.test(w.message)), false, JSON.stringify(warnings));
+  });
+});
+
+describe('state v4 — a change-log entry is a pointer', () => {
+  const text = (n) => 'x'.repeat(n);
+  const at = (change) => ({ date: '2026-09-20T00:00:00.000Z', change, phase: 'review' });
+  const v4With = (changeHistory) => ({ ...toStateV4(v2WithHistory()).state, changeHistory });
+
+  it('accepts an entry at the limit and refuses one character more, naming the repair', () => {
+    const ok = validateState(v4With([at(text(MAX_HISTORY_ENTRY_CHARS))]), { rootDir: null });
+    assert.equal(ok.valid, true, JSON.stringify(ok.errors));
+
+    const over = validateState(v4With([at(text(MAX_HISTORY_ENTRY_CHARS + 1))]), { rootDir: null });
+    assert.equal(over.valid, false);
+    const error = over.errors.find((e) => /change-log entry/.test(e.message));
+    assert.ok(error, JSON.stringify(over.errors));
+    assert.match(error.message, new RegExp(`is ${MAX_HISTORY_ENTRY_CHARS + 1} characters`));
+    assert.match(error.message, /state compact --keep active/, 'the repair must be named');
+    assert.match(error.message, /name the artifact path/, 'the rule must be stated, not just the limit');
+  });
+
+  it('is a v4 rule: a v1-v3 log holds prose by design and is not scolded for it', () => {
+    // Same reasoning as the foreign-record warning above. A v3 document's repair is
+    // `state migrate`, which compacts the log on its way to v4.
+    const v3 = v2WithHistory({ changeHistory: [at(text(1200))] });
+    const { valid, errors } = validateState(v3, { rootDir: null });
+    assert.equal(errors.some((e) => /change-log entry/.test(e.message)), false, JSON.stringify(errors));
+    assert.equal(valid, true, JSON.stringify(errors));
+  });
+
+  it('archives an over-long entry even when it is the newest one', () => {
+    // Recency is the wrong selector for this class: the newest entry is exactly the one
+    // an agent just wrote, and it is the one that must not sit in the document.
+    const { kept, archived } = compactHistory([at('short'), at(text(500))]);
+    assert.deepEqual(kept.map((e) => e.change.length), [5]);
+    assert.deepEqual(archived.map((e) => e.change.length), [500]);
+  });
+
+  it('never archives live state, however long it is', () => {
+    const exception = { type: 'gate-exception', gate: 'testsPassed', change: text(500) };
+    const { kept, archived } = compactHistory([exception]);
+    assert.equal(kept.length, 1);
+    assert.equal(archived.length, 0);
+  });
+
+  it('keeps an over-long entry that compaction has already seen, so nothing is archived twice', () => {
+    const first = compactHistory([at(text(500))]);
+    const second = compactHistory(first.kept);
+    assert.equal(second.kept.length, 0);
+    assert.equal(second.archived.length, 0);
+  });
+
+  it('the migration archives a v3 prose entry, and the v4 document it produces validates', () => {
+    const prose = text(1200);
+    const { state, archivedHistory } = toStateV4(v2WithHistory({ changeHistory: [at(prose), at('kept')] }));
+    assert.deepEqual(archivedHistory.map((e) => e.change.length), [1200]);
+    assert.deepEqual((state.changeHistory || []).map((e) => e.change.length), [4]);
+    const { valid, errors } = validateState(state, { rootDir: null });
+    assert.equal(valid, true, JSON.stringify(errors));
+  });
+
+  it('bounds the entry, not one field, so prose cannot be relocated to escape it', () => {
+    // Measured on the audited consumer: `reason` held 12.3 KB of the 18.9 KB the surviving log
+    // occupied. A bound on `change` alone would have left 65% of the bytes in place.
+    const spread = validateState(v4With([{ date: '2026-09-20T00:00:00.000Z', change: text(100), reason: text(100), rationale: text(250) }]), { rootDir: null });
+    assert.equal(spread.valid, false);
+    const error = spread.errors.find((e) => /change-log entry/.test(e.message));
+    assert.ok(error, JSON.stringify(spread.errors));
+    assert.match(error.message, /is 450 characters/);
+    assert.match(error.message, /change\/reason\/rationale/);
+    assert.match(error.message, /Prose has a home/);
+  });
+
+  it('accepts an entry whose reason is at the limit and whose change is short', () => {
+    // The arithmetic is done rather than written down: a hardcoded offset is how this test
+    // first failed, by one character, for a reason that had nothing to do with the rule.
+    const pointer = 'see .cadet/reports/x.md';
+    const ok = validateState(v4With([{ date: '2026-09-20T00:00:00.000Z', change: pointer, reason: text(MAX_HISTORY_ENTRY_CHARS - pointer.length) }]), { rootDir: null });
+    assert.equal(ok.valid, true, JSON.stringify(ok.errors));
+  });
+
+  it('does not apply the bound to a legacy gate exception, which is live state', () => {
+    const exception = {
+      type: 'gate-exception', gate: 'compileCheckConfirmed', category: 'manual-compile',
+      reason: text(900), closureReviewNote: text(200), date: '2026-09-20T00:00:00.000Z', change: 'x',
+    };
+    const { errors } = validateState(v4With([exception]), { rootDir: null, strictClosure: { enabled: true } });
+    assert.equal(errors.some((e) => /change-log entry is/.test(e.message)), false, JSON.stringify(errors));
+  });
+
+  it('compaction selects an over-long entry by its whole text, not by its change field', () => {
+    const { kept, archived } = compactHistory([{ change: 'short', reason: text(500) }]);
+    assert.equal(kept.length, 0);
+    assert.equal(archived.length, 1);
+  });
+
+  it('still bounds the log by recency, so the pointer rule did not replace that', () => {
+    const many = Array.from({ length: HISTORY_ENTRIES_KEPT + 3 }, (_, i) => at(`entry ${i}`));
+    const { kept, archived } = compactHistory(many);
+    assert.equal(kept.length, HISTORY_ENTRIES_KEPT);
+    assert.equal(archived.length, 3);
   });
 });

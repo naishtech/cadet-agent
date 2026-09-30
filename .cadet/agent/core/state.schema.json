@@ -24,7 +24,7 @@
           "type": "string",
           "enum": [
             "manual-compile", "budget-override", "analyzer-fallback", "unscoped-freshness",
-            "documentation-only", "tooling-gap", "pre-harness-story"
+            "documentation-only", "tooling-gap", "pre-harness-story", "non-user-facing"
           ],
           "description": "v3: required on a gate-exception under strictClosure. Determines the default expiry window and whether closureReviewNote is required. The set must match EXCEPTION_CATEGORIES in policy.mjs."
         },
@@ -186,6 +186,21 @@
           "type": "boolean",
           "default": false,
           "description": "The story's declared reachability is honoured: witnessed, or deferred to a work item that exists and is not already done. Required on review→validation only when .cadet/harness.json sets reachability.enabled; verified with `cadet-agent harness verify-reachability`. Contract v6 §2."
+        },
+        "architectureFitnessPassed": {
+          "type": "boolean",
+          "default": false,
+          "description": "Every required architecture check that governs the changed files ran and reported no violation. Required on implementation -> review only when `architectureFitness.enabled` is true AND at least one check is declared, so a project that declares none keeps the frozen transition lists unchanged; also re-examined at validation -> closed, because a later story can break a dependency an earlier one satisfied."
+        },
+        "humanAcceptanceConfirmed": {
+          "type": "boolean",
+          "default": false,
+          "description": "A person accepted the delivered work. Human-owned: no reviewer's record and no command can stand in for them. Required on validation -> closed only, and only when humanAcceptance.enabled is true (opt-in; the shipped policy file turns it on for a new consumer). The record must carry a non-empty witness and limitations."
+        },
+        "designReviewCompleted": {
+          "type": "boolean",
+          "default": false,
+          "description": "The formal design review of the design, completed before story breakdown. Required on architectureComplete -> story-breakdown only, and only when designReview.enabled is true (opt-in; the shipped policy file turns it on for a new consumer)."
         }
       }
     },
@@ -251,28 +266,31 @@
     },
     "changeHistory": {
       "type": "array",
-      "description": "v1-v3 only: audit trail of state changes, including gate exceptions for those versions. A v4 document omits this field entirely — transitions live in `lastTransition` and the sealing commit, handoff prose in `.cadet/handoffs/`, and gate exceptions in `gateExceptions`. An empty array is not written for v4, because a field that exists invites being filled again.",
+      "description": "The change log. **BOUNDED in v4, not retired**: eight skills record an artifact path here and `Resume` cross-checks its last entry against commit history, so removing the field would make those instructions false and take away a facility with no replacement. Bounded three ways — a transition writes no line (it is in `lastTransition` and in the sealing commit), an entry is a pointer no longer than 400 characters, and compaction keeps the most recent 25 inline while appending the overflow to `.cadet/archive/history.jsonl`. The length rule is **semantic, not per-field**: `validateState` sums the entry's text across `change`, `reason` and `rationale`, because bounding `change` alone merely relocates prose — on the audited consumer `reason` held 65% of the surviving log's bytes. The `maxLength` on `change` here is the coarse half of the same rule; the validator is authoritative and is also where the v1-v3 exemption and the live-state exemption (a legacy gate exception is never archived) live. v1-v3 documents are unchanged and keep being appended to.",
       "items": {
         "type": "object",
         "required": ["date", "change"],
         "properties": {
           "date": { "type": "string", "format": "date-time" },
-          "change": { "type": "string" },
+          "change": { "type": "string", "maxLength": 400, "description": "A pointer, not a record: the artifact path, and the commit when there is one. The artifact says what happened, and git holds the artifact. Entries over 400 characters are an error — `cadet-agent state compact --keep active` moves them to `.cadet/archive/history.jsonl`." },
           "phase": { "type": "string" },
           "type": { "type": "string", "enum": ["gate-exception", "transition", "resume", "migration"] },
           "gate": { "type": "string" },
           "scope": { "type": "string" },
-          "rationale": { "type": "string" },
+          "rationale": { "type": "string", "maxLength": 400, "description": "Part of the entry's text for the 400-character bound: `change` + `reason` + `rationale` are summed, so prose cannot be moved from one field to another to escape the limit." },
           "expiresAt": { "type": "string", "format": "date-time" },
           "category": {
             "type": "string",
             "enum": [
               "manual-compile", "budget-override", "analyzer-fallback", "unscoped-freshness",
-              "documentation-only", "tooling-gap", "pre-harness-story"
+              "documentation-only", "tooling-gap", "pre-harness-story", "non-user-facing"
             ],
             "description": "v3: required on a gate-exception under strictClosure. Determines the default expiry window and whether closureReviewNote is required. Strict closure only."
           },
-          "reason": { "type": "string", "description": "v3: why the exception was needed. Strict closure only." },
+          "reason": {
+            "type": "string",
+            "description": "v3: why the exception was needed. Strict closure only."
+          },
           "closureReviewNote": {
             "type": "string",
             "description": "v3: who accepted this exception and what would change that judgement. Required for categories that are not documentation-only. Strict closure only."
