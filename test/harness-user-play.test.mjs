@@ -202,13 +202,16 @@ describe('play deferrals — the graph', () => {
     assert.deepEqual(siblings, [], 'an unreadable directory is not this verdict\'s business');
   });
 
-  it('names every gap in one paragraph', () => {
-    const text = describePlayGaps({
+  it('names every gap, one line per finding — the shape the CLI iterates', () => {
+    const lines = describePlayGaps({
       validation: { ok: false, message: 'no Play: line' },
       cycles: [['a', 'b', 'a']],
       story: 's.md',
     });
-    assert.match(text, /s\.md/);
-    assert.match(text, /a → b → a/);
+    assert.ok(Array.isArray(lines), 'a joined string iterates its characters, which printed the refusal one letter per line');
+    assert.equal(lines.length, 2);
+    assert.match(lines[0], /s\.md/);
+    assert.match(lines[1], /a → b → a/);
+    assert.deepEqual(describePlayGaps({ validation: { ok: true }, cycles: [] }), []);
   });
 });

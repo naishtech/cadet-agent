@@ -13,6 +13,13 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Fixed
+
+- `harness verify-play` printed its refusal one character per line. `describePlayGaps` returned a
+  joined string where its sibling `describeReachabilityGaps` returns an array, and the CLI iterates
+  the result — so an agent refused a gate saw `-`, then `w`, then `h`, instead of the gap. Found by
+  running the released CLI against a real story; the test now asserts the shape, not just the text.
+
 ## [0.59.0] — 2026-10-01
 
 ### Added
