@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.59.0] — 2026-10-01
+
 ### Added
 
 - **The `userPlaythroughConfirmed` gate, and the story-level `Play:` declaration it reads.** Game work
