@@ -229,6 +229,63 @@ export function readOnlyCommands() {
   return Object.entries(COMMANDS).filter(([, c]) => !c.mutates).map(([k]) => k);
 }
 
+/** Repository-relative form of a path: forward slashes, no leading `./`. */
+function normaliseRepoPath(path) {
+  return String(path).replace(/\\/g, '/').replace(/^\.\//, '');
+}
+
+/**
+ * Does one of a command's `writes` patterns cover a path?
+ *
+ * The shipped table uses exactly three shapes, and the matcher supports those and no more:
+ * an exact path (`AGENTS.md`), a directory subtree (`<dir>/**`), and a root-level suffix
+ * wildcard (`*.coverage.json`). `**` crosses directory boundaries and `*` does not — the
+ * distinction a shell makes, and the reason a `*` that crossed directories would refuse a
+ * file the command never touches.
+ *
+ * Wildcards are replaced FIRST, with placeholders that survive the escape pass. Doing it the
+ * other way round turns `**` into a literal `\*\*` and every declaration stops matching — the
+ * defect this function shipped with for one run, caught by the generated test below it.
+ *
+ * Absolute paths are deliberately not translated: `--files` carries repository-relative paths
+ * by contract, so an absolute path is a different mistake and not this function's to guess at.
+ */
+function writePatternMatches(pattern, path) {
+  const escaped = normaliseRepoPath(pattern)
+    .replace(/\*\*/g, '\u0000')
+    .replace(/\*/g, '\u0001')
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/\u0000/g, '.*')
+    .replace(/\u0001/g, '[^/]*');
+
+  return new RegExp(`^${escaped}$`).test(normaliseRepoPath(path));
+}
+
+/**
+ * The `--files` entries a command declares it WRITES, and which must therefore never be
+ * bound as its evidence.
+ *
+ * Why this exists: a record's `inputTreeHash` covers the files it binds, and the command
+ * then writes its own outputs — the run ledger and `.cadet/state.json`. Binding one of those
+ * makes the record stale at the instant it is created, because the write it records changes
+ * a file the hash covers. Measured on a consumer on 2026-10-01: a `storyTrackingUpdated`
+ * record that bound the story, the epic and `.cadet/state.json` was refused by the very next
+ * `state transition --dry-run` with "input tree hash changed since the evidence was
+ * recorded", and the gate had to be re-recorded twice before the boundary was allowed.
+ *
+ * The answer is a refusal rather than a filter. Filtering would leave the record claiming a
+ * coverage it does not have, and the caller asked for a binding that provably cannot hold —
+ * the same choice `AGENT_OWNED_GATES` and the swallowed `--command` flag both resolved the
+ * loud way. It is derived from the registry rather than hardcoded, so a new command's
+ * outputs are covered the moment it is registered.
+ */
+export function selfBoundFiles(commandKey, files = []) {
+  const writes = COMMANDS[commandKey]?.writes || [];
+  if (writes.length === 0 || !Array.isArray(files) || files.length === 0) return [];
+
+  return files.filter((file) => writes.some((pattern) => writePatternMatches(pattern, file)));
+}
+
 /**
  * Resolve the command key for a parsed invocation.
  *

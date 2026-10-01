@@ -27,6 +27,7 @@ import {
   createEvidence, newId, computeInputTreeHash, hashCriteria,
   collectDeclaredTestNames, reconcileTestNames,
   resolveCommand, describeCommand, describeAllCommands, checkUnattendedRequirements, COMMANDS,
+  selfBoundFiles,
   STATE_VERSION, sealedEvidence, recordEvidence, appendEvidence, sealWorkItem, toStateV4,
   isHistoryExternal, HISTORY_ENTRIES_KEPT, resetGatesForNewWorkItem,
 } from './harness/index.mjs';
@@ -2362,6 +2363,41 @@ export async function run(argv) {
 
   const opts = parseArgs(argv);
   const commandKey = resolveCommand(argv);
+
+  // A command may not bind its own outputs as the evidence it records.
+  //
+  // A record's `inputTreeHash` covers the files `--files` names, and `harness verify`,
+  // `harness confirm`, `harness verify-acs`, `harness verify-reachability`,
+  // `harness verify-design-review` and `harness verify-architecture` then write the ledger
+  // and `.cadet/state.json`. Binding one of those makes the record stale at the instant it
+  // is created — the write it describes changes a file the hash covers — so the next
+  // `state transition --dry-run` refuses the boundary for a record the harness itself just
+  // wrote. Refused here, in the dispatcher, rather than at each of the four sites that
+  // resolve `--files`: the registry already declares what each command writes, so the check
+  // covers a new command and a new flag the moment they are registered, which is the same
+  // reason `--dry-run` is driven from here (contract C13).
+  if (commandKey && opts.files && opts.files.length) {
+    const selfBound = selfBoundFiles(commandKey, opts.files);
+    if (selfBound.length > 0) {
+      const named = selfBound.join(', ');
+      fail(
+        opts,
+        `--files names ${selfBound.length === 1 ? 'a path' : 'paths'} that "${commandKey}" writes itself: ${named}. `
+        + 'Bind the files this gate JUDGES — sources, tests, and the story or epic markdown — never the ledger '
+        + `or state document the evidence is recorded in: "${commandKey}" writes ${named} as it records the `
+        + 'record, so a binding to it reads as stale the moment it is written ("input tree hash changed since '
+        + 'the evidence was recorded"), and the gate can never be fresh.',
+        () => 1,
+        {
+          ok: false,
+          command: commandKey,
+          code: 'self-bound-files',
+          files: selfBound,
+          writes: COMMANDS[commandKey].writes || [],
+        },
+      );
+    }
+  }
 
   // Global `--dry-run`, driven by the registry rather than by each handler.
   //
