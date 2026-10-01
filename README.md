@@ -7,7 +7,7 @@ Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished g
 ## Repository Layout
 - `.cadet/agent/core/` contains the shared Cadet-Agent framework documents.
   - `cadet-agent.md` is the thin global directive: identity, non-negotiable rules, workflow routing, hard-gate protocol, and skill dispatch.
-  - `Harness.md` is the canonical harness contract: budgets, evidence-backed gates, retries, context tiers, tool routing, privacy, and escalation.
+  - `HarnessRuntime.md` is the lean runtime contract; `Harness.md` keeps the full harness rationale and reference.
   - `harness.schema.json` and `state.schema.json` are the machine-readable schemas for harness records and session state.
   - `skills/` contains scoped workflow-phase skills (PlanningReview, Requirements, Architecture, DesignReview, Spike, StoryBreakdown, TDD, Debugging, CodeReview, VisualEvidence, Resume, MCPSetup, AgentReviewer, Handoff, Reconciliation).
   - `templates/` contains runtime templates for planning artifacts.
@@ -197,7 +197,7 @@ The framework's only per-reply output is one line: `cadet-agent: ok`, or the pro
 
 Gates are backed by **evidence**, not assertion. Each claimed gate must have a fresh, non-superseded evidence record bound to the current work item, input tree hash, and acceptance criteria. The harness also bounds context, tokens, tool calls, retries, wall-clock time, cost, and archive sizes — and those bounds are enforced, not advisory.
 
-- Rules: `.cadet/agent/core/Harness.md`. Data contract: `docs/core/HarnessContract.md`.
+- Runtime rules: `.cadet/agent/core/HarnessRuntime.md`. Full contract: `.cadet/agent/core/Harness.md`. Data contract: `docs/core/HarnessContract.md`.
 - Overrides: `.cadet/harness.json` (preserved by sync; conservative defaults in `src/harness/policy.mjs`).
 - Ledgers: `.cadet/runs/<runId>.json` (sanitized; artifacts are redacted before they are written; no secrets or raw prompts by default).
 - Transitions recompute the input tree hash from the evidence's relevant files, so editing a relevant file invalidates the evidence.
@@ -361,7 +361,7 @@ If a specific game repository needs local conventions, add a policy file under `
 
 ## Package Output
 Running `./package-agent.ps1` produces `cadet-agent.zip` with this layout:
-- `.cadet/agent/core/` (including `Harness.md`, `harness.schema.json`, and `state.schema.json`)
+- `.cadet/agent/core/` (including `HarnessRuntime.md`, `Harness.md`, `harness.schema.json`, and `state.schema.json`)
 - `.cadet/agent/core/skills/`
 - `.cadet/agent/core/templates/`
 - `.github/agents/cadet.agent.md`

@@ -31,7 +31,8 @@ For GitHub Copilot, these skills are also exposed as slash-command prompts under
 ## Framework Artifacts
 
 - **[FrameworkManifest.json](FrameworkManifest.json)** — Distribution contract: managed paths, preserved paths, canonical repository, supported IDEs.
-- **[Harness.md](Harness.md)** — Harness rules: budgets, evidence-backed gates, retries, context tiers, tool routing, privacy, and escalation.
+- **[HarnessRuntime.md](HarnessRuntime.md)** — Lean runtime harness rules agents read by default.
+- **[Harness.md](Harness.md)** — Full harness contract and rationale.
 - **[harness.schema.json](harness.schema.json)** — JSON Schema for harness policy, run ledgers, spans, evidence, decisions, and state v2.
 - **[state.schema.json](state.schema.json)** — Session state schema (v1 to v4; v4 is current). See `docs/core/HarnessContract.md` for the frozen contract.
 - **[LICENSE.md](LICENSE.md)** — CC BY 4.0 License.
@@ -62,7 +63,7 @@ Every command declares whether it writes, and the declaration is enforced rather
 `--help` is read-only at any depth, and `--dry-run` is honoured by every mutating command. Run
 `cadet-agent harness capabilities --format json` to read the registry.
 
-Read `Harness.md` for the full contract. See `docs/core/HarnessContract.md` for the frozen data contract and compatibility invariants.
+Read `HarnessRuntime.md` for runtime rules and `Harness.md` for the full contract. See `docs/core/HarnessContract.md` for the frozen data contract and compatibility invariants.
 
 ## Operational Files
 

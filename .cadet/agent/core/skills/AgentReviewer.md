@@ -9,9 +9,9 @@ You are the **Cadet Agent Reviewer**. This skill is the primary instruction cont
 
 ## Gate Check
 
-No phase gate applies — the reviewer audits work without advancing state. **No active state:** if `.cadet/state.json` is absent and no `.cadet/agent/project-plans/` exists, this is the framework source repo — story/gate work is not applicable; switch to the contribution workflow (`CONTRIBUTING.md`). Do not audit a story, epic, or gate claim that this repository does not contain; report the repo-role mismatch as the finding instead.
+No phase gate applies — the reviewer audits work without advancing state. Apply `.cadet/agent/core/RepositoryRoleBoundary.md` before story or gate work. Do not audit a story, epic, or gate claim that this repository does not contain; report the repo-role mismatch as the finding instead.
 
-Read `.cadet/agent/core/cadet-agent.md` in full before auditing; it is the single source of truth for framework compliance. Also read `.cadet/agent/core/Harness.md` — the reviewer audits evidence-backed gates, budget enforcement, and ledger completeness.
+Read `.cadet/agent/core/cadet-agent.md` in full before auditing; it is the single source of truth for framework compliance. Also read `.cadet/agent/core/HarnessRuntime.md` — the reviewer audits evidence-backed gates, budget enforcement, and ledger completeness.
 </instructions>
 
 <context>

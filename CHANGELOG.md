@@ -14,6 +14,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 ## [Unreleased]
 
 ### Changed
+- **Runtime context is leaner and less duplicated.** Skills now point to one repository-role boundary file instead of repeating the framework-source branch, adapter pointers use one short instruction, and phase context now loads `HarnessRuntime.md` by default instead of the full explanatory `Harness.md`. The full harness contract stays available for reference and tests keep the budget table in `Harness.md` only. The kickoff route now has one ordered flow, and the directive asks only when missing information changes the next action or record.
+
 
 - **Both READMEs now describe the framework the code implements.** The root `README.md` still showed
   the workflow and the CLI as they stood before the user-play and design-review gates: the phase-gating

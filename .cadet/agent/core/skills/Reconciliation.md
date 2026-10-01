@@ -11,9 +11,9 @@ You are executing the Cadet **Reconciliation** skill. This skill is the primary 
 
 No phase gate applies: this skill reports, and never advances `currentPhase` or flips a gate. Its gate relationships are supplying the basis for `designArtifactSyncConfirmed` (the `validation → closed` gate, "Requirements, design, plan, epics mutually consistent"), which nothing else in the framework checks, and stating whether `humanAcceptanceConfirmed` still holds. When `.cadet/harness.json` sets `humanAcceptance.enabled`, read the acceptance record at closure: an acceptance whose witness or limitations is empty, or whose bound files changed since it was recorded, does not hold, and the report says so rather than passing the gate on the strength of the `true` flag alone. Never write the acceptance yourself — it is a person's record.
 
-**No active state:** if `.cadet/state.json` is absent and no `.cadet/agent/project-plans/` exists, this is the framework source repo — story/gate work is not applicable; switch to the contribution workflow (`CONTRIBUTING.md`) and offer to reconcile the in-flight contribution instead. Do not name a story, epic, or gate that this repository does not contain.
+Apply `.cadet/agent/core/RepositoryRoleBoundary.md` before story or gate work. If this is the framework source repo, offer to reconcile the in-flight contribution instead.
 
-Read `.cadet/agent/core/Harness.md`. This skill reads evidence but records none, so the harness rules that matter are the ones about honesty: a claim without a citation is not a finding, and a partial reading is never reported as a complete one.
+Read `.cadet/agent/core/HarnessRuntime.md`. This skill reads evidence but records none, so the harness rules that matter are the ones about honesty: a claim without a citation is not a finding, and a partial reading is never reported as a complete one.
 </instructions>
 
 <context>

@@ -136,7 +136,9 @@ describe('adversarial — no skill restates the harness contract', () => {
 
   it('Harness.md is the single source of the budget table', () => {
     const harness = readFileSync(join(coreDir, 'Harness.md'), 'utf-8');
+    const runtime = readFileSync(join(coreDir, 'HarnessRuntime.md'), 'utf-8');
     assert.ok(harness.includes('| Context tokens | 64,000'), 'Harness.md must own the budget table');
+    assert.equal(runtime.includes('| Context tokens | 64,000'), false, 'HarnessRuntime.md must stay lean');
   });
 });
 

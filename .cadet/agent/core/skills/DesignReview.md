@@ -11,6 +11,8 @@ challenged.
 <instructions>
 ## Gate Check
 
+Apply `.cadet/agent/core/RepositoryRoleBoundary.md` before story or gate work.
+
 Read `.cadet/state.json` first.
 
 - **No `.cadet/state.json`, and no `.cadet/agent/project-plans/`**: you are in the

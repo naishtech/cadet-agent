@@ -102,7 +102,7 @@ Run `npm test` to validate:
 
 ## Harness pointers
 
-Adapters do not restate harness rules. Each adapter's `Read First` pointer to `.cadet/agent/core/cadet-agent.md` leads to the Harness rules; the canonical harness contract is `.cadet/agent/core/Harness.md`.
+Adapters do not restate harness rules. Each adapter's `Read First` pointer to `.cadet/agent/core/cadet-agent.md` leads to the Harness rules; the lean runtime contract is `.cadet/agent/core/HarnessRuntime.md`; the full contract is `.cadet/agent/core/Harness.md`.
 
 **Interception is measured, not inferred.** `cadet-agent harness capabilities --verify-host` probes the
 configured mechanisms and reports a level — `native`, `external` or `advisory` — for each host and each

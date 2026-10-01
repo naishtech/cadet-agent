@@ -22,8 +22,8 @@ These rules apply to all work, regardless of learner tier, operating mode, or wo
 - Interface-first and mock-first patterns are required for service-style architecture and testing seams.
 - Do not skip required large-change artifacts (requirements, technical design, project plan, epics) unless the user explicitly directs that exception. If they do, state the skipped artifact and the reason before continuing.
 - During planning (requirements and architecture), explicitly list every assumption being made about technology capabilities, integration behavior, performance characteristics, or platform constraints. For each assumption, classify it as **verified** (documented/known), **reasonable** (standard practice, low risk), or **unverified** (unknown, high risk). For unverified assumptions, recommend a spike to answer the open question before the assumption becomes a design dependency.
-- When uncertain, ask. If both sides are uncertain, get permission before searching online.
-- **Never assume you or the user already knows the answer.** If any fact, constraint, or requirement is unclear or ambiguous, ask — do not fill gaps with assumptions. If the user does not know, direct them to the appropriate subject matter expert rather than guessing.
+- Ask only when missing information changes the next action or the record. If the repository can answer, read it instead.
+- If the user cannot answer a required domain question, ask them to identify the subject matter expert. Get permission before searching online.
 - For new tech: check familiarity, explain if unfamiliar, confirm consent before adoption.
 - When an active repository policy defines technology defaults, state the policy default before recommending alternatives. Do not silently substitute a different technology.
 - For Unity projects, use Unity Test Framework (UTF) for unit tests. Do not recommend external test frameworks like NUnit or xUnit for Unity code.
@@ -58,26 +58,21 @@ After filling, the final artifact contains zero XML tags.
 
 ## Workflow Routing
 
-### Kickoff
+### First-action order
 
-On the first substantive response of a session, run the full kickoff sequence in `.cadet/agent/core/KickoffFlow.md` before planning or implementation.
+Before planning or implementation:
 
-### Determining the Workflow Path
+1. Run `.cadet/agent/core/KickoffFlow.md`.
+2. Detect active policy, guidance, and standards.
+3. Classify the work as `large`, `small`, or `no_test_required`.
+4. Resolve operating mode from the request.
+5. Dispatch the matching skill.
 
-Before any substantive work, ask the user ONE question:
-
-> "Is this a small, focused change to a single component, or a larger feature that spans multiple systems? (If it's purely documentation/config, say so.)"
-
-Based on the answer, classify the change:
-- **large** — multi-component feature, system, refactor, architecture change
-- **small** — single-component feature, bug fix
-- **no_test_required** — documentation, config, comments, README
-
-The classification determines which skills are dispatched and in what sequence. Follow the skill dispatch order below.
+Ask the classification question only when the request and repository state do not answer it.
 
 ### Context Resolution
 
-Before the first substantive action, detect the active policy (`.cadet/agent/policies`), available guidance, and standards automatically.
+Detect the active policy (`.cadet/agent/policies`), available guidance, and standards automatically.
 
 ### Determining Operating Mode
 
@@ -209,7 +204,7 @@ These files define specific operational workflows. Read them on session start or
 - `.cadet/agent/core/GitFirstRule.md` — Git bootstrap procedure. Git must be initialized before any Unity project or code, and branch status must be checked before starting new work.
 - `.cadet/agent/core/FrameworkSyncGate.md` — Framework update check. Check for framework updates before substantive work.
 - `.cadet/agent/core/KickoffFlow.md` — Full kickoff sequence. Step-by-step sequence for the first interaction in a session.
-- `.cadet/agent/core/Harness.md` — **Harness rules.** Budgets, evidence-backed gates, retry classes, context tiers, tool routing, redaction, and escalation. Every skill follows it. The CLI (`cadet-agent state …`, `cadet-agent harness …`) enforces it; see `.cadet/harness.json` for repository overrides.
+- `.cadet/agent/core/HarnessRuntime.md` — lean runtime rules every skill reads. `Harness.md` remains the full contract and rationale.
 
 ## Important Paths
 
@@ -217,7 +212,7 @@ These files define specific operational workflows. Read them on session start or
 - Planning artifacts: `.cadet/agent/project-plans/` — requirements, designs, plans, epics, stories.
 - Session state: `.cadet/state.json` — the single source of truth for workflow progress.
 - Framework manifest: `.cadet/agent/core/FrameworkManifest.json` — packaged version, canonical repository, managed and preserved paths.
-- Harness policy: `.cadet/harness.json` — repository-local budgets and limits (preserved by framework sync). Harness rules: `.cadet/agent/core/Harness.md`.
+- Harness policy: `.cadet/harness.json` — repository-local budgets and limits (preserved by framework sync). Harness runtime rules: `.cadet/agent/core/HarnessRuntime.md`; full contract: `.cadet/agent/core/Harness.md`.
 - Execution ledger: `.cadet/runs/<runId>.json` — sanitized run records (never contains secrets or raw prompts by default).
 - Reference documentation: `docs/` — full rationale, examples, anti-patterns, and detailed reference. See `docs/index.md` for navigation.
 

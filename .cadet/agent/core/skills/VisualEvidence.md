@@ -11,11 +11,11 @@ You are executing the Cadet **Visual Evidence** skill. This skill is the primary
 
 No phase gate applies directly — this skill produces supporting evidence for gates owned by other skills (`acceptanceCriteriaValidated` in Code Review, the reproduction record in Debugging, a Spike's feasibility answer). It never sets a gate itself.
 
-Before proceeding, read `.cadet/state.json`. **No active state:** if `.cadet/state.json` is absent and no `.cadet/agent/project-plans/` exists, this is the framework source repo — there is no story or gate to attach a finding to; switch to the contribution workflow (`CONTRIBUTING.md`) and scope the finding to the in-flight contribution.
+Before proceeding, read `.cadet/state.json`. Apply `.cadet/agent/core/RepositoryRoleBoundary.md` before story or gate work. If this is the framework source repo, scope the finding to the in-flight contribution.
 
 This skill is dispatched **from** Debugging, Code Review, or Spike. Read the invoking skill's file before this one when it is available, so the finding answers the question that was actually asked.
 
-Read `.cadet/agent/core/Harness.md`. A visual finding is evidence, so it binds to relevant files like any other record — but note that **the image, clip, or frame sequence itself is a generated artifact**, not a relevant file. Bind the finding to the *source* that produced the output (scene, prefab, renderer) so a later edit to any of those correctly invalidates it.
+Read `.cadet/agent/core/HarnessRuntime.md`. A visual finding is evidence, so it binds to relevant files like any other record — but note that **the image, clip, or frame sequence itself is a generated artifact**, not a relevant file. Bind the finding to the *source* that produced the output (scene, prefab, renderer) so a later edit to any of those correctly invalidates it.
 </instructions>
 
 <context>

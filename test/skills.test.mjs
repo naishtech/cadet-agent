@@ -69,20 +69,22 @@ describe('Skill files', () => {
 });
 
 describe('Repository-role boundary in skills', () => {
-  // Every phase skill must tell the agent what to do when there is no active
-  // state, so it cannot reason about stories/gates in the framework source repo.
+  // The role boundary lives in one file. Skills point to it instead of copying
+  // the same framework-source branch into every phase file.
   const allSkills = [...expectedSkills, 'AgentReviewer.md', 'PlanningReview.md'];
 
+  it('defines the no-active-state branch once', () => {
+    const content = readFileSync(join(coreDir, 'RepositoryRoleBoundary.md'), 'utf-8');
+    assert.ok(content.includes('.cadet/agent/project-plans/'), 'boundary must check for project-plans');
+    assert.ok(content.includes('CONTRIBUTING.md'), 'boundary must point framework-source users at CONTRIBUTING.md');
+  });
+
   for (const skill of allSkills) {
-    it(`${skill} documents the no-active-state branch`, () => {
+    it(`${skill} references the repository-role boundary`, () => {
       const content = readFileSync(join(skillsDir, skill), 'utf-8');
       assert.ok(
-        content.includes('.cadet/agent/project-plans/'),
-        `${skill} must name .cadet/agent/project-plans/ in its no-active-state branch`,
-      );
-      assert.ok(
-        content.includes('CONTRIBUTING.md'),
-        `${skill} must point framework-source users at CONTRIBUTING.md`,
+        content.includes('.cadet/agent/core/RepositoryRoleBoundary.md'),
+        `${skill} must reference the repository-role boundary`,
       );
     });
   }
@@ -263,7 +265,7 @@ describe('harness artifacts', () => {
 // ── Harness contract per skill (Phase 7 exit criterion) ─────────────────────
 //
 // Every canonical skill must either consume or emit harness records, and must
-// reference Harness.md. This fails if a skill omits its required harness contract.
+// reference HarnessRuntime.md. This fails if a skill omits its required harness contract.
 
 describe('Skill harness contract', () => {
   const harnessSkills = [
@@ -284,8 +286,8 @@ describe('Skill harness contract', () => {
     it(`${skill} references the harness contract`, () => {
       const content = readFileSync(join(skillsDir, skill), 'utf-8');
       assert.ok(
-        content.includes('.cadet/agent/core/Harness.md'),
-        `${skill} must reference .cadet/agent/core/Harness.md`
+        content.includes('.cadet/agent/core/HarnessRuntime.md'),
+        `${skill} must reference .cadet/agent/core/HarnessRuntime.md`
       );
     });
   }
