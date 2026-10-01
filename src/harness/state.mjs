@@ -15,6 +15,7 @@ import {
   REACHABILITY_GATE, REACHABILITY_TRANSITION_FROM,
   DESIGN_REVIEW_GATE, DESIGN_REVIEW_TRANSITION_FROM,
   HUMAN_ACCEPTANCE_GATE, HUMAN_ACCEPTANCE_TRANSITION_FROM,
+  USER_PLAY_GATE, USER_PLAY_TRANSITION_FROM,
   ARCHITECTURE_GATE, ARCHITECTURE_TRANSITION_FROM, ARCHITECTURE_TRANSITION_TO,
   architectureFitnessActive,
 } from './policy.mjs';
@@ -1375,7 +1376,7 @@ export function conditionalEdgeGates(fromPhase, toPhase, policy = null) {
   return policy?.designReview?.enabled === true ? [DESIGN_REVIEW_GATE] : [];
 }
 
-export function requiredGates(toPhase, { reachability = false, humanAcceptance = false, architectureFitness = false } = {}) {
+export function requiredGates(toPhase, { reachability = false, humanAcceptance = false, architectureFitness = false, userPlay = false } = {}) {
   for (const [from, spec] of Object.entries(TRANSITIONS)) {
     if (spec.to === toPhase) {
       const gates = [...spec.gates];
@@ -1398,6 +1399,16 @@ export function requiredGates(toPhase, { reachability = false, humanAcceptance =
       // revalidated gate is judged without its phase stamp — which for this one would
       // mean accepting a record written in any phase at all.
       if (humanAcceptance && from === HUMAN_ACCEPTANCE_TRANSITION_FROM) gates.push(HUMAN_ACCEPTANCE_GATE);
+      // User play joins the STORY boundary (`review -> validation`) and nothing else, and
+      // only when the repository has asked for it. Placement: a playthrough is a claim
+      // about a delivered, reviewed story, and this is the edge a story crosses before the
+      // next one starts — `validation -> implementation` is the next-story loop and stays
+      // unblocked, which is why the requirement cannot live there. It is deliberately NOT
+      // in `revalidate`: at `validation -> closed` the epic's own
+      // `humanAcceptanceConfirmed` covers the whole epic, and demanding every story's play
+      // again at closure would multiply the person's work at the exact moment they are
+      // being asked to accept the finished thing.
+      if (userPlay && from === USER_PLAY_TRANSITION_FROM) gates.push(USER_PLAY_GATE);
       // Architecture fitness joins `implementation -> review`, and only when the project
       // has declared checks. It is appended at evaluation time rather than written into
       // the transition table, so a project that declares nothing keeps the frozen lists
@@ -1618,6 +1629,7 @@ export function evaluateTransition(state, toPhase, context = {}) {
     reachability: context.policy?.reachability?.enabled === true,
     humanAcceptance: context.policy?.humanAcceptance?.enabled === true,
     architectureFitness: architectureFitnessActive(context.policy),
+    userPlay: context.policy?.userPlay?.enabled === true,
   });
   // An edge with no `TRANSITIONS` entry can still carry a gate. It is resolved HERE,
   // before the ungated-edge shortcut below, because that shortcut is what would

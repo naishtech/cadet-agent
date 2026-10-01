@@ -13,6 +13,7 @@ export {
   DEFAULT_REACHABILITY, REACHABILITY_GATE,
   DEFAULT_DESIGN_REVIEW, DESIGN_REVIEW_GATE, DESIGN_REVIEW_TRANSITION_FROM,
   DEFAULT_HUMAN_ACCEPTANCE, HUMAN_ACCEPTANCE_GATE, HUMAN_ACCEPTANCE_TRANSITION_FROM,
+  DEFAULT_USER_PLAY, USER_PLAY_GATE, USER_PLAY_TRANSITION_FROM,
   DEFAULT_ARCHITECTURE_FITNESS, ARCHITECTURE_GATE, ARCHITECTURE_TRANSITION_FROM,
   ARCHITECTURE_TRANSITION_TO, CHECK_SEVERITIES, architectureFitnessActive,
   validatePolicy, defaultPolicy, loadPolicy, budgetForScope, policyPath, PolicyError,
@@ -134,6 +135,17 @@ export {
   validateReachabilityDeclaration, findDeferralCycles, readSiblingDeclarations,
   describeReachabilityGaps,
 } from './reachability.mjs';
+
+export {
+  PLAY_KINDS,
+  parsePlayDeclaration, parsePlayDeclarationText,
+  validatePlayDeclaration, readSiblingPlayDeclarations, describePlayGaps,
+} from './play.mjs';
+
+export {
+  PLAY_FORM_GATE, PLAY_FORM_SUFFIX, PLAY_TEMPLATE_RELATIVE, PLAY_HUMAN_FIELDS,
+  playFormPath, buildPlayForm, parsePlayForm, writePlayForm, readPlayTemplate,
+} from './play-form.mjs';
 
 export {
   COMMANDS, mutatingCommands, readOnlyCommands, resolveCommand, selfBoundFiles,

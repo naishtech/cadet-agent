@@ -42,7 +42,8 @@
         "reachabilityAddressed",
         "designReviewCompleted",
         "humanAcceptanceConfirmed",
-        "architectureFitnessPassed"
+        "architectureFitnessPassed",
+        "userPlaythroughConfirmed"
       ]
     },
     "evidenceStatus": {
@@ -212,6 +213,14 @@
         "humanAcceptance": {
           "type": "object",
           "description": "The human-acceptance gate. Absent or enabled:false is byte-identical pre-change behaviour — the gate is not required. When true, `humanAcceptanceConfirmed` is required on `validation -> closed` at evaluation time, not in the transitions table, so the next-story loop (`validation -> implementation`) stays unblocked. The shipped policy file for a new consumer sets it true.",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false }
+          },
+          "additionalProperties": false
+        },
+        "userPlay": {
+          "type": "object",
+          "description": "The user-playthrough gate. Absent or enabled:false is byte-identical pre-change behaviour — the gate is not required. When true, `userPlaythroughConfirmed` is required on `review -> validation` — the story boundary — at evaluation time, not in the transitions table, so the next-story loop (`validation -> implementation`) stays unblocked and an epic's closure is covered by `humanAcceptanceConfirmed` alone. The gate is human-owned: `harness verify-play` records it for a story whose `Play:` declaration is `deferred`, and refuses a `required` one, which only the person's own form (`harness play-form` then `harness confirm --artifact`) can record. The shipped policy file for a new consumer sets it true, so a new project hands its game to a person before a story can pass.",
           "properties": {
             "enabled": { "type": "boolean", "default": false }
           },

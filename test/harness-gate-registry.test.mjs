@@ -97,7 +97,7 @@ describe('gate registry — the contract is declared once', () => {
     const required = new Set();
     for (const phase of PHASES) {
       for (const optedIn of [false, true]) {
-        const spec = requiredGates(phase, { reachability: optedIn, humanAcceptance: optedIn, architectureFitness: optedIn });
+        const spec = requiredGates(phase, { reachability: optedIn, humanAcceptance: optedIn, architectureFitness: optedIn, userPlay: optedIn });
         if (!spec) continue;
         for (const gate of spec.gates) required.add(gate);
         for (const gate of spec.revalidate || []) required.add(gate);
@@ -121,7 +121,7 @@ describe('gate registry — the contract is declared once', () => {
     // either kind.
     assert.deepEqual(manualOnlyGateNames(), [
       'codeReviewCompleted', 'securityReviewPassed', 'designArtifactSyncConfirmed',
-      'humanAcceptanceConfirmed',
+      'humanAcceptanceConfirmed', 'userPlaythroughConfirmed',
     ]);
   });
 

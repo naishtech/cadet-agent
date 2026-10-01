@@ -34,12 +34,14 @@ describe('policy — defaults', () => {
     // closure and only when `humanAcceptance.enabled` is true
     // (harness-human-acceptance.test.mjs); `architectureFitnessPassed` only on
     // implementation -> review and only when the project declares checks
-    // (harness-architecture.test.mjs).
+    // (harness-architecture.test.mjs); `userPlaythroughConfirmed` only on
+    // review -> validation and only when `userPlay.enabled` is true
+    // (harness-user-play.test.mjs).
     assert.deepEqual([...GATES], [
       'codeReviewCompleted', 'testsPassed', 'storyTrackingUpdated', 'compileCheckConfirmed',
       'unityAnalyzerClean', 'acceptanceCriteriaValidated', 'securityReviewPassed',
       'designArtifactSyncConfirmed', 'reachabilityAddressed', 'designReviewCompleted',
-      'humanAcceptanceConfirmed', 'architectureFitnessPassed',
+      'humanAcceptanceConfirmed', 'architectureFitnessPassed', 'userPlaythroughConfirmed',
     ]);
   });
 

@@ -16,6 +16,7 @@ These rules apply to all work, regardless of learner tier, operating mode, or wo
 - One requirement or test objective per diff.
 - Work is scoped to stories, not epics. Epics are grouping containers — break each into small, independently implementable stories before any code.
 - **Delivered work must be reachable.** Every story declares how its deliverable becomes reachable — a path by which a user or operator can reach and observe it — or an explicit deferral naming the work item that will make it so. Silence is not reachability, and an unowned deferral is not a plan: a `deferred to <work item>` declaration expires when that work item is `done`. Reachability is checked mechanically by `cadet-agent harness verify-reachability`, gated by `reachability.enabled` in `.cadet/harness.json` (off by default, so enabling it is a deliberate act). See `skills/TDD.md`, `skills/CodeReview.md` and `skills/StoryBreakdown.md`.
+- **A person plays the work before the story moves on, when the repository asks for it.** Every story also declares `Play:` — `required — <what the user does in the game, and what they should see>`, or `deferred to <work item> — <why it cannot be played yet>`. With `userPlay.enabled` set, `userPlaythroughConfirmed` is required on `review -> validation` and only a person's own record satisfies it: a `required` story needs the playthrough form, and a `deferred` one is recorded by `cadet-agent harness verify-play` and expires when its owner is `done`. Reachability asks whether a person CAN reach the deliverable; this asks whether one DID. A game can be fully tested, compiled and reviewed without ever being played, and that is the condition this gate exists to close.
 - When a story hits a blocker that cannot be resolved within the current design (e.g., a missing interface, an incompatible integration, a flawed architectural assumption), do not force the implementation. Pause the story, document the blocker, and trace it upstream: update the technical design, propagate changes to epics and stories (adding, removing, or modifying stories as needed), then resume with the revised story. Apply the decommission rule if the design change makes existing code obsolete.
 - When a refactor or major design change replaces or removes existing functionality (e.g., switching APIs, replacing a subsystem, retiring a pattern), identify any obsolete code, interfaces, integrations, or assets that should be decommissioned. Ask the user whether cleanup and decommissioning should be included in the plan before proceeding with implementation.
 - Interface-first and mock-first patterns are required for service-style architecture and testing seams.
@@ -266,6 +267,21 @@ These files define specific operational workflows. Read them on session start or
       infrastructure work is not blocked. Verify with `cadet-agent harness verify-reachability
       --story <path>`; when the repository configures `reachability.command`, that probe's exit code
       is the verdict, because Cadet cannot know how a given repository wires its pieces together.
+    </gate>
+    <gate id="userPlaythroughConfirmed">
+      A person played the delivered work, and recorded what they did and what they saw.
+      REQUIRED ONLY WHEN `userPlay.enabled` is set in `.cadet/harness.json`, and only on THIS edge:
+      `review -> validation` is the story boundary, so the next-story loop stays unblocked and an
+      epic's closure is covered by `humanAcceptanceConfirmed` alone.
+      A story whose deliverable can be played declares `Play: required — <what the user does and what
+      they see>`; a story that cannot be played yet declares `Play: deferred to <work item> — <why>`,
+      which expires when that work item is done. Silence is neither.
+      HUMAN-OWNED: no command produces this gate and `harness verify` refuses it. For a `required`
+      story the only route is the person's own account — `harness play-form --story <path>` writes the
+      form, a person fills its three blank fields, and `harness confirm --gate userPlaythroughConfirmed
+      --artifact <the form>` records it. `cadet-agent harness verify-play --story <path>` records the
+      gate for a `deferred` story and refuses a `required` one, so an agent can never answer this
+      question in the person's place.
     </gate>
   </transition>
   <transition from="validation" to="closed">

@@ -13,6 +13,27 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Added
+
+- **The `userPlaythroughConfirmed` gate, and the story-level `Play:` declaration it reads.** Game work
+  can be fully tested, fully compiled and fully reviewed without anyone ever playing it, and the one
+  gate that asks a person — `humanAcceptanceConfirmed` — fires at epic closure, by which point every
+  story is already marked done. A story now states
+  `Play: required — <what the user does and what they see>` or
+  `Play: deferred to <work item> — <why it cannot be played yet>`; the gate is required on
+  `review -> validation` — the story boundary, so the next-story loop stays unblocked and an epic's
+  closure is covered by the acceptance gate alone — when the repository sets `userPlay.enabled`.
+  It is **human-owned**: `harness verify-play` records it only for a deferral,
+  `harness play-form` writes the form, and `harness confirm --artifact` records the person's own
+  account of what they played and what they saw. There is deliberately no "not applicable" form: a
+  deferral names an owner and expires when that owner is done. The shipped policy file for a new
+  consumer sets `userPlay.enabled: true`.
+- `cadet-agent harness verify-play --story <path>` — check a story's `Play:` declaration, and record
+  the gate for a deferral.
+- `cadet-agent harness play-form --story <path>` — write a user-playthrough form for a story,
+  pre-filled from state.
+- `.cadet/agent/core/templates/UserPlaythroughTemplate.md`.
+
 ## [0.58.0] — 2026-10-01
 
 ### Changed
