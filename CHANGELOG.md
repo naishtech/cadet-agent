@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.59.1] — 2026-10-01
+
 ### Fixed
 
 - `harness verify-play` printed its refusal one character per line. `describePlayGaps` returned a
