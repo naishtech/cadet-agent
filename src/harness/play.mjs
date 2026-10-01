@@ -248,14 +248,23 @@ export function readSiblingPlayDeclarations(storyPath, { max = DEFAULT_MAX_SIBLI
   return out;
 }
 
-/** One paragraph naming every play gap, for a human-readable failure. */
+/**
+ * One line per play gap, for a human-readable failure.
+ *
+ * AN ARRAY, NOT A JOINED STRING, and the difference is not style: the CLI iterates this
+ * (`for (const line of gaps) console.error(line)`), which is the contract its sibling
+ * `describeReachabilityGaps` already has. A joined string iterates its CHARACTERS, so the
+ * first release of this command printed the refusal one letter per line — a useless message
+ * from the one command whose whole job is to tell a caller what to do next. Found by running
+ * the released CLI against a real story, which is why the test now asserts the shape.
+ */
 export function describePlayGaps({ validation, cycles = [], story } = {}) {
   const lines = [];
   if (validation && !validation.ok) lines.push(`- ${story || 'the story'}: ${validation.message}`);
   for (const cycle of cycles) {
     lines.push(`- the play deferrals form a cycle, so none of these can ever be played: ${cycle.join(' → ')}`);
   }
-  return lines.join('\n');
+  return lines;
 }
 
 /** Re-exported so the CLI and its tests need one import for both halves of the walk. */
