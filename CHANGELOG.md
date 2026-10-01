@@ -13,6 +13,24 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Changed
+
+- **Both READMEs now describe the framework the code implements.** The root `README.md` still showed
+  the workflow and the CLI as they stood before the user-play and design-review gates: the phase-gating
+  table and the workflow diagram omitted the `userPlaythroughConfirmed` gate and its `Play:` declaration,
+  the `designReviewCompleted` gate was missing from the diagram's `architecture → story-breakdown` edge,
+  `state init` and `state begin` were absent from the command list, and twelve commands of the current
+  surface (`harness status`, `verify-acs`, `verify-reachability`, `verify-design-review`,
+  `verify-architecture`, `verify-play`, `play-form`, `acceptance-form`, `confirm`, `changes`,
+  `matrix-check`, and `context plan|record|validate`) were unlisted. Corrected against the code: the
+  human-owned gates (`humanAcceptanceConfirmed`, `userPlaythroughConfirmed`) and their form route, the
+  response contract and `harness status`, the two skills missing from the skills list and the cross-IDE
+  matrix (Design Review, Visual Evidence), the code-review step count (17 → 23), and the packaged layout
+  (`.agents/skills/`, `.githooks/pre-commit`, `AGENTS.md`, `.cadet/harness.json`). A heading that split
+  the phase-gating table in two now follows it. `.cadet/agent/core/README.md` had the same gaps and
+  stated two retired facts — the state schema as "v1 and v2" and a `state migrate` that upgrades
+  "v1 → v2"; both now name v4.
+
 ## [0.59.1] — 2026-10-01
 
 ### Fixed
