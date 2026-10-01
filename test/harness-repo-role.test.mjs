@@ -149,7 +149,12 @@ describe('cli — repo identity reporting', () => {
   it('harness verify reports the repo role in its JSON result', () => {
     const dir = makeConsumer(tmpProject());
     try {
-      const res = runCli(['harness', 'verify', '--gate', 'testsPassed', '--command', 'node -e "process.exit(3)"', '--files', '.cadet/state.json', '--target', dir, '--format', 'json']);
+      // The bound file must be one the command does NOT write: `harness verify` writes
+      // `.cadet/state.json` and the ledger, and binding either is refused before the handler
+      // runs (see `selfBoundFiles`, and `harness-self-bound-files.test.mjs`). The manifest is
+      // simply a file the consumer fixture already lays down — this test is about the repo
+      // role appearing in the result, not about what a gate binds.
+      const res = runCli(['harness', 'verify', '--gate', 'testsPassed', '--command', 'node -e "process.exit(3)"', '--files', '.cadet/agent/core/FrameworkManifest.json', '--target', dir, '--format', 'json']);
       const out = JSON.parse(res.stdout);
       assert.equal(out.repoRole, REPO_ROLES.CONSUMER);
     } finally { rmSync(dir, { recursive: true, force: true }); }

@@ -136,7 +136,7 @@ export {
 } from './reachability.mjs';
 
 export {
-  COMMANDS, mutatingCommands, readOnlyCommands, resolveCommand,
+  COMMANDS, mutatingCommands, readOnlyCommands, resolveCommand, selfBoundFiles,
   describeCommand, describeAllCommands, checkUnattendedRequirements,
 } from './commands.mjs';
 
