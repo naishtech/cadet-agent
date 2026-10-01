@@ -435,11 +435,50 @@ export function validateState(state, context = {}) {
         const scope = Array.isArray(entry.scope) ? entry.scope : (entry.scope ? [entry.scope] : []);
         for (const s of scope) excepted.add(String(s));
       }
+      // The same ambiguity, seen from the other side: a story the session moved on
+      // FROM, with evidence behind it, that still reads `planned` — which makes a
+      // finished story indistinguishable from one that was never started.
+      //
+      // The data already tells the two apart. `storyCompletions` records the
+      // boundary and how much the item left behind, and its comment says why the
+      // count is there: so "a completion with nothing behind it is visible rather
+      // than implied". A row with nothing behind it is a hollow completion — an
+      // item begun and then abandoned — and is left alone here. A row with records
+      // in it is a story that was carried to a verdict, and `planned` is then a
+      // false statement about it.
+      //
+      // It is an ERROR, not a warning, for the reason the rule below gives, and its
+      // remedy has the same shape: say what happened. A story that was superseded
+      // rather than delivered is not `planned` either.
+      //
+      // `in-progress` is deliberately NOT checked: `state begin` on an item that
+      // still carries its old completion row leaves it active, so active-plus-row
+      // is a legitimate combination and refusing it would be a false accusation.
+      const completedWith = new Map();
+      if (Array.isArray(state.storyCompletions)) {
+        for (const row of state.storyCompletions) {
+          if (!isPlainObject(row)) continue;
+          if (typeof row.workItemId !== 'string' || row.workItemId.length === 0) continue;
+          const records = Number(row.evidenceRecords);
+          if (!(records > 0)) continue;
+          completedWith.set(row.workItemId, records);
+        }
+      }
       for (const [epicId, epic] of Object.entries(state.epics)) {
         if (!isPlainObject(epic) || !isPlainObject(epic.stories)) continue;
         for (const [storyId, status] of Object.entries(epic.stories)) {
-          if (status !== 'done') continue;
           const workItemId = `${epicId}::${storyId}`;
+          if (status === 'planned' && completedWith.has(workItemId)) {
+            errors.push({
+              path: `epics.${epicId}.stories.${storyId}`,
+              message: `story "${storyId}" reads "planned" but the completion row for its work item `
+                + `"${workItemId}" records ${completedWith.get(workItemId)} evidence record(s). A story the `
+                + 'session moved on from, with evidence behind it, is not planned: it is done, or it is '
+                + 'superseded. Leaving it planned makes a finished story indistinguishable from one that '
+                + 'was never started.',
+            });
+          }
+          if (status !== 'done') continue;
           if (evidenced.has(workItemId)) continue;
           if (excepted.has(workItemId)) continue;
           errors.push({

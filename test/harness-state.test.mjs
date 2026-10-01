@@ -93,6 +93,47 @@ describe('state — validation', () => {
   });
 
   // ------------------------------------------------------------------
+  // The completion row versus a `planned` story.
+  //
+  // `state begin` records the item it moves on FROM, so a finished story and an
+  // abandoned one both leave a row behind. `evidenceRecords` is what separates
+  // them, so this pair pins BOTH sides: the row that stands on evidence is an
+  // error when the story still reads `planned`, and the hollow row is legal.
+  // ------------------------------------------------------------------
+
+  it('rejects a story that reads planned while its completion row stands on evidence', () => {
+    const r = validateState(v2State({
+      epics: { 'epic-1': { status: 'in-progress', stories: { 'story-1.md': 'planned' } } },
+      storyCompletions: [{
+        workItemId: 'epic-1::story-1.md',
+        completedAt: '2026-10-01T01:22:05.155Z',
+        evidenceRecords: 9,
+      }],
+    }));
+    assert.equal(r.valid, false);
+    assert.ok(
+      r.errors.some((e) => e.path === 'epics.epic-1.stories.story-1.md'
+        && /reads "planned" but the completion row/.test(e.message)),
+      `expected the planned-with-evidence error: ${JSON.stringify(r.errors)}`,
+    );
+  });
+
+  it('accepts a planned story whose completion row left nothing behind', () => {
+    const r = validateState(v2State({
+      epics: { 'epic-1': { status: 'in-progress', stories: { 'story-1.md': 'planned' } } },
+      storyCompletions: [{
+        workItemId: 'epic-1::story-1.md',
+        completedAt: '2026-10-01T01:22:05.155Z',
+        evidenceRecords: 0,
+      }],
+    }));
+    assert.ok(
+      !r.errors.some((e) => e.path === 'epics.epic-1.stories.story-1.md'),
+      `a hollow completion must not be accused: ${JSON.stringify(r.errors)}`,
+    );
+  });
+
+  // ------------------------------------------------------------------
   // Gate exceptions vs validation (defect A2).
   //
   // A stale gate may be covered by a scoped, unexpired gate-exception. The
