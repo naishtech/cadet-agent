@@ -55,6 +55,7 @@
   },
   "designReview": { "enabled": true },
   "humanAcceptance": { "enabled": true },
+  "userPlay": { "enabled": true },
   "architectureFitness": { "enabled": false, "checks": [] },
   "scopes": {
     "perRun": {},

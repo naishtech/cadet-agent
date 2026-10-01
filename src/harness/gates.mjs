@@ -43,7 +43,7 @@
  * Contract: docs/core/HarnessContract.md C14.
  */
 
-import { GATES, REACHABILITY_GATE, MANUAL_ONLY_GATES } from './policy.mjs';
+import { GATES, REACHABILITY_GATE, MANUAL_ONLY_GATES, USER_PLAY_GATE } from './policy.mjs';
 
 /**
  * Who owns the evidence for a gate.
@@ -185,6 +185,27 @@ export const GATE_BUILDERS = Object.freeze({
     manual: true,
     binds: 'files',
     attests: 'a named person accepted the delivered work against a stated witness, with the limitations they accepted',
+  },
+  userPlaythroughConfirmed: {
+    owner: 'human',
+    contract: 1,
+    // No automated path and no project override, for the same reason
+    // humanAcceptanceConfirmed has neither: the gate asks whether a PERSON played the
+    // delivered work. A command cannot answer it, and neither can a reviewer's record —
+    // the record's substance is the person's own account of what they played and what
+    // they saw, which is why the route is a form they fill in and `verify-play` refuses
+    // to record a `required` declaration on their behalf.
+    automatedPath: null,
+    command: null,
+    projectCommand: false,
+    manual: true,
+    // `files`, where its sibling `reachabilityAddressed` binds `story`. The difference is
+    // the subject: reachability's evidence is a declaration about a work item, while this
+    // gate's evidence is an account of a build the person actually ran, so a later edit to
+    // the sources that produced it must invalidate the record. The deferral route
+    // (`Play: deferred to <work item>`) binds the story, which is where the declaration is.
+    binds: 'files',
+    attests: 'a named person played the delivered work and recorded what they did and what they saw',
   },
   codeReviewCompleted: {
     owner: 'agent',
@@ -359,6 +380,12 @@ export function auditGateRegistry() {
   }
   if (gateBuilder(REACHABILITY_GATE)?.projectCommand !== false) {
     problems.push(`gate "${REACHABILITY_GATE}" must not accept a project command`);
+  }
+  if (gateBuilder(USER_PLAY_GATE)?.projectCommand !== false) {
+    problems.push(`gate "${USER_PLAY_GATE}" must not accept a project command`);
+  }
+  if (gateBuilder(USER_PLAY_GATE)?.owner !== 'human') {
+    problems.push(`gate "${USER_PLAY_GATE}" must stay human-owned: a person plays the work`);
   }
   return problems;
 }

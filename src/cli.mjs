@@ -24,6 +24,9 @@ import {
   parseReachabilityDeclaration, validateReachabilityDeclaration, collectWorkItems,
   findDeferralCycles, readSiblingDeclarations, normalizeWorkItemRef, describeReachabilityGaps,
   REACHABILITY_GATE, runCommand,
+  parsePlayDeclaration, validatePlayDeclaration, readSiblingPlayDeclarations, describePlayGaps,
+  USER_PLAY_GATE, buildPlayForm, parsePlayForm, writePlayForm, readPlayTemplate,
+  PLAY_FORM_GATE, PLAY_FORM_SUFFIX,
   createEvidence, newId, computeInputTreeHash, hashCriteria,
   collectDeclaredTestNames, reconcileTestNames,
   resolveCommand, describeCommand, describeAllCommands, checkUnattendedRequirements, COMMANDS,
@@ -73,6 +76,8 @@ function showHelp() {
     cadet-agent harness verify      Run a bounded, classified verification loop
     cadet-agent harness verify-acs  Verify declared AC↔test coverage against a test report
     cadet-agent harness verify-reachability  Verify a story's declared reachability (opt-in)
+    cadet-agent harness verify-play  Verify a story's Play: declaration and record the deferral (opt-in)
+    cadet-agent harness play-form   Write a user-playthrough form for a story, filled in from state (opt-in)
     cadet-agent harness verify-design-review  Check the design-review artifact and record the gate (opt-in)
     cadet-agent harness acceptance-form  Write a human-acceptance form for an epic, filled in from state
     cadet-agent harness verify-architecture  Run the project's declared architecture checks (opt-in)
@@ -100,8 +105,8 @@ function showHelp() {
     --expires-at   ISO-8601 expiry bounding the confirmation (harness confirm)
     --environment  key=value,... describing what was verified (harness confirm)
     --scope        Comma-separated scope of the confirmation (harness confirm)
-    --story        Story markdown declaring the acceptance criteria or reachability (harness verify-acs|verify-reachability)
-    --artifact     Design-review artifact to check (verify-design-review), or the acceptance form to record from (confirm --gate humanAcceptanceConfirmed)
+    --story        Story markdown declaring the acceptance criteria, reachability or play declaration (harness verify-acs|verify-reachability|verify-play|play-form)
+    --artifact     Design-review artifact to check (verify-design-review), or the acceptance/playthrough form to record from (confirm --gate humanAcceptanceConfirmed|userPlaythroughConfirmed)
     --epic         Epic a generated form belongs to (harness acceptance-form)
     --out          Where to write the form (default: the epic's plan directory)
 
@@ -977,40 +982,73 @@ async function cmdHarness(opts) {
     // the record. `--witness` and `--limitations` no longer exist; a caller that passes
     // them is refused here rather than silently recorded, which is why the check is on
     // the missing artifact rather than on the flags.
+    const FORM_RECORDED_GATES = new Set([HUMAN_ACCEPTANCE_GATE, USER_PLAY_GATE]);
     if (gate === HUMAN_ACCEPTANCE_GATE && !opts.artifact) {
       fail(opts, `a human acceptance is recorded from a form: run "cadet-agent harness acceptance-form --epic <epicId>" to write one pre-filled from state, fill in its blank fields, then pass it back with --artifact <the form>.`, () => 1, { ok: false, gate, code: 'acceptance-form-required' });
     }
+    // A playthrough is recorded from a form too, and from nothing else. The gate asks whether a
+    // PERSON played the delivered work, so the only route is that person's own account of it —
+    // which is also why `harness verify-play` refuses a `required` declaration.
+    if (gate === USER_PLAY_GATE && !opts.artifact) {
+      fail(opts, `a playthrough is recorded from a form: run "cadet-agent harness play-form --story <path>" to write one pre-filled from state, play the work, fill in its blank fields, then pass it back with --artifact <the form>.`, () => 1, { ok: false, gate, code: 'play-form-required' });
+    }
 
-    // `harness acceptance-form` writes the form pre-filled from state; this reads it back.
+    // `harness acceptance-form` and `harness play-form` write the form pre-filled from state;
+    // this reads it back.
     if (opts.artifact) {
-      if (gate !== HUMAN_ACCEPTANCE_GATE) {
-        fail(opts, `--artifact is only for ${HUMAN_ACCEPTANCE_GATE}: every other gate's evidence comes from its own command or from explicit fields.`, () => 1, { ok: false, gate, code: 'artifact-not-applicable' });
+      const isPlaythrough = gate === USER_PLAY_GATE;
+      if (!FORM_RECORDED_GATES.has(gate)) {
+        fail(opts, `--artifact is only for ${HUMAN_ACCEPTANCE_GATE} and ${USER_PLAY_GATE}: every other gate's evidence comes from its own command or from explicit fields.`, () => 1, { ok: false, gate, code: 'artifact-not-applicable' });
       }
       const conflicting = ['scope', 'environment'].filter((k) => opts[k]);
       if (conflicting.length > 0) {
-        fail(opts, `--artifact already carries the acceptance, so ${conflicting.map((k) => `--${k}`).join(' and ')} would be a second, competing source. Pass the artifact alone.`, () => 1, { ok: false, gate, code: 'artifact-conflicts-with-flags', conflicting });
+        fail(opts, `--artifact already carries the record, so ${conflicting.map((k) => `--${k}`).join(' and ')} would be a second, competing source. Pass the artifact alone.`, () => 1, { ok: false, gate, code: 'artifact-conflicts-with-flags', conflicting });
       }
       let formText;
       try {
         formText = readFileSync(opts.artifact, 'utf-8');
       } catch (err) {
-        fail(opts, `the acceptance form could not be read (${err.message}).`, () => 1, { ok: false, gate, code: 'artifact-unreadable' });
+        fail(opts, `the ${isPlaythrough ? 'playthrough' : 'acceptance'} form could not be read (${err.message}).`, () => 1, { ok: false, gate, code: 'artifact-unreadable' });
       }
-      const form = parseAcceptanceForm(formText);
-      if (form.incomplete.length > 0) {
-        fail(opts, `the form still has unfilled fields: ${form.incomplete.join(', ')}. Fill them in ${opts.artifact} and run the command again — an acceptance nobody wrote down is not an acceptance.`, () => 1, { ok: false, gate, code: 'acceptance-form-incomplete', missing: form.incomplete });
+
+      if (isPlaythrough) {
+        const form = parsePlayForm(formText);
+        if (form.incomplete.length > 0) {
+          fail(opts, `the form still has unfilled fields: ${form.incomplete.join(', ')}. Fill them in ${opts.artifact} and run the command again — a playthrough nobody described is not a playthrough.`, () => 1, { ok: false, gate, code: 'play-form-incomplete', missing: form.incomplete });
+        }
+        // The record binds to the ACTIVE work item, so a form that plays a different story is
+        // refused rather than recorded against the one in flight — the same failure the
+        // story-bound evidence rules exist to prevent, wearing a filled-in form.
+        const activeStory = state?.activeWorkItem?.storyId || null;
+        const formStory = String(form.story || '');
+        if (activeStory && formStory && !formStory.includes(activeStory)) {
+          fail(opts, `the form plays "${form.story}", but the active work item is "${activeStory}". Record a playthrough of the work in flight, or begin that story first.`, () => 1, { ok: false, gate, code: 'play-form-story-mismatch', story: form.story, active: activeStory });
+        }
+        opts.witness = form.witness;
+        opts.limitations = form.limitations;
+        opts.environment = form.environment || null;
+        opts.scope = [form.story || activeStory || 'playthrough'];
+        if (!opts.files || opts.files.length === 0) opts.files = form.fileList;
+        opts.files = opts.files && opts.files.length ? opts.files : null;
+        opts.filesGiven = opts.files !== null;
+        opts.playedBy = form.player;
+      } else {
+        const form = parseAcceptanceForm(formText);
+        if (form.incomplete.length > 0) {
+          fail(opts, `the form still has unfilled fields: ${form.incomplete.join(', ')}. Fill them in ${opts.artifact} and run the command again — an acceptance nobody wrote down is not an acceptance.`, () => 1, { ok: false, gate, code: 'acceptance-form-incomplete', missing: form.incomplete });
+        }
+        if (state && form.epic && state.epics && !state.epics[form.epic]) {
+          fail(opts, `the form accepts epic "${form.epic}", which does not exist in state.json. Fix the form, or accept the epic the repository actually has.`, () => 1, { ok: false, gate, code: 'acceptance-form-epic-unknown', epic: form.epic });
+        }
+        opts.witness = form.witness;
+        opts.limitations = form.limitations;
+        opts.environment = form.environment || null;
+        opts.scope = [form.epic];
+        if (!opts.files || opts.files.length === 0) opts.files = form.fileList;
+        opts.files = opts.files && opts.files.length ? opts.files : null;
+        opts.filesGiven = opts.files !== null;
+        opts.acceptedBy = form.acceptor;
       }
-      if (state && form.epic && state.epics && !state.epics[form.epic]) {
-        fail(opts, `the form accepts epic "${form.epic}", which does not exist in state.json. Fix the form, or accept the epic the repository actually has.`, () => 1, { ok: false, gate, code: 'acceptance-form-epic-unknown', epic: form.epic });
-      }
-      opts.witness = form.witness;
-      opts.limitations = form.limitations;
-      opts.environment = form.environment || null;
-      opts.scope = [form.epic];
-      if (!opts.files || opts.files.length === 0) opts.files = form.fileList;
-      opts.files = opts.files && opts.files.length ? opts.files : null;
-      opts.filesGiven = opts.files !== null;
-      opts.acceptedBy = form.acceptor;
     }
 
     // No check for empty witness/limitations is needed here: the form is the only route
@@ -1676,6 +1714,179 @@ async function cmdHarness(opts) {
       if (probe) console.log(`   Project probe "${probe.command}" exited 0 (${probe.durationMs} ms).`);
       else console.log('   No reachability.command configured — the declaration is checked, the wiring is not proven.');
       console.log(`   Ledger: ${ledgerPath}`);
+    }
+    return;
+  }
+
+  if (sub === 'verify-play') {
+    refuseCommandOverride('harness verify-play', "the story's Play: declaration");
+    // Mechanical play-declaration verification (contract v7 §1). A story states whether a
+    // person can play its deliverable, or which work item will make it playable; this checks
+    // that declaration against the work items that exist.
+    //
+    // WHY THIS COMMAND CANNOT SET THE GATE FOR A PLAYABLE STORY. The gate asks whether a
+    // PERSON played the work. So this records the gate for a `deferred` declaration — the
+    // declaration is the answer, exactly as a reachability deferral is — and REFUSES to
+    // record it for a `required` one, pointing at the form. An agent that could answer
+    // "the user played it" in a sentence would make the gate worthless, which is the whole
+    // reason `userPlaythroughConfirmed` is human-owned in the gate registry.
+    if (!opts.story) fail(opts, 'harness verify-play requires --story <path>');
+    const storyPath = resolve(opts.targetDir, opts.story);
+    const storyRel = relative(opts.targetDir, storyPath).replace(/\\/g, '/') || basename(storyPath);
+    const { exists, state } = readState(opts.targetDir);
+    assertExpectedPhase(opts, state);
+    const playEnabled = policy.userPlay?.enabled === true;
+    const workItemId = state ? workItemIdOf(state) : 'unscoped';
+    const phase = state?.session?.currentPhase || 'implementation';
+
+    let playDeclaration;
+    try {
+      playDeclaration = parsePlayDeclaration(storyPath);
+    } catch (err) {
+      fail(opts, `cannot read story "${opts.story}": ${err.message}`, () => 1, { ok: false, code: 'story-unreadable', story: opts.story });
+    }
+
+    const playWorkItems = exists ? collectWorkItems(state) : null;
+    const playValidation = validatePlayDeclaration(playDeclaration, { workItems: playWorkItems, self: basename(storyPath) });
+    const playSiblings = readSiblingPlayDeclarations(storyPath, { workItems: playWorkItems });
+    const playGraph = playSiblings.length > 0
+      ? playSiblings
+      : [{ id: basename(storyPath), aliases: [], declaration: playDeclaration }];
+    const playCycles = exists ? findDeferralCycles(playGraph) : [];
+    const playGaps = describePlayGaps({ validation: playValidation, cycles: playCycles, story: opts.story });
+
+    // A playable story. The gate is NOT set here, and the refusal names the route that can.
+    if (playValidation.ok && playValidation.code === 'required') {
+      const formHint = `run "cadet-agent harness play-form --story ${opts.story}" to write one pre-filled from state, play the game, fill in the three blank fields, then pass it back with --artifact <the form>.`;
+      fail(
+        opts,
+        `${USER_PLAY_GATE} is a person's record, and this story declares its deliverable playable: ${playDeclaration.instruction}. ${formHint}`,
+        () => 1,
+        { ok: false, gate: USER_PLAY_GATE, code: 'play-form-required', story: opts.story, declaration: playDeclaration },
+      );
+    }
+
+    const playOk = playValidation.ok && playCycles.length === 0;
+
+    if (!playEnabled) {
+      if (opts.format === 'json') {
+        emit(opts, '', { ok: playOk, story: opts.story, declaration: playDeclaration, play: playValidation, cycles: playCycles, gateSet: false, enabled: false });
+      } else if (playOk) {
+        console.log(`✅ Play declaration for ${opts.story}: ${playValidation.message}`);
+        console.log('   userPlay.enabled is false — reported only, state.json unchanged.');
+      } else {
+        console.error(`⚠️  Play gaps in ${opts.story} (userPlay.enabled is false — reported only):`);
+        for (const line of playGaps) console.error(line);
+      }
+      if (!playOk) process.exit(1);
+      return;
+    }
+
+    if (!playOk) {
+      const detail = {
+        ok: false,
+        story: opts.story,
+        declaration: playDeclaration,
+        play: playValidation,
+        cycles: playCycles,
+        gateSet: false,
+        code: playValidation.ok !== true ? playValidation.code : 'deferral-cycle',
+      };
+      if (opts.format === 'json') emit(opts, '', detail);
+      else {
+        console.error(`❌ Cannot set ${USER_PLAY_GATE} for ${opts.story}:`);
+        for (const line of playGaps) console.error(line);
+      }
+      process.exit(1);
+    }
+
+    const playAt = new Date();
+    const playEvidence = createEvidence({
+      evidenceId: newId(),
+      workItemId,
+      acceptanceCriterionId: null,
+      phase,
+      gate: USER_PLAY_GATE,
+      status: 'passed',
+      command: `harness verify-play --story ${opts.story}`,
+      result: `play deferred (${playValidation.code})`,
+      exitCode: 0,
+      commit: opts.commit || null,
+      inputTreeHash: computeInputTreeHash(opts.targetDir, [storyRel]),
+      criteriaHash: hashCriteria([
+        workItemId,
+        playValidation.code,
+        playDeclaration.deferTo || playDeclaration.instruction || '',
+      ]),
+      relevantFiles: [storyRel],
+      createdAt: playAt,
+      expiresAt: null,
+      freshnessPolicy: { scope: 'story' },
+      source: 'automated',
+    });
+
+    const playLedger = new RunLedger({ targetDir: opts.targetDir, policy, runId: state?.activeRunId || null, workItemId, phase });
+    playLedger.addEvidence(playEvidence);
+    playLedger.addDecision({ kind: 'stop', reason: `play deferred (${playValidation.code})`, scope: 'declaration only' });
+    playLedger.finalize({ status: 'ok' });
+    const playLedgerPath = playLedger.persist();
+
+    if (exists) {
+      const next = recordEvidence(state, playEvidence);
+      writeState(opts.targetDir, next);
+    }
+
+    if (opts.format === 'json') {
+      emit(opts, '', { ok: true, story: opts.story, play: playValidation, cycles: playCycles, evidenceId: playEvidence.evidenceId, gateSet: exists, runId: playLedger.runId, path: playLedgerPath });
+    } else {
+      console.log(`✅ ${USER_PLAY_GATE} for ${opts.story}: ${playValidation.message}`);
+      console.log('   The story defers the playthrough, so the declaration is the record — no form is needed.');
+      console.log(`   Ledger: ${playLedgerPath}`);
+    }
+    return;
+  }
+
+  if (sub === 'play-form') {
+    if (!opts.story) {
+      fail(opts, 'harness play-form needs --story <path>: the form belongs to the story being played.', () => 1, { ok: false, code: 'story-required' });
+    }
+    const { exists, state } = readState(opts.targetDir);
+    if (!exists) {
+      fail(opts, 'No .cadet/state.json found. The form is generated from state, so there is nothing to fill it from yet.', () => 1, { ok: false, code: 'no-state' });
+    }
+    const storyPath = resolve(opts.targetDir, opts.story);
+    const storyRel = relative(opts.targetDir, storyPath).replace(/\\/g, '/') || basename(storyPath);
+    let playDeclaration = null;
+    try {
+      playDeclaration = parsePlayDeclaration(storyPath);
+    } catch (err) {
+      fail(opts, `cannot read story "${opts.story}": ${err.message}`, () => 1, { ok: false, code: 'story-unreadable', story: opts.story });
+    }
+    let playTemplate;
+    try {
+      playTemplate = readPlayTemplate(opts.targetDir);
+    } catch (err) {
+      fail(opts, `${err.message}. Run "cadet-agent sync" to restore it — the form is generated from that file so the template and the form cannot drift apart.`, () => 1, { ok: false, code: 'template-missing' });
+    }
+    const playText = buildPlayForm({
+      template: playTemplate,
+      state,
+      storyPath,
+      storyRel,
+      targetDir: opts.targetDir,
+      declaration: playDeclaration,
+    });
+    const playResult = writePlayForm(opts.targetDir, storyRel, playText, { out: opts.out });
+    if (!playResult.written) {
+      fail(opts, `harness play-form refuses to overwrite an existing form: ${playResult.reason} (${playResult.path}).`, () => 1, { ok: false, code: 'form-exists', path: playResult.path });
+    }
+    const playShown = playResult.path.slice(opts.targetDir.length + 1).replace(/\\/g, '/');
+    if (opts.format === 'json') {
+      emit(opts, '', { ok: true, path: playShown, story: opts.story, next: `cadet-agent harness confirm --gate ${PLAY_FORM_GATE} --artifact ${playShown}` });
+    } else {
+      console.log(`Playthrough form written: ${playShown}`);
+      console.log('   Play the work, fill in the three unfilled fields, then run:');
+      console.log(`   cadet-agent harness confirm --gate ${PLAY_FORM_GATE} --artifact ${playShown}`);
     }
     return;
   }

@@ -51,6 +51,11 @@ export const GATES = Object.freeze([
   // APPENDED by the architecture-fitness change. OPT-IN, and required only when the
   // project has declared checks — see ARCHITECTURE_GATE.
   'architectureFitnessPassed',
+  // APPENDED by the user-play change. HUMAN-OWNED, for the same reason
+  // humanAcceptanceConfirmed is: only a person can answer whether they played the
+  // delivered work and what they saw. OPT-IN, and required on the story boundary —
+  // see USER_PLAY_GATE.
+  'userPlaythroughConfirmed',
 ]);
 
 /**
@@ -138,6 +143,46 @@ export const HUMAN_ACCEPTANCE_TRANSITION_FROM = 'validation';
  * consumer.
  */
 export const DEFAULT_HUMAN_ACCEPTANCE = Object.freeze({
+  enabled: false,
+});
+
+/**
+ * The user-playthrough gate.
+ *
+ * It answers the one question the workflow otherwise never asks: did a PERSON play the
+ * delivered work. Every other gate can be satisfied by a command or by a reviewer, so a
+ * project can go green for many stories in a row with nothing ever on screen — the
+ * condition `humanAcceptanceConfirmed` only reaches at epic closure, and the condition a
+ * `Reachability: witnessed` line states without proving.
+ *
+ * Required on `review -> validation`, which IS the story boundary: `validation ->
+ * implementation` is the next-story loop and stays unblocked, so "before moving on to
+ * the next story" is this edge. It sits beside `reachabilityAddressed` because the two
+ * ask the same question at different strengths — reachability asks whether a person CAN
+ * reach the deliverable, and this asks whether one DID.
+ *
+ * A story that cannot be played yet declares `Play: deferred to <work item>`, and that
+ * declaration satisfies the gate exactly as a reachability deferral does: it names an
+ * owner and expires when the owner is done, so "we will see it later" is a plan with a
+ * term rather than a gap. There is deliberately NO "not applicable" form — a story with
+ * no playable surface of its own still has a reachable one (the game still runs), and an
+ * escape hatch an agent can write for itself is the class of check this framework keeps
+ * having to delete.
+ */
+export const USER_PLAY_GATE = 'userPlaythroughConfirmed';
+
+/** The `from` phase the user-playthrough gate attaches to (`-> validation`). */
+export const USER_PLAY_TRANSITION_FROM = 'review';
+
+/**
+ * Default user-play policy.
+ *
+ * Opt-in, on the same reasoning as every other switch in this file: adopting a framework
+ * version must not add a requirement to a repository that did not ask for it. A consumer
+ * turns it on in its own `.cadet/harness.json`, and a project that has never been played
+ * is the condition this gate exists for.
+ */
+export const DEFAULT_USER_PLAY = Object.freeze({
   enabled: false,
 });
 
@@ -459,6 +504,7 @@ export const MANUAL_ONLY_GATES = Object.freeze([
   'securityReviewPassed',
   'designArtifactSyncConfirmed',
   'humanAcceptanceConfirmed',
+  'userPlaythroughConfirmed',
 ]);
 
 /**
@@ -744,6 +790,18 @@ function resolveHumanAcceptance(raw) {
   return { enabled: raw.enabled === true };
 }
 
+function resolveUserPlay(raw) {
+  if (raw === undefined) return { ...DEFAULT_USER_PLAY };
+  if (!isPlainObject(raw)) throw new PolicyError('"userPlay" must be an object.');
+  for (const key of Object.keys(raw)) {
+    if (key !== 'enabled') throw new PolicyError(`Unknown "userPlay" key "${key}".`);
+  }
+  if (raw.enabled !== undefined && typeof raw.enabled !== 'boolean') {
+    throw new PolicyError('"userPlay.enabled" must be a boolean.');
+  }
+  return { enabled: raw.enabled === true };
+}
+
 function resolveDesignReview(raw) {
   if (raw === undefined) return { ...DEFAULT_DESIGN_REVIEW };
   if (!isPlainObject(raw)) throw new PolicyError('"designReview" must be an object.');
@@ -769,7 +827,7 @@ export function validatePolicy(raw, defaults = DEFAULT_BUDGETS) {
     'budgets', 'archive', 'output', 'retention', 'estimation', 'hook',
     'allowBudgetCeilingOverride', 'scopes', 'model', 'analyzerCommand',
     'compileCommand', 'testCommand', 'allowEmptyFreshness', 'strictClosure',
-    'reachability', 'designReview', 'humanAcceptance', 'architectureFitness',
+    'reachability', 'designReview', 'humanAcceptance', 'architectureFitness', 'userPlay',
   ]);
   for (const key of Object.keys(raw)) {
     if (!allowed.has(key)) {
@@ -840,6 +898,7 @@ export function validatePolicy(raw, defaults = DEFAULT_BUDGETS) {
   const designReview = resolveDesignReview(raw.designReview);
   const humanAcceptance = resolveHumanAcceptance(raw.humanAcceptance);
   const architectureFitness = resolveArchitectureFitness(raw.architectureFitness);
+  const userPlay = resolveUserPlay(raw.userPlay);
 
   const resolved = {
     budgets,
@@ -855,6 +914,7 @@ export function validatePolicy(raw, defaults = DEFAULT_BUDGETS) {
     designReview,
     humanAcceptance,
     architectureFitness,
+    userPlay,
     scopes: raw.scopes || { perRun: {}, perStory: {} },
     model: raw.model || null,
     analyzerCommand: raw.analyzerCommand || null,
