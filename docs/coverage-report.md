@@ -157,6 +157,15 @@ now carries the work, and `cadet-agent.md` states what each stage must carry.
 | "Use guidance docs to prefer patterns that have worked well" | ✅ cadet-agent.md L17 |
 | "Do not present guidance as hard requirement unless standard/policy requires it" | ✅ cadet-agent.md L17 |
 
+## Source: Harness.md — leaner split (2026-10-02)
+
+| Instruction | Disposition |
+|---|---|
+| Per-transition gate definitions, the execution protocol, and the failure-to-satisfy rule (§13) | ✅ `.cadet/agent/core/HarnessGates.md` — moved verbatim out of `cadet-agent.md`'s gate block; `cadet-agent.md` and `HarnessRuntime.md` now point at that file |
+| §12 "CLI surface": the per-command explanations | ✅ same rules as one table; every flag, bound, refusal and read-only declaration survives, and `cadet-agent --help` prints the full command index with each flag's owning command |
+| §5, §2a, §2c explanatory clauses (the "why" around each rule) | 📚 git history and `docs/`; every rule statement stays in `Harness.md` at its section number, so the skills' section pointers still resolve |
+| "record a structured `gate-exception` in `changeHistory`" | ✅ corrected to `.cadet/state.json → gateExceptions`, its v4 home |
+
 ---
 
 ## Summary
