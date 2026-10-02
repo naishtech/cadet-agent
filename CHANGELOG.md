@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.60.0] — 2026-10-02
+
 ### Changed
 - **The harness contract is leaner, and the gate reference has its own file.** `Harness.md` loads only when an agent follows a pointer, but a host reads a whole file, so every section it does not need is still paid for. The per-transition gate definitions and the execution protocol move to `.cadet/agent/core/HarnessGates.md` — the read `cadet-agent.md` already asked for at a transition — so that read is 8 KB instead of 59 KB. Section 12's 26 per-command bullets become one table: every flag and refusal survives, and `cadet-agent --help` already prints the full command index and each flag's owning command. Sections 5, 2a and 2c keep every rule and lose the narrative around it. `Harness.md` falls from 59.5 KB to 42.0 KB, and the file a transition reads from 59.5 KB to 8.0 KB. The moved gate text is unchanged except one sentence that named the wrong home for a `gate-exception`: it now names `.cadet/state.json → gateExceptions`.
 
