@@ -13,14 +13,17 @@ Workflow phases are implemented as scoped skills under **[skills/](skills/)**. W
 - [PlanningReview](skills/PlanningReview.md)
 - [Requirements](skills/Requirements.md)
 - [Architecture](skills/Architecture.md)
+- [DesignReview](skills/DesignReview.md)
 - [Spike](skills/Spike.md)
 - [StoryBreakdown](skills/StoryBreakdown.md)
 - [TDD](skills/TDD.md)
 - [Debugging](skills/Debugging.md)
 - [CodeReview](skills/CodeReview.md)
+- [VisualEvidence](skills/VisualEvidence.md)
 - [Resume](skills/Resume.md)
 - [MCPSetup](skills/MCPSetup.md)
 - [AgentReviewer](skills/AgentReviewer.md)
+- [Handoff](skills/Handoff.md)
 - [Reconciliation](skills/Reconciliation.md)
 
 For GitHub Copilot, these skills are also exposed as slash-command prompts under `.github/prompts/`.
@@ -28,9 +31,10 @@ For GitHub Copilot, these skills are also exposed as slash-command prompts under
 ## Framework Artifacts
 
 - **[FrameworkManifest.json](FrameworkManifest.json)** — Distribution contract: managed paths, preserved paths, canonical repository, supported IDEs.
-- **[Harness.md](Harness.md)** — Harness rules: budgets, evidence-backed gates, retries, context tiers, tool routing, privacy, and escalation.
+- **[HarnessRuntime.md](HarnessRuntime.md)** — Lean runtime harness rules agents read by default.
+- **[Harness.md](Harness.md)** — Full harness contract and rationale.
 - **[harness.schema.json](harness.schema.json)** — JSON Schema for harness policy, run ledgers, spans, evidence, decisions, and state v2.
-- **[state.schema.json](state.schema.json)** — Session state schema (v1 and v2). See `docs/core/HarnessContract.md` for the frozen contract.
+- **[state.schema.json](state.schema.json)** — Session state schema (v1 to v4; v4 is current). See `docs/core/HarnessContract.md` for the frozen contract.
 - **[LICENSE.md](LICENSE.md)** — CC BY 4.0 License.
 
 ## Harness
@@ -43,9 +47,11 @@ Cadet runs under an observable, bounded harness. In short:
 - The CLI enforces the rules:
 
 ```bash
+cadet-agent state init --workflow-path <kind>   # write the first state document
 cadet-agent state validate          # validate state against the schema
-cadet-agent state migrate           # atomically upgrade v1 → v2 (no writes if it fails)
+cadet-agent state migrate           # atomically upgrade v1 → v4 (no writes if it fails)
 cadet-agent state transition --to <phase>
+cadet-agent harness status          # the one health line: ok, or the problem
 cadet-agent harness verify --gate <gate>
 cadet-agent harness report
 cadet-agent harness reconcile      # read-only: reconcile the planning chain against state.json
@@ -57,7 +63,7 @@ Every command declares whether it writes, and the declaration is enforced rather
 `--help` is read-only at any depth, and `--dry-run` is honoured by every mutating command. Run
 `cadet-agent harness capabilities --format json` to read the registry.
 
-Read `Harness.md` for the full contract. See `docs/core/HarnessContract.md` for the frozen data contract and compatibility invariants.
+Read `HarnessRuntime.md` for runtime rules and `Harness.md` for the full contract. See `docs/core/HarnessContract.md` for the frozen data contract and compatibility invariants.
 
 ## Operational Files
 
@@ -75,10 +81,10 @@ line, printed by `cadet-agent harness status`. It is not defined in a separate f
 Full rationale, examples, anti-patterns, and detailed process reference are available at the canonical repository (GitHub Pages): https://github.com/naishtech/cadet-agent
 
 - **Core Concepts**: Identity, Principles, Learner Model, Workflow, Operating Rules
-- **Skills**: Scoped workflow phase skills (Requirements, Architecture, Spike, StoryBreakdown, TDD, Debugging, Code Review)
+- **Skills**: Scoped workflow phase skills (Planning Review, Requirements, Architecture, Design Review, Spike, StoryBreakdown, TDD, Debugging, Code Review, Visual Evidence, Resume, MCP Setup, Reviewer, Handoff, Reconciliation)
 - **Guidance**: Preferred patterns and lessons learned (Architecture, Unity, Performance, Debugging, Localization, Spikes, Technology Decisions)
 - **Standards**: Mandatory quality bars (Performance, Security, SOLID, Testing)
-- **Templates**: Document templates (Requirements, Technical Design, Project Plan, Epic, Policy, ADR)
+- **Templates**: Document templates (Requirements, Technical Design, Design Review, Project Plan, Epic, Story, Policy, ADR, Change Report, Human Acceptance, User Playthrough, Visual Evidence)
 
 ## Policy System
 

@@ -47,7 +47,7 @@ function fixture({ phase = 'implementation', storyStatus = 'in-progress' } = {})
     mkdirSync(join(dir, p), { recursive: true });
   }
   writeFileSync(join(dir, '.cadet/agent/core/cadet-agent.md'), '# the directive\n');
-  writeFileSync(join(dir, '.cadet/agent/core/Harness.md'), '# the runtime contract\n');
+  writeFileSync(join(dir, '.cadet/agent/core/HarnessRuntime.md'), '# the runtime contract\n');
   writeFileSync(join(dir, '.cadet/agent/core/skills/TDD.md'), '# TDD\n');
   writeFileSync(join(dir, '.cadet/agent/core/skills/CodeReview.md'), '# CodeReview\n');
   writeFileSync(join(dir, '.cadet/harness.json'), JSON.stringify({}, null, 2));
@@ -78,7 +78,7 @@ describe('context protocol — the plan', () => {
 
       const refs = r.json.required.map((i) => i.reference);
       assert.ok(refs.includes('.cadet/agent/core/cadet-agent.md'), 'tier 0 is always required');
-      assert.ok(refs.includes('.cadet/agent/core/Harness.md'));
+      assert.ok(refs.includes('.cadet/agent/core/HarnessRuntime.md'));
       assert.ok(refs.includes('.cadet/harness.json'));
       assert.ok(refs.includes('.cadet/state.json'));
       assert.ok(refs.includes('.cadet/agent/core/skills/TDD.md'), 'the phase dispatches its own skill');
@@ -147,7 +147,7 @@ describe('context protocol — the record', () => {
     const dir = fixture();
     try {
       runCli(['harness', 'context', 'plan', '--target', dir]);
-      const r = runCli(['harness', 'context', 'record', '--level', 'enforced', '--loaded', '.cadet/agent/core/Harness.md', '--target', dir, '--format', 'json']);
+      const r = runCli(['harness', 'context', 'record', '--level', 'enforced', '--loaded', '.cadet/agent/core/HarnessRuntime.md', '--target', dir, '--format', 'json']);
       assert.equal(r.status, 1, r.stdout + r.stderr);
       assert.equal(r.json?.code, 'enforcement-unverifiable');
       assert.match(r.json?.error, /enforced-by/, 'the refusal names the remedy');
@@ -160,7 +160,7 @@ describe('context protocol — the record', () => {
     try {
       runCli(['harness', 'context', 'plan', '--target', dir]);
       const r = runCli(['harness', 'context', 'record', '--level', 'enforced', '--enforced-by', '.claude/hooks/context-guard.json',
-        '--loaded', '.cadet/agent/core/Harness.md', '--target', dir, '--format', 'json']);
+        '--loaded', '.cadet/agent/core/HarnessRuntime.md', '--target', dir, '--format', 'json']);
       assert.equal(r.status, 1);
       assert.equal(r.json?.code, 'enforcement-unverifiable');
       assert.equal(existsSync(join(dir, '.cadet/context/record.json')), false);
@@ -174,7 +174,7 @@ describe('context protocol — the record', () => {
       writeFileSync(join(dir, '.claude/hooks/context-guard.json'), JSON.stringify({ version: 1, enforces: ['context'], hooks: {} }) + '\n');
       runCli(['harness', 'context', 'plan', '--target', dir]);
       const r = runCli(['harness', 'context', 'record', '--level', 'enforced', '--enforced-by', '.claude/hooks/context-guard.json',
-        '--loaded', '.cadet/agent/core/Harness.md', '--target', dir, '--format', 'json']);
+        '--loaded', '.cadet/agent/core/HarnessRuntime.md', '--target', dir, '--format', 'json']);
       assert.equal(r.status, 0, r.stdout + r.stderr);
       assert.equal(readContextRecord(dir).level, 'enforced');
       assert.equal(readContextRecord(dir).enforcedBy, '.claude/hooks/context-guard.json');
@@ -190,7 +190,7 @@ describe('context protocol — the record', () => {
       writeFileSync(join(dir, '.github/hooks/git-guard.json'), JSON.stringify({ version: 1, hooks: { preToolUse: [] } }) + '\n');
       runCli(['harness', 'context', 'plan', '--target', dir]);
       const r = runCli(['harness', 'context', 'record', '--level', 'enforced', '--enforced-by', '.github/hooks/git-guard.json',
-        '--loaded', '.cadet/agent/core/Harness.md', '--target', dir, '--format', 'json']);
+        '--loaded', '.cadet/agent/core/HarnessRuntime.md', '--target', dir, '--format', 'json']);
       assert.equal(r.status, 1, r.stdout + r.stderr);
       assert.equal(r.json?.code, 'enforcement-unverifiable');
       assert.match(r.json?.error, /enforces.*context/i, 'the refusal says what a claim needs');
@@ -411,7 +411,7 @@ describe('context protocol — adapter conformance', () => {
     // sending the reader to cadet-agent.md, so one statement there reaches every host. Putting it
     // in the adapters as well would restate canonical content 50 times — which C7 forbids, and
     // which the adapter size guard already rejects.
-    for (const file of ['.cadet/agent/core/Harness.md', '.cadet/agent/core/cadet-agent.md', '.cadet/agent/core/KickoffFlow.md']) {
+    for (const file of ['.cadet/agent/core/HarnessRuntime.md', '.cadet/agent/core/cadet-agent.md', '.cadet/agent/core/KickoffFlow.md']) {
       // Whitespace normalised first: prose wraps, and a test that fails on a line break is testing
       // the wrapping rather than the claim.
       const text = read(file).replace(/\s+/g, ' ');
@@ -469,7 +469,7 @@ describe('context protocol — adapter conformance', () => {
       runCli(['harness', 'context', 'plan', '--target', dir]);
       runCli(['harness', 'context', 'record', '--level', 'recorded', '--loaded', loaded(dir), '--target', dir]);
       // A run record is needed for the report; the framework writes one when a harness command runs.
-      runCli(['harness', 'verify', '--gate', 'testsPassed', '--command', 'node -e "process.exit(0)"', '--files', '.cadet/agent/core/Harness.md', '--target', dir]);
+      runCli(['harness', 'verify', '--gate', 'testsPassed', '--command', 'node -e "process.exit(0)"', '--files', '.cadet/agent/core/HarnessRuntime.md', '--target', dir]);
       const r = runCli(['harness', 'report', '--target', dir, '--format', 'json']);
       if (r.status === 0) {
         assert.equal(r.json?.report?.context?.level, 'recorded');

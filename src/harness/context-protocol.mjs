@@ -66,8 +66,8 @@ export const PHASE_SKILL = Object.freeze({
   closed: 'Resume.md',
 });
 
-/** The runtime contract every phase reads. */
-const HARNESS_CONTRACT = '.cadet/agent/core/Harness.md';
+/** The lean runtime contract every phase reads. */
+const HARNESS_CONTRACT = '.cadet/agent/core/HarnessRuntime.md';
 const KICKOFF = '.cadet/agent/core/cadet-agent.md';
 
 const normalise = (path) => String(path).replace(/\\/g, '/').replace(/^\.\//, '');
@@ -101,7 +101,7 @@ export function planEntries({ targetDir, policy, state = null }) {
     tier: 'tier0', reason: 'always-load: the directive that routes every other decision', authority: 'framework', required: true,
   }));
   required.push(entry(HARNESS_CONTRACT, {
-    tier: 'tier0', reason: 'the runtime contract for gates, evidence and budgets', authority: 'framework', required: true,
+    tier: 'tier0', reason: 'the lean runtime contract for gates, evidence and budgets', authority: 'framework', required: true,
   }));
   for (const ref of ['.cadet/harness.json', '.cadet/state.json']) {
     required.push(entry(ref, {

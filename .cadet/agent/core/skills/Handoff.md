@@ -11,9 +11,9 @@ You are executing the Cadet **Handoff** skill. Your sole purpose is to write a d
 
 No phase gate applies — handoff records state without advancing it. Never transition phases, never flip a gate, and never claim a gate is satisfied.
 
-**No active state:** if `.cadet/state.json` is absent and no `.cadet/agent/project-plans/` exists, this is the framework source repo — report the detected role instead of inventing a story handoff, point the user at the contribution workflow (`CONTRIBUTING.md`), and produce a handoff covering the in-flight contribution (branch, uncommitted changes, next step) rather than story/gate work.
+Apply `.cadet/agent/core/RepositoryRoleBoundary.md` before story or gate work. If this is the framework source repo, produce a handoff covering the in-flight contribution: branch, uncommitted changes, and next step.
 
-Read `.cadet/agent/core/Harness.md`. The handoff must report the active run, budget consumption, stale or superseded evidence, and any unresolved escalation — an incoming agent that does not know a budget is nearly exhausted will burn it on the wrong task.
+Read `.cadet/agent/core/HarnessRuntime.md`. The handoff must report the active run, budget consumption, stale or superseded evidence, and any unresolved escalation — an incoming agent that does not know a budget is nearly exhausted will burn it on the wrong task.
 </instructions>
 
 <context>
@@ -44,7 +44,7 @@ Capture what was done in this session and what remains, as a durable artifact pl
 Collect, without changing anything:
 
 1. Read `.cadet/state.json`. Record `currentPhase`, `session.workflowPath`, `session.trackingMode`, and `activeWorkItem`.
-2. Read `.cadet/agent/core/Harness.md` and load the active run (`cadet-agent harness report --format json`). Record consumed vs. remaining budgets, run status, and any unresolved escalation.
+2. Read `.cadet/agent/core/HarnessRuntime.md` and load the active run (`cadet-agent harness report --format json`). Record consumed vs. remaining budgets, run status, and any unresolved escalation.
 3. Run `cadet-agent state validate --format json` and report errors or warnings. Do not fix them — record them for the next agent.
 4. Inspect the checkout: current branch, `git status --short`, and unpushed commits. Distinguish committed work from uncommitted work; an incoming agent must know exactly what is not yet on disk under version control.
 5. Determine the next legal transition with `cadet-agent state transition --to <phase> --dry-run`. **Always pass `--dry-run`** — without it the transition is applied and `state.json` is rewritten during what is meant to be a read-only summary.

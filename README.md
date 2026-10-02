@@ -7,9 +7,9 @@ Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished g
 ## Repository Layout
 - `.cadet/agent/core/` contains the shared Cadet-Agent framework documents.
   - `cadet-agent.md` is the thin global directive: identity, non-negotiable rules, workflow routing, hard-gate protocol, and skill dispatch.
-  - `Harness.md` is the canonical harness contract: budgets, evidence-backed gates, retries, context tiers, tool routing, privacy, and escalation.
+  - `HarnessRuntime.md` is the lean runtime contract; `Harness.md` keeps the full harness rationale and reference.
   - `harness.schema.json` and `state.schema.json` are the machine-readable schemas for harness records and session state.
-  - `skills/` contains scoped workflow-phase skills (PlanningReview, Requirements, Architecture, Spike, StoryBreakdown, TDD, Debugging, CodeReview, Resume, MCPSetup, AgentReviewer, Handoff, Reconciliation).
+  - `skills/` contains scoped workflow-phase skills (PlanningReview, Requirements, Architecture, DesignReview, Spike, StoryBreakdown, TDD, Debugging, CodeReview, VisualEvidence, Resume, MCPSetup, AgentReviewer, Handoff, Reconciliation).
   - `templates/` contains runtime templates for planning artifacts.
 - `.cadet/harness.json` holds repository-local budget/policy overrides (preserved by sync).
 - `.cadet/runs/` holds sanitized run ledgers (preserved by sync; no secrets or raw prompts by default).
@@ -37,11 +37,13 @@ Cadet-Agent provides the **same skills** across six IDEs — one canonical file 
 | Planning Review | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Requirements | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Architecture | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Design Review | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Spike | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Story Breakdown | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | TDD | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Debugging | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Code Review | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Visual Evidence | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Resume | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | MCP Setup | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Reconciliation | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -118,12 +120,12 @@ flowchart TD
     REPORT["Report current phase,<br/>epics, stories & gates"]
     CR["🔍 Context Resolution<br/>classify change size,<br/>calibrate learner,<br/>detect policy"]
     REQ["📋 Requirements<br/>Given/When/Then criteria<br/>assumption audit"]
-    PLANREV["🧩 Planning Review<br/>interview one question<br/>at a time · decision tree"]
+    PLANREV["🧩 Planning Review (skill)<br/>interview one question<br/>at a time · decision tree"]
     ARCH["🏗️ Architecture<br/>technical design,<br/>ADR decisions"]
     SPIKE["🧪 Spikes<br/>resolve unverified<br/>assumptions"]
     BREAKDOWN["📐 Story Breakdown<br/>epics → testable stories"]
     IMPL["🔨 Implementation<br/>TDD per story,<br/>red → green → refactor"]
-    REVIEW["✅ Review<br/>hard gate: 17-step<br/>code review, security"]
+    REVIEW["✅ Review<br/>hard gate: 23-step<br/>code review, security"]
     VALIDATE["✔️ Validation<br/>acceptance criteria,<br/>design artifact sync"]
     CLOSED(["🎉 Closed"])
     NEXT_STORY{"More stories<br/>in epic?"}
@@ -140,13 +142,13 @@ flowchart TD
 
     REQ --> ARCH
     ARCH -->|"unverified assumptions"| SPIKE
-    ARCH -->|"all assumptions resolved"| BREAKDOWN
+    ARCH -->|"all assumptions resolved<br/>gate: designReviewCompleted ✅ (opt-in)"| BREAKDOWN
     SPIKE -->|"spike complete"| ARCH
 
     BREAKDOWN --> IMPL
 
     IMPL -->|"story complete"| REVIEW
-    REVIEW -->|"gate: codeReviewCompleted ✅<br/>gate: securityReviewPassed ✅<br/>gate: reachabilityAddressed ✅ (opt-in)"| VALIDATE
+    REVIEW -->|"gate: codeReviewCompleted ✅<br/>gate: securityReviewPassed ✅<br/>gate: acceptanceCriteriaValidated ✅<br/>gate: reachabilityAddressed ✅ (opt-in)<br/>gate: userPlaythroughConfirmed ✅ (opt-in)"| VALIDATE
     VALIDATE -->|"gate: designArtifactSyncConfirmed ✅"| NEXT_STORY
     NEXT_STORY -->|"yes"| IMPL
     NEXT_STORY -->|"no"| CLOSED
@@ -165,13 +167,15 @@ Use the `/cadet-resume` slash command to pick up where you left off. It reads `.
 
 ### Phase Gating
 
-Hard gates are enforced at every phase transition. The agent reads `.cadet/state.json → gates` before advancing and **blocks** the transition if any required gate is `false`. Gates cannot be skipped without an explicit user-directed exception recorded in `changeHistory`.
+Hard gates are enforced at every phase transition. The agent reads `.cadet/state.json → gates` before advancing and **blocks** the transition if any required gate is `false`. Gates cannot be skipped without an explicit, user-directed exception recorded in `.cadet/state.json → gateExceptions` — bounded by `expiresAt`, and naming the work items it covers. A `v1`–`v3` exception is read out of `changeHistory`, its older home.
 
 | Transition | Required Gates |
 |---|---|
 | architectureComplete → story-breakdown | `designReviewCompleted` when `designReview.enabled` is set — the formal design review, recorded by `harness verify-design-review` |
 | implementation → review | `testsPassed`, `compileCheckConfirmed`, `unityAnalyzerClean`, `storyTrackingUpdated`, and `architectureFitnessPassed` when the project declares architecture checks and enables them |
-| review → validation | `codeReviewCompleted`, `securityReviewPassed`, `acceptanceCriteriaValidated`, and `reachabilityAddressed` when `reachability.enabled` is set |
+| review → validation | `codeReviewCompleted`, `securityReviewPassed`, `acceptanceCriteriaValidated`, `reachabilityAddressed` when `reachability.enabled` is set, and `userPlaythroughConfirmed` when `userPlay.enabled` is set — a story declares `Play: required — <what the user does and what they see>` or `Play: deferred to <work item> — <why>`. A person's own record satisfies `required` (`harness play-form` writes the form, `harness confirm --artifact` records it); `harness verify-play` records `deferred`, and the deferral expires when the named work item closes |
+| validation → closed | `designArtifactSyncConfirmed`, and `humanAcceptanceConfirmed` when `humanAcceptance.enabled` is set — a person's own record (`harness acceptance-form` writes the form, `harness confirm --artifact` records it); no command can produce it |
+
 ### Runtime context protocol (opt-in, and the framework's own claim discipline)
 
 `harness context plan` states what a phase requires (with a reason and a hash for each reference),
@@ -181,42 +185,67 @@ reported as it is — a run reported as `recorded` is never reported as `enforce
 a hook that declares it enforces context. A required reference that was never loaded, or that changed
 after the record, blocks the checkpoint. See `.cadet/agent/core/Harness.md` §2d.
 
-| validation → closed | `designArtifactSyncConfirmed`, and `humanAcceptanceConfirmed` when `humanAcceptance.enabled` is set — a person's own record (`harness acceptance-form` writes the form, `harness confirm --artifact` records it); no command can produce it |
-
 **`closed` is end-of-epic, not per-story.** `validation → closed` is taken only when no stories remain (`NEXT_STORY → no → CLOSED` above). When an epic still has stories, the next story re-enters from `validation → implementation` (`NEXT_STORY → yes → IMPL`). Do not close a story individually: `closed` is terminal, and there is no transition out of it.
 
-The full set of legal transitions is the three gated rows above **plus** the ungated forward edges (classification, planning progression, `story-breakdown → implementation`, and the `validation → implementation` next-story loop). Any transition outside that set is rejected with a named reason.
+The full set of legal transitions is the three gated rows above **plus** the ungated forward edges (classification, planning progression, `story-breakdown → implementation`, and the `validation → implementation` next-story loop). Any transition outside that set is rejected with a named reason. **Planning Review is a skill, not a phase**: the agent dispatches it before requirements or architecture when the plan is fuzzy or contested, and it records no transition.
+
+### The response contract
+
+The framework's only per-reply output is one line: `cadet-agent: ok`, or the problem in its place. `cadet-agent harness status` derives that line — read-only — from the state document and the run ledger, so it cannot claim a health nothing verified. `ok` means the record is readable, valid and fresh, and no recorded run stopped on a budget or failed to run. A gate that is unmet because the story is unfinished is normal, and is not reported. The rest of a reply carries the work: the decisions taken, what changed, what the checks show, and what is unverified or deferred.
 
 ### Harness
 
 Gates are backed by **evidence**, not assertion. Each claimed gate must have a fresh, non-superseded evidence record bound to the current work item, input tree hash, and acceptance criteria. The harness also bounds context, tokens, tool calls, retries, wall-clock time, cost, and archive sizes — and those bounds are enforced, not advisory.
 
-- Rules: `.cadet/agent/core/Harness.md`. Data contract: `docs/core/HarnessContract.md`.
+- Runtime rules: `.cadet/agent/core/HarnessRuntime.md`. Full contract: `.cadet/agent/core/Harness.md`. Data contract: `docs/core/HarnessContract.md`.
 - Overrides: `.cadet/harness.json` (preserved by sync; conservative defaults in `src/harness/policy.mjs`).
 - Ledgers: `.cadet/runs/<runId>.json` (sanitized; artifacts are redacted before they are written; no secrets or raw prompts by default).
 - Transitions recompute the input tree hash from the evidence's relevant files, so editing a relevant file invalidates the evidence.
 - `harness verify` binds evidence to `--files` (or the working tree's changed files), and a `testsPassed` green result requires a prior red record.
+- A `--files` binding may not name a path the recording command itself writes: `--files .cadet/state.json` is refused before anything runs, because the write that follows would stale the record it just wrote.
 - When Git is unavailable and no `--files` are given, verification blocks (`freshness-unavailable`) rather than recording unscoped evidence.
 - `state validate` rejects a `true` gate whose evidence is missing, stale, expired, superseded, or bound to another work item; evidence records are schema-validated in full (`command`, `result`, `criteriaHash`, and a freshness bound).
+- `state validate` errors when a work item that a `storyCompletions` row records as finished, with evidence behind it, still reads `planned`. The remedy is `done` or `superseded`: a finished story must not be indistinguishable from one that was never started.
+- A `changeHistory` entry is a pointer, not a retelling: it is limited to 400 characters, and `state compact` archives a longer entry in place rather than truncating it.
 - Evidence must include a UUID, work item, phase, gate, status, command/result, input-tree hash, criteria hash, relevant files, timestamp, and either `expiresAt` or `freshnessPolicy`.
 - **Evidence history does not live in `state.json`.** A v4 document keeps only the active work item's records inline; a closed work item's evidence is written into the commit that closes it, as `Cadet-*` trailers, and archived to `.cadet/archive/`. `evidenceCoverage` indexes what left, so the "a done story owns evidence" check still works offline. Cadet still never commits: `state seal` prepares a message file and you commit with `git commit -F`.
+- **Two gates are human-owned: `humanAcceptanceConfirmed` and `userPlaythroughConfirmed`.** No
+  command can produce them, and `--command` is refused for them. `harness acceptance-form --epic <id>`
+  and `harness play-form --story <path>` write the form; `harness confirm --gate <gate> --artifact <form>`
+  records what the person wrote. A form still holding a placeholder is refused, and a form someone has
+  started is never overwritten.
 - Command output counts against the output budget; a configured cost budget cannot be satisfied by unmeasurable cost (the run is blocked, `budget-blocked`).
 - State and run ledgers are written atomically, so an interrupted write cannot truncate a record; persisted artifacts are redacted before hashing or writing.
 - Empty freshness coverage is an explicit policy decision: set `allowEmptyFreshness: true` in `.cadet/harness.json` only when unscoped evidence is acceptable.
 
 ```bash
+cadet-agent state init --workflow-path large     # write the first state document (validated before it lands)
 cadet-agent state validate                       # validate state against the schema (read-only)
 cadet-agent state validate --verify-sealed       # also read evidence out of commit trailers
 cadet-agent state migrate                        # atomically upgrade v1 → the current version
 cadet-agent state migrate --to 4                 # archive closed work items' evidence; build the index
 cadet-agent state compact --keep active          # routine housekeeping on a v4 state
 cadet-agent state seal                           # write the active work item's evidence as commit trailers
+cadet-agent state begin --epic <id> --story <id> # start a work item; archive the previous item's evidence
 cadet-agent state transition --to review         # enforce the matrix + evidence
+cadet-agent harness status                       # the health line: ok, or the problem (read-only)
 cadet-agent harness verify --gate testsPassed --files src/a.cs   # bounded, classified loop
+cadet-agent harness verify-acs --story <path>    # derive coverage from the run report, then record the gate
+cadet-agent harness verify-reachability --story <path>           # check the declaration; run the project probe
+cadet-agent harness verify-design-review --artifact <path> --files <design,requirements,ADRs>
+cadet-agent harness verify-architecture          # run the project's declared fitness checks
+cadet-agent harness verify-play --story <path>   # check a story's `Play:` declaration; record a deferral
+cadet-agent harness play-form --story <path>     # write a user-playthrough form for a person to fill
+cadet-agent harness acceptance-form --epic <id>  # write the epic's human-acceptance form
+cadet-agent harness confirm --gate <gate> --artifact <form>      # record a person's own account
+cadet-agent harness changes                      # the files a story changed, with links (read-only)
 cadet-agent harness report                       # budget consumption and failures (no secrets)
 cadet-agent harness reconcile                    # reconcile the planning chain against state.json (read-only)
+cadet-agent harness matrix-check                 # reconcile a TDD matrix against the test inventory (read-only)
+cadet-agent harness context plan|record|validate # plan what a phase loads, record what it loaded, decide
 cadet-agent harness cleanup --older-than-ms <n>  # apply the retention policy (bound required)
 cadet-agent harness capabilities                 # available CLI/Unity/MCP/hook/token/cost telemetry
+cadet-agent harness capabilities --verify-host   # probe the configured interception, per action
 ```
 
 Every command supports `--format human|json` and exits nonzero for invalid state, failed verification, budget exhaustion, stale evidence, or safety rejection.
@@ -332,13 +361,14 @@ If a specific game repository needs local conventions, add a policy file under `
 
 ## Package Output
 Running `./package-agent.ps1` produces `cadet-agent.zip` with this layout:
-- `.cadet/agent/core/` (including `Harness.md`, `harness.schema.json`, and `state.schema.json`)
+- `.cadet/agent/core/` (including `HarnessRuntime.md`, `Harness.md`, `harness.schema.json`, and `state.schema.json`)
 - `.cadet/agent/core/skills/`
 - `.cadet/agent/core/templates/`
 - `.github/agents/cadet.agent.md`
 - `.github/agents/cadet-agent-reviewer.agent.md`
 - `.github/prompts/cadet-*.prompt.md`
-- `.github/hooks/`
+- `.github/hooks/` (the Copilot `git-guard` hook and its scripts)
+- `.githooks/pre-commit` (the portable Git hook; installed by you with `git config core.hooksPath .githooks`)
 - `.cursor/rules/cadet-agent.md`
 - `.cursor/rules/cadet-agent-reviewer.md`
 - `.continue/rules/cadet-agent.md`
@@ -346,6 +376,10 @@ Running `./package-agent.ps1` produces `cadet-agent.zip` with this layout:
 - `.continue/config.yaml`
 - `.claude/skills/cadet-agent/SKILL.md`
 - `.claude/skills/cadet-*/SKILL.md`
+- `.agents/skills/cadet-agent/SKILL.md` (the cross-client root Deep Code and Hermes read)
+- `.agents/skills/cadet-*/SKILL.md`
+- `AGENTS.md` (create-only: an existing consumer copy is never overwritten)
+- `.cadet/harness.json` (create-only: the new-consumer policy seed)
 
 ## Notes
 - `.cadet/agent/core/FrameworkManifest.json` defines the managed and preserved paths for packaged installs.

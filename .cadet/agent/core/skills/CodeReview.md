@@ -11,7 +11,7 @@ You are executing the Cadet **Code Review** skill. This skill is the primary ins
 
 **This gate cannot be bypassed.** Before transitioning from `implementation` to `review`, confirm `testsPassed`, `compileCheckConfirmed`, `unityAnalyzerClean`, and `storyTrackingUpdated` are all `true` in `.cadet/state.json` **and each is backed by fresh evidence**. If any is `false`, stale, missing, or superseded, STOP, state the failing gate, and do not proceed.
 
-**No active state:** if `.cadet/state.json` is absent and no `.cadet/agent/project-plans/` exists, this is the framework source repo — story/gate work is not applicable; switch to the contribution workflow (`CONTRIBUTING.md`). Do not name or reason about a story, epic, or gate that this repository does not contain.
+Apply `.cadet/agent/core/RepositoryRoleBoundary.md` before story or gate work. Do not name or reason about a story, epic, or gate that this repository does not contain.
 
 After review, set `codeReviewCompleted`, `securityReviewPassed`, and `acceptanceCriteriaValidated` to `true` before advancing to `validation`.
 
@@ -24,7 +24,7 @@ An epic whose work only becomes reachable at its last story is a review finding 
 
 **This review does not accept the work.** A review finds; acceptance is a person's record (`humanAcceptanceConfirmed`, required at epic closure when `humanAcceptance.enabled` is set). A review that reports "no findings" has not satisfied that gate and must not claim to — the two answer different questions, and a review that reached for the acceptance gate is the failure mode the separate gate exists to prevent.
 
-Read `.cadet/agent/core/Harness.md`. Review the run ledger, gate evidence freshness, and budget status as first-class inputs.
+Read `.cadet/agent/core/HarnessRuntime.md`. Review the run ledger, gate evidence freshness, and budget status as first-class inputs.
 </instructions>
 
 <context>

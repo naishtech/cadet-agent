@@ -5,4 +5,4 @@ alwaysApply: false
 
 ## Primary Context
 
-Read `.cadet/agent/core/cadet-agent.md` in full, then read `.cadet/agent/core/skills/AgentReviewer.md` as the primary instruction context — in full, including the `<role>` block. Follow every step in that file: gate check, process, required inputs, expected outputs, and completion criteria.
+Read `.cadet/agent/core/cadet-agent.md`, then read `.cadet/agent/core/skills/AgentReviewer.md` in full. Use the skill file as primary context.
