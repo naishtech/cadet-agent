@@ -31,3 +31,4 @@ Lean runtime subset for agents. `Harness.md` remains the full contract and ratio
 - Evidence storage and sealing: `Harness.md` section 2c.
 - Runtime context protocol: `Harness.md` section 2d.
 - Budgets, retries, verification commands, and command write semantics: `Harness.md` sections 3 to 12.
+- Gate definitions and execution protocol: `HarnessGates.md`.

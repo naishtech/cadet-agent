@@ -73,36 +73,36 @@ A gate is `true` only when backed by **fresh, structured evidence**.
   disabled, behaviour is identical to v2. See `docs/core/HarnessContract-v3.md` §1–§2.
 
 ## 2a. Manual-confirmation quality
-
 A `manual-confirmation` record is a human assertion. It binds to the same relevant files as an
 automated record — those given by `--files`, or the working tree's changed files when the flag is
-omitted — so a later edit to any of them invalidates it. Its `expiresAt` is an *additional* bound,
-not its only one. Under `strictClosure.enabled` it must carry:
+omitted. Its `expiresAt` is an *additional* bound, not its only one. Under `strictClosure.enabled` it must
+carry:
 
 - `reason` — why automation was unavailable;
 - `expiresAt` — a concrete bound (`null` is rejected: declaring the key is not declaring a bound);
 - `environment` — `{ projectPath?, editorVersion?, tool?, ... }` describing what was verified;
 - `scope` — a non-empty array naming what the confirmation covers.
 
-`strictClosure.disallowManualFor` forbids `manual-confirmation` for the gates it names, because
-a manual confirmation is a substitute for something those gates can always prove mechanically
-(only for them: forbidding it elsewhere would leave the gate unsatisfiable, not stricter). The
-default list is `testsPassed`, `acceptanceCriteriaValidated` and `reachabilityAddressed`.
-`designReviewCompleted` is deliberately not in it: a design review is a judgement, so the
-reviewer — agent or person — may record it, and `harness confirm --gate designReviewCompleted`
-with the strict-closure metadata is a valid route. `humanAcceptanceConfirmed` is absent for a
-stronger reason: no command produces it at all, so a list that forbade it by hand would leave it
-unsatisfiable rather than stricter, and `validatePolicy` refuses such a list.
-`architectureFitnessPassed` **is** in the list, for the opposite reason: the project declares the
-checks that produce it, so a command can always prove it and a hand record would substitute for
-something available. A project whose checks cannot run uses a `tooling-gap` exception that names who
-accepted it, which is a different statement from "a person verified this".
-`compileCheckConfirmed`, `unityAnalyzerClean` and `storyTrackingUpdated` are deliberately absent:
-their automated path legitimately falls back to manual confirmation when the Unity CLI or the
-project's own script is absent. A human may always record a judgement gate
-(`codeReviewCompleted`, `securityReviewPassed`, `designArtifactSyncConfirmed`) — the framework
-does not force a judgement onto an agent. Prefer `cadet-agent harness confirm` over hand-editing
-state — it enforces these rules at creation time and writes the ledger and state atomically.
+`strictClosure.disallowManualFor` names the gates a manual confirmation may **not** satisfy. The default
+list is `testsPassed`, `acceptanceCriteriaValidated`, `reachabilityAddressed` and
+`architectureFitnessPassed`: each has an automated path in every environment Cadet supports, so a hand
+record would substitute for something available.
+
+The gates deliberately outside that list, and why:
+
+- `compileCheckConfirmed`, `unityAnalyzerClean`, `storyTrackingUpdated` — their automated path can be
+  absent (no Unity CLI, no project script), so forbidding manual confirmation would leave the gate
+  unsatisfiable rather than stricter.
+- `designReviewCompleted` — a review is a judgement, so the reviewer, agent or person, may record it with
+  `harness confirm --gate designReviewCompleted` and the strict-closure metadata.
+- `humanAcceptanceConfirmed` — no command produces it at all, so a list that forbade it by hand would leave
+  it unsatisfiable, and `validatePolicy` refuses such a list.
+
+A judgement gate (`codeReviewCompleted`, `securityReviewPassed`, `designArtifactSyncConfirmed`) may always
+be recorded by a human. A project whose declared checks cannot run uses a `tooling-gap` exception that
+names who accepted it, which is a different statement from "a person verified this". Prefer
+`cadet-agent harness confirm` over hand-editing state: it enforces these rules at creation time and writes
+the ledger and state atomically.
 
 ## 2b. Exception taxonomy
 
@@ -122,52 +122,48 @@ would only re-raise an unchanged finding. Scope it to the story work-item ids it
 an exception for one story never excuses another.
 
 ## 2c. Where evidence lives (state v4)
-
 Evidence has three homes, and the boundary between them is the work item.
 
-- **Live, in `state.json → gateEvidence`** — the **active work item's live records**. This is what
+- **Live, in `state.json → gateEvidence`** — the **active work item's live records**, and what
   `state transition` reads. It includes records with no commit to cite: a `manual-confirmation`, a
-  `compileCheckConfirmed` fallback, and the mid-story green run all live here, because a gate must be
-  satisfiable on a tree that has not been committed yet.
-  - **"Live" excludes history, and that is a second, independent bound.** The *newest record per
-    gate*, every `passed`/`manual-confirmation` record, and every `failed` record (red-before-green
-    reads the prior red) stay inline; `superseded` records, and `blocked` ones that are not the newest
-    for their gate, belong in the archive. Without this bound a single long story is unbounded —
-    nothing fires a story boundary *inside* a story. Measured on the audited repository: 26
-    `testsPassed` records for one story, of which one was live, and 81% of an 8,000-line document.
-    `state compact` applies it; `--retain-all` opts out.
-  - **The story boundary is a command, not an edit.** `cadet-agent state begin --epic <id> --story
-    <file>` resets the gates, archives the finished story's records, and folds them into the coverage
-    index. Setting `activeWorkItem` by hand — which is what `Resume` used to instruct — leaves the
-    previous story's records inline for ever, where `evidenceFreshness` rejects them as belonging to
-    another work item: unreadable by every gate, and therefore pure weight.
-- **Sealed, in a commit's trailers** — written by `state seal` and read back with `state validate
-  --verify-sealed`. Each record's fields become `Cadet-*` trailers and **the commit id is the seal**:
-  trailers are part of the commit object, so editing one changes the SHA and the citation stops
-  resolving. This is why trailers are used rather than `git notes`, which are not pushed by default
-  and can be rewritten silently.
-- **Archived, in `.cadet/archive/evidence/<work-item>.jsonl`** — append-only, and the home of records
-  that left `state.json` but were never sealed (every pre-v4 record, which cites no commit).
+  `compileCheckConfirmed` fallback, and the mid-story green run, because a gate must be satisfiable on a
+  tree that has not been committed yet.
+  - **"Live" excludes history.** The *newest record per gate*, every `passed`/`manual-confirmation`
+    record and every `failed` record stay inline (red-before-green reads the prior red); `superseded`
+    records, and `blocked` ones that are not the newest for their gate, belong in the archive.
+    `state compact` applies this bound; `--retain-all` opts out.
+  - **The story boundary is a command, not an edit.** `cadet-agent state begin --epic <id> --story <file>`
+    resets the gates, archives the finished story's records and folds them into the coverage index.
+    Setting `activeWorkItem` by hand leaves the previous story's records inline for ever, where
+    `evidenceFreshness` rejects them as belonging to another work item — unreadable by every gate, and
+    therefore pure weight.
+- **Sealed, in a commit's trailers** — written by `state seal` and read back with
+  `state validate --verify-sealed`. Each record's fields become `Cadet-*` trailers and **the commit id is
+  the seal**: trailers are part of the commit object, so editing one changes the SHA and the citation stops
+  resolving. Trailers are used rather than `git notes`, which are not pushed by default and can be
+  rewritten silently.
+- **Archived, in `.cadet/archive/evidence/<work-item>.jsonl`** — append-only, and the home of records that
+  left `state.json` but were never sealed (every pre-v4 record, which cites no commit).
 
-`state.json → evidenceCoverage` is a one-row-per-work-item index of everything that is no longer
-inline (`recordCount`, `gates`, first/last timestamps, `sealedCommit`). **It is what keeps the
-`done`-story coverage rule in §1 answerable without git**, so a compacted repository is never
-mistaken for one with missing evidence.
+`state.json → evidenceCoverage` is a one-row-per-work-item index of everything no longer inline
+(`recordCount`, `gates`, first/last timestamps, `sealedCommit`). **It is what keeps the `done`-story
+coverage rule in §1 answerable without git**, so a compacted repository is never mistaken for one with
+missing evidence.
 
 Two rules follow, and both are load-bearing:
 
 - **Nothing leaves `state.json` without being written down first.** Compaction validates the slimmer
   document, *then* appends the archive, *then* writes the backup, *then* renames. A crash between the
   writes must leave records in both places — never neither.
-- **A record that cannot be bound must not satisfy a gate.** A sealed block that exceeded the output
-  bound is marked `partial` and is rejected, exactly as an unscoped or stale record is.
+- **A record that cannot be bound must not satisfy a gate.** A sealed block that exceeded the output bound
+  is marked `partial` and is rejected, exactly as an unscoped or stale record is.
 
-**Cadet never commits** (C5). Sealing prepares a message file; run `git commit -F <path>` yourself.
-Sealing is a `validation`/closure-time act, once per work item — not something to do on every gate, and
-**not** something to leave until later: it must happen **before `state begin` moves to the next story**,
-because the boundary archives the records and a record in `.cadet/archive/` can no longer be sealed. Sealed
-before the boundary, a story's evidence is part of the commit that closed it; sealed afterwards, it is a
-file beside the history rather than in it.
+**Cadet never commits** (C5). Sealing prepares a message file; run `git commit -F <path>` yourself. Sealing
+is a `validation`/closure-time act, once per work item — not something to do on every gate, and **not**
+something to leave until later: it must happen **before `state begin` moves to the next story**, because
+the boundary archives the records and a record in `.cadet/archive/` can no longer be sealed. Sealed before
+the boundary, a story's evidence is part of the commit that closed it; sealed afterwards, it is a file
+beside the history rather than in it.
 
 ## 2d. The runtime context protocol
 
@@ -309,65 +305,55 @@ attempt. See §5.
   `manual-confirmation` record (project path, editor version, timestamp, scope).
 - The analyzer command must be declared in `.cadet/harness.json` before the gate can be automated.
 - **Evidence is bound to relevant files.** `cadet-agent harness verify` hashes the files given by
-  `--files` (or the working tree's changed files by default) into the evidence `inputTreeHash`, so a
-  later edit to any of them invalidates the evidence and blocks the transition.
-- **Cadet's own files are never relevant files.** `.cadet/state.json` and `.cadet/runs/**` are
-  excluded from the working-tree scan. `state.json` is rewritten by the very command that records a
-  gate, and `runs/` gains a ledger on every harness invocation; binding evidence to either would
-  make a gate stale the instant it was written and would certify no story code. Pass `--files`
-  explicitly to bind evidence to the work itself rather than to whatever happens to be dirty. An
-  empty `--files ""` is rejected (`empty-files`) rather than silently falling back to the scan.
-- **A declared test must actually run.** Each acceptance criterion in a story records the exact
-  test identifiers that prove it. Under `strictClosure.enabled`, `acceptanceCriteriaValidated`
-  cannot be set while any declared test is absent from the inventory of the run that satisfied
-  `testsPassed`. The check is mechanical: an unparseable report yields an *unknown* inventory,
-  which proves nothing and cannot satisfy the gate. Editing a declared test name invalidates
-  evidence bound to the old name, because AC ids and test names participate in `criteriaHash`.
-- **The AC record binds the story, not the report.** `harness verify-acs` binds its evidence to
-  the story — repo-relative, so the freshness re-derivation at transition time actually resolves
-  it — and to the declared test names via `criteriaHash`. The test report it read is kept as
-  `artifactPath` for audit and is deliberately **not** a relevant file: a generated report is
-  rewritten by the very command that produced it, so binding it would stale the record the moment
-  the tests were re-run. Same reason `.cadet/state.json` and `.cadet/runs/**` are excluded above.
+  `--files` (or the working tree's changed files by default) into the evidence `inputTreeHash`; a later
+  edit to any of them invalidates the evidence and blocks the transition.
+- **Cadet's own files are never relevant files.** `.cadet/state.json` and `.cadet/runs/**` are excluded
+  from the working-tree scan. Pass `--files` explicitly to bind evidence to the work itself rather than to
+  whatever happens to be dirty. An empty `--files ""` is rejected (`empty-files`) rather than silently
+  falling back to the scan.
+- **A declared test must actually run.** Each acceptance criterion in a story records the exact test
+  identifiers that prove it. Under `strictClosure.enabled`, `acceptanceCriteriaValidated` cannot be set
+  while any declared test is absent from the inventory of the run that satisfied `testsPassed`. An
+  unparseable report yields an *unknown* inventory, which proves nothing and cannot satisfy the gate.
+  Editing a declared test name invalidates evidence bound to the old name, because AC ids and test names
+  participate in `criteriaHash`.
+- **The AC record binds the story, not the report.** `harness verify-acs` binds its evidence to the story
+  — repo-relative, so the freshness re-derivation at transition time can resolve it — and to the declared
+  test names via `criteriaHash`. The test report is kept as `artifactPath` for audit and is deliberately
+  **not** a relevant file.
 - **Freshness cannot be silently skipped.** If Git cannot be queried and no `--files` are given,
   verification is blocked (`freshness-unavailable`) rather than recorded against an empty input tree.
   A project may opt out explicitly with `allowEmptyFreshness: true` in `.cadet/harness.json`.
-- **Red-before-green is enforced, not just documented.** A `testsPassed` green result is rejected
-  unless a prior failed (red) record exists for the same work item and gate — either in state or from
-  an earlier attempt in the same loop. A `no_test_required` work item is exempt.
-- **A command that never launched is not a red.** Red-before-green is only meaningful if the red came
-  from a test that actually ran. When the shell cannot find or execute the command — a spawn error, a
-  `cmd.exe` that cannot resolve the program, a WSL stub with no installed distribution, or a shell's
+- **Red-before-green is enforced.** A `testsPassed` green result is rejected unless a prior failed (red)
+  record exists for the same work item and gate — in state, or from an earlier attempt in the same loop.
+  A `no_test_required` work item is exempt.
+- **A command that never launched is not a red.** When the shell cannot find or execute the command — a
+  spawn error, a program `cmd.exe` cannot resolve, a WSL stub with no installed distribution, or a shell's
   exit 126/127 convention — the attempt is recorded `blocked` with stopReason `launch-failed`, **never**
-  `failed`, and it is not retried: a missing interpreter does not appear on a second attempt. A
-  `blocked` record cannot satisfy red-before-green, so no green can be licensed by a run in which
-  nothing executed. Before executing, a command led by a POSIX interpreter (`bash`, `sh`, `dash`,
-  `zsh`, `ksh`) is resolved on Windows: if every candidate on PATH is a WSL stub, the gate is blocked
-  before anything runs and the rejected path is named. The declared command is never rewritten — the
-  declaration stays the auditable record. Install Git for Windows (a real `bash`) or declare a command
-  that does not need a POSIX interpreter.
+  `failed`, and it is not retried. A `blocked` record cannot satisfy red-before-green, so no green can be
+  licensed by a run in which nothing executed. Before executing, a command led by a POSIX interpreter
+  (`bash`, `sh`, `dash`, `zsh`, `ksh`) is resolved on Windows: if every candidate on PATH is a WSL stub,
+  the gate is blocked before anything runs and the rejected path is named. The declared command is never
+  rewritten. Install Git for Windows (a real `bash`), or declare a command that needs no POSIX
+  interpreter.
 - **Reachability is opt-in, and the switch is not the guarantee.** `reachabilityAddressed` joins
   `review -> validation` only when `.cadet/harness.json` sets `reachability.enabled: true`; with the
-  default off, the gate list is exactly what the matrix declares, so adopting a framework version
-  never blocks an in-flight story on a new declaration. When it is on, a story must declare either
-  `Reachability: witnessed — <how>` or `Reachability: deferred to <work item> — <why>`. **A deferral
-  is re-examined once its target is `done`**: it then fails, because the work item that was going to
-  make the story reachable has landed — at verify time, and again at `validation -> closed` under
-  strict closure, so an expired deferral cannot ride through to a closed story. Under strict closure
-  the gate may not be satisfied by manual confirmation (it is in the default `disallowManualFor`);
-  the declaration check runs even with no probe configured, so a manual assertion adds nothing. A
-  `witnessed` declaration is a claim, not a proof — the proof
-  is the repository's own `reachability.command`, whose exit code is the verdict. With no command
-  configured the check says so rather than implying a guarantee it did not establish. **A new Unity
-  project has this gate on from the moment it is installed**: the shipped policy file declares it off, and
-  initialization turns it on after detecting `ProjectSettings/ProjectVersion.txt` (or, failing that,
-  `Assets/` with `Packages/manifest.json`). A project that already owns `.cadet/harness.json` keeps it
-  unchanged, and a repository that is not a Unity project keeps the gate off.
+  default off, the gate list is exactly what the transition matrix declares. When it is on, a story must
+  declare either `Reachability: witnessed — <how>` or `Reachability: deferred to <work item> — <why>`.
+  **A deferral is re-examined once its target is `done`**: it then fails, at verify time and again at
+  `validation -> closed` under strict closure. Under strict closure the gate may not be satisfied by
+  manual confirmation (it is in the default `disallowManualFor`), because the declaration check runs even
+  with no probe configured. A `witnessed` declaration is a claim, not a proof: the proof is the
+  repository's own `reachability.command`, whose exit code is the verdict. With no command configured the
+  check says so rather than implying a guarantee it did not establish. **A new Unity project has this gate
+  on from installation**: the shipped policy file declares it off, and initialization turns it on after
+  detecting `ProjectSettings/ProjectVersion.txt` (or, failing that, `Assets/` with `Packages/manifest.json`).
+  A project that already owns `.cadet/harness.json` keeps it unchanged, and a non-Unity repository keeps
+  the gate off.
 - **Hard budgets block.** Exceeding a hard limit (context tokens, output tokens, tool calls, wall-clock,
-  cost) stops the operation and can never produce a passing gate. Command output is counted against
-  the output-token budget (estimated from its byte length). When a configured cost budget exists
-  but provider rates are unavailable, the cost is unmeasurable and the envelope cannot be confirmed —
-  the run is blocked rather than treated as within budget.
+  cost) stops the operation and can never produce a passing gate. Command output is counted against the
+  output-token budget, estimated from its byte length. When a configured cost budget exists but provider
+  rates are unavailable, the cost is unmeasurable: the run is blocked rather than treated as within budget.
 - See `.cadet/agent/core/UnityCli.md` for the full command contract.
 
 ## 6. Loop contract
@@ -448,54 +434,53 @@ budget state is missing.
 
 ## 12. CLI surface
 
-**Every command declares whether it writes.** The registry in `src/harness/commands.mjs` is the
-single source of truth: `mutates`, `writes`, and any required unattended bound. Two consequences
-matter to a skill, and neither depends on the caller remembering a flag:
+**Every command declares whether it writes.** The registry in `src/harness/commands.mjs` is the single
+source of truth: `mutates`, `writes`, and any required unattended bound. Three consequences matter, and
+none depends on the caller remembering a flag:
 
-- `--help` is honoured at any depth and writes nothing. "Checking the help" is always read-only.
-- `--dry-run` is honoured **globally and automatically** for every mutating command. You do not need
-  to know that a command supports it; passing it is sufficient, and omitting it is the only way to
-  write. `state transition` is the one declared exception: its dry run returns the identical verdict
+- `--help` is honoured at any depth and writes nothing.
+- `--dry-run` is honoured **globally and automatically** for every mutating command; omitting it is the
+  only way to write. `state transition` is the declared exception — its dry run returns the same verdict
   a real transition would, rather than a bare acknowledgement.
-- A command declared read-only performs no writes, ever. This is asserted for every such command, so
-  a new write in `report` or `matrix-check` fails the build rather than the user.
-- A command that acts irreversibly and may run unattended must require a **content-bearing bound**
-  rather than a confirmation flag — `cleanup` requires `--older-than-ms`, so an agent must state
-  *what* it deletes, not merely *that* it approves deleting something.
+- A command that acts irreversibly and may run unattended requires a **content-bearing bound** rather
+  than a confirmation flag: `cleanup` requires `--older-than-ms`, and `state compact` requires `--keep`.
 
-Run `cadet-agent harness capabilities --format json` to read the registry instead of inferring it.
+`cadet-agent --help` lists every command and flag, and `cadet-agent harness capabilities --format json`
+carries the registry. Gate meanings and evidence rules are in §5; the test suite asserts each refusal
+named below.
 
-- `cadet-agent state validate [--verify-sealed]` — validate state against the current schema. Read-only. `--verify-sealed` additionally reads evidence out of commit trailers (§2c); it is additive by design, so it can only clear an error a real sealed record backs and can never raise a new one, and a read that cannot reach git is reported as a warning rather than a silent pass.
-- `cadet-agent state migrate [--to <version>] [--keep <bound>]` — atomically migrate a v1 document forward, or (with `--to 4`) compact a v2/v3 document: promote gate exceptions, archive non-active evidence, and build the coverage index. **On failure the tree is left exactly as found**, backup included: the archive is written only after the migrated document validates, and the backup only after that.
-- `cadet-agent state compact --keep <bound> [--retain-all]` — routine housekeeping on a v4 document. `--keep` (`always`|`active`|work-item ids) selects the **work items** that stay inline and is required when unattended, so an agent states *what* stays. Within those work items the newest record per gate, every `passed`/`manual-confirmation` record, and every `failed` record are kept; the rest is archived to `.cadet/archive/` and `evidenceCoverage` is rebuilt. `--retain-all` keeps every record of the kept work items instead, which is the older behaviour.
-- `cadet-agent state begin --epic <epicId> --story <storyFile>` — start a work item: reset every gate, archive the previous item's evidence to `.cadet/archive/` **before** the document is written, fold it into `evidenceCoverage`, and drop expired gate exceptions. Refuses when the target is already the active work item, and when the session is `closed` (new work starts from `context-resolution`). Use this instead of editing `activeWorkItem` by hand.
-- `cadet-agent state seal [--work-item <id>] [--commit-msg <path>]` — write the active work item's evidence as commit trailers, for `git commit -F`. **Cadet never commits** (C5): this prepares a message file and archives the records; the commit stays the user's action.
-- `cadet-agent state init [--workflow-path large|small|no_test_required] [--tracking-mode markdown|github] [--phase <phase>] [--learner-tier <tier>] [--operating-mode <mode>]` — create the first `.cadet/state.json`. Without it a new consumer had no route to a first document: every other command refuses with "Initialise state", and the only documented route was a hand-written `version: 1` document that `state validate` rejects. Refuses to overwrite an existing document, refuses an unknown value, and validates the document before writing it. `cadet-agent init` (no `state`) installs the framework; this creates the state the workflow runs on.
-- `cadet-agent state transition --to <phase> [--dry-run]` — enforce the transition matrix + evidence. **`--dry-run` reports the same verdict and writes nothing** — use it for every inspection; without the flag the transition is applied and `state.json` is written. A transition is legal only when it is a gated transition in the matrix or a declared ungated forward edge (bootstrap + planning progression); `closed` is terminal, so leaving it is rejected. A rejection lists every missing or stale gate.
-- `cadet-agent harness record` — append a sanitized span/evidence/decision event. Honours `--dry-run`. Append-only, so it carries no unattended bound: requiring a flag to record evidence would push agents to skip logging.
-- `cadet-agent harness confirm --gate <gate> --reason <t> --expires-at <iso> --environment <k=v,...> --scope <a,b> [--files a,b] [--commit <sha>] [--expect-phase <phase>]` — record `manual-confirmation` evidence, the first-class path for a gate automation cannot satisfy. Validates the strict-closure metadata *before* writing, rejects a gate in `disallowManualFor`, bounds the validity window, and binds the record to files exactly as `harness verify` does. Writes the ledger and then `state.json` atomically; prior passing evidence for the gate is marked `superseded`, never deleted. Use this instead of hand-editing `state.json` — the rules in §2a are checked at creation time, when the human still remembers what was verified.
-- `cadet-agent harness verify --gate <gate> [--files a,b] [--commit <sha>] [--expect-phase <phase>]` — run a bounded, classified verification loop. Evidence is bound to the relevant files given by `--files` (or the working tree's changed files). A `testsPassed` green result requires a prior red record. On success it records the new evidence in `state.json → gateEvidence` and flips the gate; prior passing evidence for that gate is marked `superseded`. The full attempt history is written to the run ledger. A **failing** verification still persists its ledger: that is the red record, and suppressing it would break TDD evidence.
-- `cadet-agent harness verify-acs --story <path> [--report <path>] [--write-coverage]` — mechanically verify that every test a story declares for an acceptance criterion actually ran. The story is the single source of truth for the AC→test mapping; the inventory is extracted from a test report (TAP, JUnit XML, or Unity JSON), auto-detected by content. Under `strictClosure.enabled`, any declared test absent from the inventory, any AC that declares no test, or an unknown/empty inventory means `acceptanceCriteriaValidated` is **not** set and the command exits 1, listing every gap with its AC id. With strict closure off it reports and exits 0 without touching `state.json`. `--write-coverage` additionally writes a derived `*.coverage.json` artifact.
-- `cadet-agent harness matrix-check --matrix <path> [--report <path> | --inventory <path>]` — reconcile a TDD matrix's **delivered** test-name claims against a compiled inventory. A matrix row is authored during architecture, before implementation, so a name can be an intention that changes or never happens while nothing re-checks the row; this is the mechanical check for that. Read-only — it never writes state, so it runs at authoring time as well as in a gate. Two directions are kept deliberately separate: a name in a `DELIVERED` row absent from the inventory is a **defect** (exit 1), while a name in an undelivered row is an **intention** and is never reported. Collapsing the two produces false failures, and a false failure is how a real check gets switched off. Undelivered intentions that *have* landed are reported informationally, so a stale row is visible rather than silent. Without `--report` or `--inventory` nothing can be proven, so the command exits 1 rather than reporting success.
-- `cadet-agent harness verify-architecture` — run the project's declared architecture checks and record `architectureFitnessPassed`. **The checks come from `.cadet/harness.json` and nowhere else**: no `--command`, because a gate whose command is chosen at the call site proves nothing about the repository — the caller picks both the question and the answer. Each check has a stable id, the files it governs, a severity, and optionally an artifact it must write; a declared artifact that is missing, or unparseable when `artifactFormat` is `json`, leaves the check **blocked** rather than passed, because an exit-zero command that wrote nothing proved nothing. A required check that fails blocks review; an advisory failure is recorded and does not block. A check that times out or never launches is `blocked`, not a red: nothing was disproved, and the remedy is a `tooling-gap` exception, not a hand record. The record carries one entry per check (`checks`), so it names what proved the claim. It never decides whether the design is good — that is `designReviewCompleted`, and the two are separate so neither borrows the other's credibility. Enforcement is opt-in twice over: the gate joins `implementation -> review` only when the block is enabled AND at least one check is declared, so a project that declares nothing keeps the frozen lists unchanged. Samples: `docs/core/ArchitectureFitness.md`.
-- `cadet-agent harness acceptance-form --epic <id>` — write the human-acceptance form, filled in from state: the epic, its stories and their statuses, the revision and editor version, the files the acceptance covers, and a candidate list of what the record says is still outstanding. Three fields are left blank, because only a person can answer them — **Accepted by**, **Witness** and **Accepted limitations** — and the form prints the exact command that records it. It is written once and never overwritten, so a form someone has started is never lost. It writes no state: generating a form is not a gate change.
-- `cadet-agent harness confirm --gate humanAcceptanceConfirmed --artifact <the form> --reason "<why>" --expires-at <ISO-8601>` — record the acceptance from that form, and this is the only route. Nothing is retyped: the witness, the limitations, the environment, the scope and the bound files all come from the file, and the command refuses a form whose witness or limitations is still a placeholder, so a half-filled form cannot be recorded by accident. There is no flag route on purpose: two routes to one gate means the weaker route defines the gate, and a flag-only record is one no person can read later. `--scope` and `--environment` are refused alongside `--artifact`, because the file is the single source and a second copy could disagree with the record. **There is no command that produces this gate**: it is human-owned, `harness verify` refuses it, and `--command` is refused for it, because nothing automated can answer whether a person accepted what was built. The two prose fields are the record's substance — the witness is what the person did and saw, the limitations are what they accepted as missing (write `none` when there are none). Both are required: an acceptance with no witness is a signature on nothing, and a limitation nobody wrote down is discovered later by surprise. Enforcement is opt-in: with `humanAcceptance.enabled` false the gate is not required at closure and closure behaves exactly as before. A repository whose work a user cannot reach satisfies closure with a `non-user-facing` gate exception instead, which must name who judged it (see the exception taxonomy).
-- `cadet-agent harness verify-design-review --artifact <path> --files <design,requirements,ADRs>` — check the formal design review and record `designReviewCompleted`. The reviewer's judgement lives in the artifact; this command checks what makes an artifact readable as a review (a named reviewer, named inputs, a `## Findings` section, a known disposition per finding, a reference for the dispositions that claim something exists elsewhere) and blocks the one case the gate exists for — a contested decision with nobody's name against it. The artifact and its inputs are bound to the record, so editing the design makes the review **stale** rather than leaving it looking current. Enforcement is opt-in: with `designReview.enabled` false the command reports and writes nothing, and the gate is not required on `architectureComplete -> story-breakdown`. It never writes the artifact: a check that authored the thing it checks would prove nothing. On success it records the gate and exits 0.
-- `cadet-agent harness verify-play --story <path>` — mechanically check that a story's `Play:` declaration is honoured. A missing or malformed declaration, a deferral naming a work item that does not exist, a deferral whose target is already `done`, and a cycle of play deferrals within the story's own epic are all **refused**. For a `deferred` declaration it records `userPlaythroughConfirmed` and exits 0; for a `required` one it **refuses to record anything** and names the form route, because the gate asks whether a PERSON played the work and no command can answer that in their place. Enforcement is opt-in: with `userPlay.enabled` false (the default is off, and the shipped policy file for a NEW consumer sets it true) the command reports and writes nothing, and the gate is not part of `review -> validation`.
-- `cadet-agent harness play-form --story <path>` — write a user-playthrough form for a story, pre-filled from state: the story and its `Play:` instruction, the revision, the gates still unmet, and three blank fields only a person can fill (played by, what you did and saw, limitations accepted). One form per story, written beside it, and never overwritten. Recording it is `cadet-agent harness confirm --gate userPlaythroughConfirmed --artifact <the form>`; the form carries the scope, the environment and the bound files, so nothing is retyped and a form still holding a placeholder is refused.
-- `--expect-phase <phase>` (accepted by every command that records gate evidence: `harness
-  verify`, `harness confirm`, `harness verify-acs`, `harness verify-reachability`,
-  `harness verify-design-review`) refuses to
-  record unless `state.json`'s current phase is exactly `<phase>`, and refuses a value naming no
-  known phase. It exists because a caller that chains commands with `;` and filters the output
-  can read the next command's success as a failed `state transition`'s, recording the following
-  gates into the phase it never left. Opt-in: omitting it changes nothing, and a mismatch writes
-  nothing at all — it cannot corrupt state, only stop the command.
-- `cadet-agent harness report` — summarize budget consumption and failures (no secrets). Read-only.
-- `cadet-agent harness cleanup --older-than-ms <n>` — apply the retention policy to `.cadet/runs/`. **Deletes run records irreversibly, so `--older-than-ms` is required**: an unattended agent must state the age bound it is deleting by. Without it the command refuses and deletes nothing, so a caller that does not know what the command does cannot destroy evidence by accident. `--dry-run` reports what would be deleted without deleting it.
-- `cadet-agent harness capabilities` — report available CLI/Unity/MCP/hook/token/cost telemetry, plus the command registry (`commands[]`) with each command's `mutates`, `writes`, and unattended requirements. Read-only.
+| Command | Writes | Key flags and behaviour |
+|---|---|---|
+| `cadet-agent state init` | `state.json` | `--workflow-path large\|small\|no_test_required` (default `large`), `--tracking-mode`, `--phase`, `--learner-tier`, `--operating-mode`. Refuses an existing document and an unknown value, and validates the document before writing it. |
+| `cadet-agent state validate` | – | `--verify-sealed` also reads evidence out of commit trailers (§2c). It is additive: it can clear an error a real sealed record backs, and never raises a new one. A read that cannot reach git is a warning, not a silent pass. |
+| `cadet-agent state migrate` | `state.json`, `.cadet/archive/`, backup | `--to <version>`, `--keep <bound>`. Atomic: a failure leaves the tree exactly as found, backup included. |
+| `cadet-agent state compact` | `state.json`, `.cadet/archive/` | `--keep always\|active\|<work-item ids>` (required when unattended) selects the work items that stay inline; within them the newest record per gate, every `passed`/`manual-confirmation` record and every `failed` record stay. `--retain-all` keeps every record of those items instead. |
+| `cadet-agent state begin` | `state.json`, `.cadet/archive/` | `--epic`, `--story`. Resets every gate, archives the previous item's evidence **before** the document is written, folds it into `evidenceCoverage`, and drops expired exceptions. Refuses an already-active target, and a `closed` session. |
+| `cadet-agent state seal` | `.cadet/archive/`, `*.commit-msg` | `--work-item`, `--commit-msg`. **Cadet never commits** (C5): it prepares the message file for `git commit -F`; the commit stays the user's action. |
+| `cadet-agent state transition` | `state.json` | `--to <phase>`, `--dry-run`. Legal only for a gated transition or a declared ungated forward edge; `closed` is terminal, so leaving it is rejected. A rejection lists every missing or stale gate. |
+| `cadet-agent harness record` | `.cadet/runs/` | Append-only span/evidence/decision event. No unattended bound: requiring a flag to record evidence would push agents to skip logging. |
+| `cadet-agent harness confirm` | `.cadet/runs/`, `state.json` | `--gate --reason --expires-at --environment --scope [--files --commit --expect-phase]`. Validates the strict-closure metadata **before** writing, refuses a gate in `disallowManualFor`, and marks prior passing evidence `superseded` rather than deleting it. |
+| `cadet-agent harness verify` | `.cadet/runs/`, `state.json` | `--gate [--files --commit --expect-phase]`. Binds `--files` (or the changed files) into the input-tree hash. A green `testsPassed` needs a prior red; a failure still persists its ledger, because that ledger is the red record. |
+| `cadet-agent harness verify-acs` | `.cadet/runs/`, `state.json`, `*.coverage.json` | `--story [--report --write-coverage --expect-phase]`. Under strict closure, a declared test that did not run, an AC that declares no test, or an unknown inventory leaves `acceptanceCriteriaValidated` unset and exits 1. |
+| `cadet-agent harness verify-reachability` | `.cadet/runs/`, `state.json` | `--story [--expect-phase]`. Checks the declaration and runs the configured `reachability.command`. Opt-in (`reachability.enabled`). |
+| `cadet-agent harness verify-design-review` | `.cadet/runs/`, `state.json` | `--artifact --files`. Binds the artifact and its inputs, so an edited design makes the review stale. It never writes the artifact. Opt-in (`designReview.enabled`). |
+| `cadet-agent harness verify-architecture` | `.cadet/runs/`, `state.json` | No `--command`: the checks come from `.cadet/harness.json`. A declared artifact that is missing, or unparseable as `json`, leaves the check `blocked` rather than passed. Opt-in (`architectureFitness.enabled` and at least one check). |
+| `cadet-agent harness verify-play` | `.cadet/runs/`, `state.json` | `--story`. Refuses a missing or malformed declaration, a deferral to a work item that does not exist or is `done`, and a deferral cycle. It records only a `deferred` declaration; a `required` one is refused with the form route named. Opt-in (`userPlay.enabled`). |
+| `cadet-agent harness play-form` | `.cadet/agent/project-plans/` | `--story [--out]`. One form per story, never overwritten, and it writes no state. Record it with `confirm --gate userPlaythroughConfirmed --artifact <the form>`. |
+| `cadet-agent harness acceptance-form` | `.cadet/agent/project-plans/` | `--epic [--out]`. Leaves only the three person-only fields blank, and never overwrites a form someone has started. It writes no state. The gate is human-owned: no command produces it and `harness verify` refuses it. Opt-in (`humanAcceptance.enabled`). |
+| `cadet-agent harness matrix-check` | – | `--matrix [--report\|--inventory]`. A `DELIVERED` row missing from the inventory is a defect (exit 1); an undelivered row is an intention and is never reported. With no inventory nothing is proven, so it exits 1. |
+| `cadet-agent harness context plan` / `record` / `validate` | `.cadet/context/plan.json` / `record.json` / – | `plan` writes what the phase requires; `record` writes what the host loaded and the level it can claim (`--level`, `--loaded`, `--enforced-by`, `--transcript`, `--host`); `validate` is read-only. §2d. |
+| `cadet-agent harness status` | – | The one-line health line: `cadet-agent: ok`, or the problem in its place. |
+| `cadet-agent harness changes` | – | `--range`, `--relative-to`, `--include-cadet`. The changed-file inventory the Change Report uses. |
+| `cadet-agent harness report` | – | Budget consumption and failures, never secrets. |
+| `cadet-agent harness reconcile` | – | `--plans-dir`. Reports the provable inconsistencies; never repairs one. |
+| `cadet-agent harness cleanup` | `.cadet/runs/` | `--older-than-ms` is required: the caller states the age bound it deletes by, so an agent that does not know the command cannot destroy evidence by accident. `--dry-run` reports what would go and deletes nothing. |
+| `cadet-agent harness capabilities` | – | `--verify-host` probes the configured host controls and reports the measured level; `--format json` includes the command registry. |
+| `cadet-agent init` / `cadet-agent sync` | framework files, `AGENTS.md` | `--target`, `--agents-md keep\|overwrite\|merge`, `--yes`. |
 
-Every command supports `--format human|json` and returns nonzero for invalid state, failed
-verification, budget exhaustion, stale evidence, or safety rejection. It never prints secrets.
-An option with a missing value is a usage error, never a silently swallowed next flag: a stray
-`--target --format` previously wrote a ledger into a directory named `--format/`.
+`--expect-phase <phase>` (accepted by every command that records gate evidence) refuses to record unless
+`state.json`'s current phase matches, and refuses a value naming no known phase.
+
+Every command supports `--format human|json` and returns nonzero for invalid state, failed verification,
+budget exhaustion, stale evidence, or safety rejection. It never prints secrets. An option with a missing
+value is a usage error, never a silently swallowed next flag.
