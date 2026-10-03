@@ -34,7 +34,7 @@ paragraph. Add `--keep` to inspect the fixture afterwards.
 | A violated architecture constraint blocks and names the offender | `gated-walk.mjs` | The check fails on a real forbidden reference, the gate does not pass | The check is the project's own command. Cadet runs it and reads the exit code; it does not know architecture. |
 | An incomplete design review is refused | `gated-walk.mjs` | A finding row with an unknown disposition is refused before the gate is recorded | — |
 | An undeclared reachability claim is refused | `gated-walk.mjs` | A story with no declaration fails the check | With no project probe, the enforceable level is the declaration, and the command says so. |
-| Human acceptance comes from a generated form | `gated-walk.mjs` | `harness acceptance-form` writes it pre-filled; the unfilled form is refused; the filled form records the gate and `closed` opens | The acceptance is a person's record. The walk fills it the way a person would; the framework never writes it. |
+| Human acceptance is the person's own answer | `gated-walk.mjs` | `harness confirm --gate humanAcceptanceConfirmed --reason "<what they said>"` records it and `closed` opens; an empty answer is refused | The acceptance is a person's record. The walk speaks as the person would; the framework never writes it. |
 | Evidence is prepared for a commit | `gated-walk.mjs` | `state seal` prepares 15 records as commit trailers | Verifying the trailers needs a commit, which the walk does not make. |
 
 ## Defects these runs found
@@ -61,7 +61,7 @@ fixed, and four are pinned by a test that fails without the fix.
    `humanAcceptanceConfirmed` could not be satisfied at all. Every existing test used a policy with
    strict closure off, which is why the suite did not see it. Fixed by exempting the two fields the
    form supplies; pinned three ways, including that `--scope` beside the artifact is still refused
-   and that a missing validity window still is too.
+   and that a missing validity window still is too. **The route was removed on 2026-10-03**: the form and `--artifact` on `harness confirm` went with it, so an acceptance is now recorded from the person's own answer and this defect's fix is history rather than live behaviour.
 4. **The packager validated a file it never shipped.** `.githooks/pre-commit` was listed in the
    manifest and checked as present, and no staging rule carried it, so it never reached the package.
    Fixed, plus a test that asserts every managed path lands under a root the packager stages.
@@ -71,8 +71,8 @@ fixed, and four are pinned by a test that fails without the fix.
 
 ## Stated limitations
 
-- **The planning index has no writer.** `state.epics` is read by `resume`, `reconcile` and
-  `acceptance-form`, and no command writes it: the agent maintains it during planning. The walk
+- **The planning index has no writer.** `state.epics` is read by `resume` and `reconcile`, and no command
+  writes it: the agent maintains it during planning. The walk
   registers its epic as fixture setup, and says so rather than presenting it as a framework step.
 - **The design-review gate covers one edge.** It is required on
   `architectureComplete -> story-breakdown`. The transition matrix also allows

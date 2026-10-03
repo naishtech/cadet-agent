@@ -173,8 +173,8 @@ Hard gates are enforced at every phase transition. The agent reads `.cadet/state
 |---|---|
 | architectureComplete → story-breakdown | `designReviewCompleted` when `designReview.enabled` is set — the formal design review, recorded by `harness verify-design-review` |
 | implementation → review | `testsPassed`, `compileCheckConfirmed`, `unityAnalyzerClean`, `storyTrackingUpdated`, and `architectureFitnessPassed` when the project declares architecture checks and enables them |
-| review → validation | `codeReviewCompleted`, `securityReviewPassed`, `acceptanceCriteriaValidated`, `reachabilityAddressed` when `reachability.enabled` is set, and `userPlaythroughConfirmed` when `userPlay.enabled` is set — a story declares `Play: required — <what the user does and what they see>` or `Play: deferred to <work item> — <why>`. A person's own record satisfies `required` (`harness play-form` writes the form, `harness confirm --artifact` records it); `harness verify-play` records `deferred`, and the deferral expires when the named work item closes |
-| validation → closed | `designArtifactSyncConfirmed`, and `humanAcceptanceConfirmed` when `humanAcceptance.enabled` is set — a person's own record (`harness acceptance-form` writes the form, `harness confirm --artifact` records it); no command can produce it |
+| review → validation | `codeReviewCompleted`, `securityReviewPassed`, `acceptanceCriteriaValidated`, `reachabilityAddressed` when `reachability.enabled` is set, and `userPlaythroughConfirmed` when `userPlay.enabled` is set — a story declares `Play: required — <what the user does and what they see>` or `Play: deferred to <work item> — <why>`. A person's own answer satisfies `required` (ask them, then `harness confirm --gate userPlaythroughConfirmed --reason "<their answer>"`); `harness verify-play` records `deferred`, and the deferral expires when the named work item closes |
+| validation → closed | `designArtifactSyncConfirmed`, and `humanAcceptanceConfirmed` when `humanAcceptance.enabled` is set — a person's own answer, recorded with `harness confirm --gate humanAcceptanceConfirmed --reason "<their answer>"`; no command can produce it |
 
 ### Runtime context protocol (opt-in, and the framework's own claim discipline)
 
@@ -210,10 +210,11 @@ Gates are backed by **evidence**, not assertion. Each claimed gate must have a f
 - Evidence must include a UUID, work item, phase, gate, status, command/result, input-tree hash, criteria hash, relevant files, timestamp, and either `expiresAt` or `freshnessPolicy`.
 - **Evidence history does not live in `state.json`.** A v4 document keeps only the active work item's records inline; a closed work item's evidence is written into the commit that closes it, as `Cadet-*` trailers, and archived to `.cadet/archive/`. `evidenceCoverage` indexes what left, so the "a done story owns evidence" check still works offline. Cadet still never commits: `state seal` prepares a message file and you commit with `git commit -F`.
 - **Two gates are human-owned: `humanAcceptanceConfirmed` and `userPlaythroughConfirmed`.** No
-  command can produce them, and `--command` is refused for them. `harness acceptance-form --epic <id>`
-  and `harness play-form --story <path>` write the form; `harness confirm --gate <gate> --artifact <form>`
-  records what the person wrote. A form still holding a placeholder is refused, and a form someone has
-  started is never overwritten.
+  command can produce them, and `--command` is refused for them. ASK the person — for a playthrough,
+  whether they played it and what was unexpected; for an acceptance, whether they accept the work and
+  what they saw — and record their own answer with `harness confirm --gate <gate> --reason "<what they
+  said>"`. There is no form: the record is the person's sentence, and a record with no answer in it is
+  refused when it is written and again when the state is validated.
 - Command output counts against the output budget; a configured cost budget cannot be satisfied by unmeasurable cost (the run is blocked, `budget-blocked`).
 - State and run ledgers are written atomically, so an interrupted write cannot truncate a record; persisted artifacts are redacted before hashing or writing.
 - Empty freshness coverage is an explicit policy decision: set `allowEmptyFreshness: true` in `.cadet/harness.json` only when unscoped evidence is acceptable.
@@ -235,9 +236,7 @@ cadet-agent harness verify-reachability --story <path>           # check the dec
 cadet-agent harness verify-design-review --artifact <path> --files <design,requirements,ADRs>
 cadet-agent harness verify-architecture          # run the project's declared fitness checks
 cadet-agent harness verify-play --story <path>   # check a story's `Play:` declaration; record a deferral
-cadet-agent harness play-form --story <path>     # write a user-playthrough form for a person to fill
-cadet-agent harness acceptance-form --epic <id>  # write the epic's human-acceptance form
-cadet-agent harness confirm --gate <gate> --artifact <form>      # record a person's own account
+cadet-agent harness confirm --gate <gate> --reason "<answer>"    # record a person's own answer
 cadet-agent harness changes                      # the files a story changed, with links (read-only)
 cadet-agent harness report                       # budget consumption and failures (no secrets)
 cadet-agent harness reconcile                    # reconcile the planning chain against state.json (read-only)

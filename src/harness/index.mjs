@@ -84,12 +84,6 @@ export {
 } from './architecture.mjs';
 
 export {
-  ACCEPTANCE_FORM_GATE, ACCEPTANCE_FORM_FILENAME, ACCEPTANCE_TEMPLATE_RELATIVE,
-  ACCEPTANCE_HUMAN_FIELDS, acceptanceFormPath, acceptanceCandidates, buildAcceptanceForm,
-  parseAcceptanceForm, writeAcceptanceForm, isUnfilled,
-} from './acceptance-form.mjs';
-
-export {
   ContextManifest, buildBaseManifest, tier0References, TIER_REASONS_REQUIRED,
   DEFAULT_MAX_EXPANSION_PER_STEP, ContextError,
 } from './context.mjs';
@@ -141,11 +135,6 @@ export {
   parsePlayDeclaration, parsePlayDeclarationText,
   validatePlayDeclaration, readSiblingPlayDeclarations, describePlayGaps,
 } from './play.mjs';
-
-export {
-  PLAY_FORM_GATE, PLAY_FORM_SUFFIX, PLAY_TEMPLATE_RELATIVE, PLAY_HUMAN_FIELDS,
-  playFormPath, buildPlayForm, parsePlayForm, writePlayForm, readPlayTemplate,
-} from './play-form.mjs';
 
 export {
   COMMANDS, mutatingCommands, readOnlyCommands, resolveCommand, selfBoundFiles,

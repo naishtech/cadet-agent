@@ -49,43 +49,23 @@ Inspect the current project state and resume the Cadet workflow from the last re
    - Prompt the user: "What would you like to work on?" and stop.
 3. **If `state.json` exists:**
    - Read and validate it against `.cadet/state.schema.json`.
-   - Report a structured summary:
-
-```
-## Cadet Session State
-
-| Field | Value |
-|---|---|
-| Current Phase | <currentPhase> |
-| Workflow Path | <workflowPath> |
-| Tracking Mode | <trackingMode> |
-| Learner Tier | <learnerTier> |
-| Operating Mode | <operatingMode> |
-```
-
-   - List all epics and their stories with status:
-
-```
-## Epics & Stories
-
-| Epic | Status | Stories Done / Total |
-|---|---|---|
-| <epic-dir> | <status> | <done>/<total> |
-```
-
-   - Report gate status for the current phase:
-
-```
-## Gates for Phase "<currentPhase> → <nextPhase>"
-
-| Gate | Status |
-|---|---|
-| <gateName> | ✅ / ❌ |
-```
+   - **Do not print a report of it.** Note the phase, the tracking mode and the active work item, and
+     keep them for yourself. The phase appears in the reply only as one line of orientation, and only
+     when it is not obvious from the active work item.
+   - Do not list the epics, the stories, or their counts, and do not print a gate table. A table of the
+     session's fields answers a question the reader did not ask: `.cadet/state.json` is the record, and
+     a reader who wants it opens it. The rich version of this report was retired the way the six-field
+     status table was — see the Response Contract in `cadet-agent.md`.
 
 ## Phase 2 — Integrity Validation
 
-Before determining the next action, cross-validate `state.json` against the actual repository state. Report every discrepancy as a ⚠️ warning — do not silently reconcile.
+Before determining the next action, cross-validate `state.json` against the actual repository state.
+
+**Report a discrepancy only when it needs the reader.** A discrepancy that blocks the next transition,
+or that needs the user's decision, goes into the reply. One that the next transition resolves by itself,
+or that a recorded policy already explains, does not: record it in the change history if it matters and
+carry on. Do not print a validation report, and do not annotate clean checks — a check that passed
+informs nobody.
 
 ### 2a — Git History Validation
 
@@ -94,25 +74,12 @@ Before determining the next action, cross-validate `state.json` against the actu
    - Find the last `changeHistory` entry. Note its `date` and `phase`.
    - Check whether any commits were made **after** that date.
    - If commits exist after the last state update, check whether their content aligns with the phase recorded in state.
-3. **Discrepancies to flag:**
-   - State says a story is `"done"` but there are **no commits** reflecting implementation work for that story.
+3. **Discrepancies that need the reader:**
+   - State says a story is `"done"` and **no commit** reflects implementation work for that story.
    - State says current phase is `"implementation"` but recent commits look like review fixes or validation cleanup.
    - Commits exist that reference story/epic work not recorded in `state.json` at all.
-   - The last `changeHistory` entry predates the most recent commit by a significant margin with no obvious state update.
-4. Report findings:
-
-```
-## Git History Validation
-
-Last state update: <date> (phase: <phase>)
-Most recent commit: <date> — "<commit message>"
-
-| Check | Result |
-|---|---|
-| Commits since last state update | <count> |
-| Commit content matches recorded phase | ✅ / ⚠️ |
-| All completed stories have corresponding commits | ✅ / ⚠️ |
-```
+4. Put a finding in the reply only when it blocks the next transition or needs a decision, and state it
+   in one line with the action it needs. Nothing else is reported.
 
 ### 2b — Epic/Story File Validation (markdown mode only)
 
@@ -121,30 +88,21 @@ Skip this section if `trackingMode` is `"github"`.
 1. For each epic in `state.json → epics`, locate the epic directory.
 2. Read the epic markdown file and each story markdown file listed in state.
 3. Compare the status fields:
-   - If state says a story is `"done"` but the markdown file still shows `"in-progress"` or `"planned"`, flag it.
-   - If a markdown file says `"done"` but state still shows `"planned"`, flag it.
-   - If an epic directory or story file referenced in state does **not** exist on disk, flag it.
-   - If story files exist on disk that are **not** recorded in `state.json`, flag them.
-4. Report findings:
-
-```
-## Epic/Story File Validation
-
-| Epic | Story | State Status | File Status | Match |
-|---|---|---|---|---|
-| <epic> | <story> | done | in-progress | ⚠️ |
-| <epic> | <story> | in-progress | in-progress | ✅ |
-```
+   - If state says a story is `"done"` but the markdown file still shows `"in-progress"` or `"planned"`, note it.
+   - If a markdown file says `"done"` but state still shows `"planned"`, note it.
+   - If an epic directory or story file referenced in state does **not** exist on disk, note it.
+   - If story files exist on disk that are **not** recorded in `state.json`, check whether a recorded
+     policy explains them before calling them drift. A repository that keeps superseded records on
+     purpose says so in `.cadet/harness.json`, and `cadet-agent harness reconcile` names them; those are
+     expected and are not reported.
+4. Report a mismatch only when it cannot be settled mechanically or it needs the user's decision. A
+   mismatch between markdown and state that the next tracking update will fix is not a reply.
 
 ### 2c — Discrepancy Resolution
 
-After reporting all discrepancies:
-
-- If **no discrepancies** were found, proceed to Phase 3.
-- If **discrepancies were found**, present them to the user and ask:
-  > "The state file is out of sync with the repository. Would you like me to update `state.json` to reflect the actual repository state, or would you prefer to resolve these manually?"
-  - If the user chooses automatic reconciliation: update `state.json` to match on-disk reality (git history takes precedence for phase determination; markdown files take precedence for story status in markdown mode).
-  - If the user chooses manual resolution: stop and wait for instructions.
+- No discrepancy that needs the reader: proceed to Phase 3.
+- One exists: state it in one line, with what you propose to do, and ask only when the choice is the
+  user's — never reconcile silently, and never edit `state.json` to make a check pass.
 
 ### 2d — Branch and Working-Tree Status
 
@@ -160,16 +118,19 @@ After reporting all discrepancies:
 Before recommending the next action, validate the harness state:
 
 1. Run `cadet-agent state migrate` (idempotent) so a v1 state is upgraded to v2 before inspection.
-2. Run `cadet-agent state validate --format json`. Report any schema errors or warnings.
-3. Load the active run: `cadet-agent harness report --format json`. Report:
-   - consumed vs. remaining context, token, tool, retry, time, and cost budgets;
-   - the run status (ok / warning / failed / exhausted / blocked);
-   - any unresolved escalation (budget exhaustion, deterministic failure, stale evidence).
+2. Run `cadet-agent state validate --format json`. Report a schema error only when it blocks the next
+   transition or needs a decision.
+3. Load the active run: `cadet-agent harness report --format json`. Read the consumed and remaining
+   budgets, the run status, and any unresolved escalation. Report one only when it changes the next
+   action — a hard stop, or a run that stopped rather than reporting an outcome.
 4. Check gate evidence freshness for the current work item:
    - For each claimed `true` gate, confirm a matching, non-expired, non-superseded evidence record.
-   - Flag any gate whose evidence has a stale input tree hash, a different work item, or changed acceptance criteria.
+   - A gate whose evidence has a stale input tree hash, a different work item, or changed acceptance
+     criteria is a finding that blocks the transition: name it with the command that re-records it.
 5. Determine the **next legal transition** and whether its required gates are evidence-backed. Use `cadet-agent state transition --to <phase> --dry-run`, which reports the same verdict as a real transition without writing anything — a rejection lists the exact missing or stale gates. **Always pass `--dry-run` here:** without it the command applies the transition and writes `state.json`, which mutates finalised state during what is only meant to be an inspection.
-6. Report harness findings as warnings — do not silently reconcile.
+6. A gate that is unmet because the work is unfinished is not a finding, and is not reported. Report only
+   what the next action needs: a genuine blocker, a transition the framework refused, or a decision that
+   belongs to the user.
 
 ## Phase 3 — Determine Next Action
 
@@ -183,8 +144,8 @@ Based on `currentPhase` (after any reconciliation from Phase 2), determine the n
 | `spikes` | List planned/in-progress spikes from `state.json → spikes`. Ask which spike to work on, then invoke the Spike skill. |
 | `story-breakdown` | Invoke the Story Breakdown skill — epics need to be broken into stories. |
 | `implementation` | Identify the current in-progress story. If none is `in-progress`, pick the first `planned` story. Invoke the TDD skill for that story. |
-| `review` | Identify the story that just completed implementation. Invoke the Code Review skill — the review hard gate must be satisfied before advancing. |
-| `validation` | Run through the validation gates. **Seal the story's evidence before the boundary:** `cadet-agent state seal` writes the active work item's live records into `.cadet/seal.commit-msg` as `Cadet-*` trailers, and the commit that carries that message becomes the seal — editing a trailer afterwards changes the commit id, which is what makes a sealed record self-verifying. Cadet never commits (C5): give the message file to the user, or run `git commit -F .cadet/seal.commit-msg` when the user has asked for a commit. **Sealing after `state begin` is too late:** the boundary archives the records, so `state seal` will correctly report that there is nothing to seal, and the story's evidence is then a file in `.cadet/archive/` rather than part of the history that produced it. If the epic has remaining stories, start the next one with `cadet-agent state begin --epic <epicId> --story <storyFile>` — it resets the gates, archives the finished story's evidence to `.cadet/archive/`, folds it into the coverage index, and records the finished story as complete in `storyCompletions` first. Then transition `validation → implementation` (the next-story loop). **Never set `activeWorkItem` by hand:** that leaves the previous story's evidence inline for ever, where no gate can read it — on the audited repository it was 63 records and ~3,000 lines of dead weight. Only when no stories remain, confirm `designArtifactSyncConfirmed` — and, when `.cadet/harness.json` sets `humanAcceptance.enabled`, `humanAcceptanceConfirmed`, which only a person can record. The work is two commands, not a documentation task: `cadet-agent harness acceptance-form --epic <id>` writes a form already filled in from state, the person answers its three blank fields, and `cadet-agent harness confirm --gate humanAcceptanceConfirmed --artifact <the form> --reason "<why>" --expires-at <ISO-8601>` records it. Hand over the form path, not a checklist. Work a user cannot reach takes a `non-user-facing` exception naming who judged it instead — then transition to `closed`. Reporting a pending acceptance is the right outcome here: the agent cannot accept the work on the person's behalf, and `validation → implementation` stays open meanwhile, so the next story is never blocked by it. |
+| `review` | Identify the story that just completed implementation. Invoke the Code Review skill — the review hard gate must be satisfied before advancing. **If the review is already recorded and the only unmet gate is human-owned** (`userPlaythroughConfirmed`, or `humanAcceptanceConfirmed` at closure), the next action is to ask that person rather than to re-run the review: ask whether they played the work, and whether anything was unexpected, then record their answer with `cadet-agent harness confirm --gate <gate> --reason "<their answer>"`. |
+| `validation` | Run through the validation gates. **Seal the story's evidence before the boundary:** `cadet-agent state seal` writes the active work item's live records into `.cadet/seal.commit-msg` as `Cadet-*` trailers, and the commit that carries that message becomes the seal — editing a trailer afterwards changes the commit id, which is what makes a sealed record self-verifying. Cadet never commits (C5): give the message file to the user, or run `git commit -F .cadet/seal.commit-msg` when the user has asked for a commit. **Sealing after `state begin` is too late:** the boundary archives the records, so `state seal` will correctly report that there is nothing to seal, and the story's evidence is then a file in `.cadet/archive/` rather than part of the history that produced it. If the epic has remaining stories, start the next one with `cadet-agent state begin --epic <epicId> --story <storyFile>` — it resets the gates, archives the finished story's evidence to `.cadet/archive/`, folds it into the coverage index, and records the finished story as complete in `storyCompletions` first. Then transition `validation → implementation` (the next-story loop). **Never set `activeWorkItem` by hand:** that leaves the previous story's evidence inline for ever, where no gate can read it — on the audited repository it was 63 records and ~3,000 lines of dead weight. Only when no stories remain, confirm `designArtifactSyncConfirmed` — and, when `.cadet/harness.json` sets `humanAcceptance.enabled`, `humanAcceptanceConfirmed`, which only a person can record. The work is one question, not a documentation task: ask the person whether they accept the delivered work and what they saw, then record their answer with `cadet-agent harness confirm --gate humanAcceptanceConfirmed --reason "<their answer>" --expires-at <ISO-8601>`. Ask for it, and never write it for them. Work a user cannot reach takes a `non-user-facing` exception naming who judged it instead — then transition to `closed`. Reporting a pending acceptance is the right outcome here: the agent cannot accept the work on the person's behalf, and `validation → implementation` stays open meanwhile, so the next story is never blocked by it. |
 | `closed` | Report: "All work is complete for the current epic(s)." `closed` is terminal — there is no transition out of it. To start new work, initialise a fresh session from `context-resolution` (or a new `story-breakdown` cycle) rather than transitioning from `closed`. Ask if the user wants to start a new epic or close the session. |
 
 ## Phase 4 — Resume
@@ -197,14 +158,17 @@ Based on `currentPhase` (after any reconciliation from Phase 2), determine the n
 <output>
 ## Expected Outputs
 
-- Structured state summary with phase, epics, stories, and gates.
-- Cross-validation report (discrepancies flagged).
-- Next-action recommendation.
+- One line of orientation: the phase and the active work item, and only when they are not obvious.
+- The next action, as a `next:` line.
+- A finding, in one line with the action it needs, only when it blocks the next transition or belongs to
+  the user's decision.
 - If state was initialized: a prompt for the user's first objective.
+
+No state summary, no epic or story list, no gate table, and no integrity report.
 </output>
 
 <completion>
 ## Completion
 
-After resume completes, `.cadet/state.json` should accurately reflect the current state. The user should have a clear picture of where they are and what to do next. Do not advance any state — only report it and suggest the next action.
+After resume completes, `.cadet/state.json` should accurately reflect the current state. The user should know what to do next. Do not advance any state — only report it and suggest the next action.
 </completion>
