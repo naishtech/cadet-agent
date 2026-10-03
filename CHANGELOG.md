@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.61.0] — 2026-10-03
+
 ### Changed
 - **A reply carries the work, not the record — the Resume report is retired.** `skills/Resume.md` required
   a session-state table, an epics-and-stories table, a gate table, a git/epic cross-validation report and
