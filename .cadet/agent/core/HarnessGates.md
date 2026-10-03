@@ -57,11 +57,13 @@ Hard gates are structurally enforced checkpoints tracked in `.cadet/state.json �
       they see>`; a story that cannot be played yet declares `Play: deferred to <work item> — <why>`,
       which expires when that work item is done. Silence is neither.
       HUMAN-OWNED: no command produces this gate and `harness verify` refuses it. For a `required`
-      story the only route is the person's own account — `harness play-form --story <path>` writes the
-      form, a person fills its three blank fields, and `harness confirm --gate userPlaythroughConfirmed
-      --artifact <the form>` records it. `cadet-agent harness verify-play --story <path>` records the
-      gate for a `deferred` story and refuses a `required` one, so an agent can never answer this
-      question in the person's place.
+      story the only route is to ASK the person who played it — whether they played it, and whether
+      anything was unexpected — and record their own answer:
+      `harness confirm --gate userPlaythroughConfirmed --reason "<what they said>" --files <story>`.
+      `cadet-agent harness verify-play --story <path>` records the gate for a `deferred` story and
+      refuses a `required` one, so an agent can never answer this question in the person's place.
+      There is deliberately no form and no artifact: a document to fill in is one more thing to write,
+      read and keep in sync, and its blank fields stop a lazy agent rather than a dishonest one.
     </gate>
   </transition>
   <transition from="validation" to="closed">
@@ -72,12 +74,12 @@ Hard gates are structurally enforced checkpoints tracked in `.cadet/state.json �
       Required only when `.cadet/harness.json` sets `humanAcceptance.enabled`, and NEVER on
       `validation -> implementation` — a story moving to the next one is not a release, and the
       next-story loop must stay unblocked.
-      Two commands: `cadet-agent harness acceptance-form --epic <id>` writes a form filled in
-      from state, the person answers its three blank fields (accepted by, witness, accepted
-      limitations), and `cadet-agent harness confirm --gate humanAcceptanceConfirmed --artifact
-      <the form>` records it. Nothing is retyped and a form still holding a placeholder is
-      refused. Work a user cannot reach or observe takes a `non-user-facing` exception naming who
-      judged it, not a silent pass.
+      ASK the person: whether they accept the delivered work, and what they saw. Record their own
+      answer with `cadet-agent harness confirm --gate humanAcceptanceConfirmed --reason "<what they
+      said>" --expires-at <ISO-8601>`. There is no form and no artifact to fill in: the record is the
+      person's sentence, and a record with no answer in it is refused both when it is written and
+      when the state is validated. Work a user cannot reach or observe takes a `non-user-facing`
+      exception naming who judged it, not a silent pass.
     </gate>
   </transition>
 </gates>

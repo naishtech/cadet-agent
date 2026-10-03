@@ -687,7 +687,6 @@ export function manualConfirmation({
   gate, workItemId, phase, projectPath, editorVersion, scope, acceptanceCriterionId = null,
   relevantFiles = [], criteria = [], rootDir = process.cwd(), approvedBy = 'user', at = new Date(),
   reason = null, expiresAt = null, environment = null, expiresInMs = null, commit = null,
-  witness = null, limitations = null,
 } = {}) {
   const inputTreeHash = computeInputTreeHash(rootDir, relevantFiles);
   // v3 quality fields. `scope` is declared both as the free-text `result` line
@@ -699,8 +698,6 @@ export function manualConfirmation({
   // Redaction has no bypass (contract §8).
   const scopeList = (Array.isArray(scope) ? scope : (scope ? [scope] : [])).map(redactString);
   const safeReason = reason === null || reason === undefined ? null : redactString(String(reason));
-  const safeWitness = witness === null || witness === undefined ? null : redactString(String(witness));
-  const safeLimitations = limitations === null || limitations === undefined ? null : redactString(String(limitations));
   const env = Object.fromEntries(
     Object.entries(environment || (projectPath || editorVersion
       ? { projectPath: projectPath || null, editorVersion: editorVersion || null }
@@ -740,18 +737,10 @@ export function manualConfirmation({
     ...(safeReason !== null ? { reason: safeReason } : {}),
     ...(hasEnv ? { environment: env } : {}),
     ...(scopeList.length ? { scope: scopeList } : {}),
-    // A human acceptance states what was witnessed and what was accepted as missing.
-    // Both are free prose from a person, so both are redacted like every other field
-    // that reaches state.json. `state` validation requires them for
-    // `humanAcceptanceConfirmed`, which is why they are recorded rather than folded
-    // into `reason`: `reason` says why automation could not answer, these say what the
-    // person actually accepted.
-    ...(safeWitness !== null ? { witness: safeWitness } : {}),
-    ...(safeLimitations !== null ? { limitations: safeLimitations } : {}),
   };
   return {
     evidence, approvedBy, projectPath, editorVersion, scope: scopeList, reason: safeReason,
-    environment: env, witness: safeWitness, limitations: safeLimitations, recordedAt: timestamp(at),
+    environment: env, recordedAt: timestamp(at),
   };
 }
 

@@ -15,7 +15,7 @@ Lean runtime subset for agents. `Harness.md` remains the full contract and ratio
 - A green `testsPassed` record needs a prior red record for testable work.
 - A command that never launched is `blocked`, not a red.
 - Manual confirmation needs the same relevant-file binding as automated evidence.
-- Human-owned gates need the form route; no command can answer them for the person.
+- Human-owned gates are answered by the person and recorded from their own words; no command can answer them for the person.
 - Record context with `cadet-agent harness context plan`, `cadet-agent harness context record`, and `cadet-agent harness context validate` when a context-complete claim matters.
 - Record pointers to artifacts, not summaries of artifacts.
 - Stop on hard budget exhaustion.

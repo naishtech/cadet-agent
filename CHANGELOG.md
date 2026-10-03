@@ -13,6 +13,35 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Changed
+- **A reply carries the work, not the record — the Resume report is retired.** `skills/Resume.md` required
+  a session-state table, an epics-and-stories table, a gate table, a git/epic cross-validation report and
+  a list of warnings on every session start. Most of that could not change a decision, and the two things
+  the reader needed — what changed, and what is next — were buried under it. Those sections are gone.
+  Resume reports one line of orientation, the next action, and only a finding that blocks a transition or
+  belongs to the user's decision. The Response Contract states the rule in one sentence: the phase, the
+  gates, the statuses and the integrity checks are the record, `.cadet/state.json` holds it, and a reply
+  carries a state fact only when it needs an action. Resume's `review` row now also says that when the
+  review is already recorded and the only unmet gate is human-owned, the next action is to ask that
+  person rather than to re-run the review.
+
+### Removed
+- **The two human forms, and the commands that wrote them: `harness play-form` and
+  `harness acceptance-form`.** `humanAcceptanceConfirmed` and `userPlaythroughConfirmed` are recorded
+  from the person's own answer — ask them, then `harness confirm --gate <gate> --reason "<what they
+  said>"`. A form was a third artifact to write, read and keep in sync with the story it described, and
+  its blank fields stopped a lazy agent rather than a dishonest one. The guarantee that mattered
+  survives: the answer cannot be empty, refused when it is written and required again by `state
+  validate`. `harness confirm` no longer accepts `--artifact` at all — `verify-design-review` is the
+  command that takes an artifact — and `--witness` and `--limitations` are refused by name. A record
+  written under the old form shape still validates, so a consumer's recorded acceptance is not
+  invalidated by the upgrade.
+- Deleted with the route: `src/harness/play-form.mjs`, `src/harness/acceptance-form.mjs`,
+  `.cadet/agent/core/templates/UserPlaythroughTemplate.md`,
+  `.cadet/agent/core/templates/HumanAcceptanceTemplate.md`, and `test/harness-acceptance-form.test.mjs`
+  (its subject no longer exists; the surviving behaviour is covered by
+  `test/harness-human-acceptance.test.mjs`).
+
 ## [0.60.0] — 2026-10-02
 
 ### Changed

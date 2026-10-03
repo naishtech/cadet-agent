@@ -540,15 +540,25 @@ function validateEvidenceShape(ev, strict = null) {
   if (ev.evidenceId !== undefined && !isUuid(ev.evidenceId)) errors.push({ path: 'evidenceId', message: 'evidenceId must be a UUIDv4' });
   if (ev.phase !== undefined && !PHASES.includes(ev.phase)) errors.push({ path: 'phase', message: `unknown phase "${ev.phase}"` });
   if (ev.gate !== undefined && !GATES.includes(ev.gate)) errors.push({ path: 'gate', message: `unknown gate "${ev.gate}"` });
-  // A human acceptance with no witness, or with no statement of its limitations, is
-  // a signature on nothing. Checked at validation as well as at creation, because a
-  // hand-edited state.json is exactly what this gate must not be satisfiable by.
-  if (ev.gate === HUMAN_ACCEPTANCE_GATE) {
-    for (const field of ['witness', 'limitations']) {
-      const value = ev[field];
-      if (typeof value !== 'string' || value.trim() === '') {
-        errors.push({ path: field, message: `a ${HUMAN_ACCEPTANCE_GATE} record must carry a non-empty "${field}"` });
-      }
+  // A human-owned gate's record IS a person's answer, so the record must carry one. Checked at
+  // validation as well as at creation, because a hand-edited state.json is exactly what this gate
+  // must not be satisfiable by.
+  //
+  // Both gates carried `witness` and `limitations` here until 2026-10-03, when the form that
+  // produced them was removed; the substance moved into `reason`, which now holds what the person
+  // said. Two fields on two gates existed only to mirror that form.
+  if (ev.gate === HUMAN_ACCEPTANCE_GATE || ev.gate === USER_PLAY_GATE) {
+    const hasReason = typeof ev.reason === 'string' && ev.reason.trim() !== '';
+    // `witness` + `limitations` are the shape the removed form wrote: two fields that existed only
+    // to mirror it. A record already written under that shape keeps validating, because the
+    // framework never invalidates evidence it once accepted.
+    const hasLegacyPair = ['witness', 'limitations']
+      .every((field) => typeof ev[field] === 'string' && ev[field].trim() !== '');
+    if (!hasReason && !hasLegacyPair) {
+      errors.push({
+        path: 'reason',
+        message: `a ${ev.gate} record must carry the person's own answer in a non-empty "reason"`,
+      });
     }
   }
   // The architecture record is a claim about checks, so it must say which checks. One

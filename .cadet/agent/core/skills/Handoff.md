@@ -53,7 +53,7 @@ Collect, without changing anything:
 
 This is the core discipline of a handoff. An incoming agent inherits your mistakes unless you mark the boundary.
 
-1. For every claimed `true` gate, check whether it is backed by fresh, non-superseded evidence for the current work item. Name a pending `humanAcceptanceConfirmed` explicitly under what remains — when `humanAcceptance.enabled` is set and the epic is otherwise ready to close, the person's acceptance is the one step left, and the next agent must not read "all gates green" as "the work is accepted". Make that step as small as it can be: generate the form with `cadet-agent harness acceptance-form --epic <id>` and name its path, so the next person answers three fields rather than working out what the record needs.
+1. For every claimed `true` gate, check whether it is backed by fresh, non-superseded evidence for the current work item. Name a pending `humanAcceptanceConfirmed` explicitly under what remains — when `humanAcceptance.enabled` is set and the epic is otherwise ready to close, the person's acceptance is the one step left, and the next agent must not read "all gates green" as "the work is accepted". Make that step as small as it can be: ask the person whether they accept the work and what they saw, and record their answer with `cadet-agent harness confirm --gate humanAcceptanceConfirmed --reason "<what they said>"`, so the next person answers one question rather than working out what the record needs.
 2. Separate the handoff into two explicit lists:
    - **Verified** — done and evidence-backed (tests green with a red record, compile confirmed, review completed).
    - **Claimed / unverified** — believed done but not yet proven, not yet compiled, or not yet reviewed.

@@ -15,8 +15,8 @@
  *   Play: required — <what the user does, and what they should see>
  *   Play: deferred to <work item> — <why it cannot be played yet>
  *
- * A `required` declaration is satisfied only by a person's own record (the form route in
- * `play-form.mjs`); `harness verify-play` refuses to record it. A `deferred` declaration
+ * A `required` declaration is satisfied only by a person's own record, asked for and recorded
+ * in the conversation; `harness verify-play` refuses to record it. A `deferred` declaration
  * is satisfied by the declaration itself, exactly as a reachability deferral is, and it
  * expires the moment its target is done — a gap with an owner and a term, never a parked
  * excuse. There is deliberately no third form: a story with no playable surface of its

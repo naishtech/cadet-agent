@@ -170,26 +170,8 @@ export const COMMANDS = {
     summary: 'Verify a story\'s Play: declaration; record the gate for a deferral, refuse it for a playable story.',
     // Same posture as verify-reachability: it records evidence for its gate, so it writes
     // the ledger and state. It writes no artifact of its own — the declaration lives in the
-    // story, and a playable story's record comes from the person's form instead.
+    // story, and a playable story's record comes from the person's own answer instead.
     writes: ['.cadet/runs/**', '.cadet/state.json'],
-    unattended: true,
-  },
-  'harness play-form': {
-    mutates: true,
-    summary: 'Write a user-playthrough form for a story, pre-filled from state.',
-    // One file, and only when it does not exist: a form is a person's worksheet once they
-    // have touched it, and regenerating it would discard what they wrote. It never writes
-    // state — recording the gate is `harness confirm --artifact`.
-    writes: ['.cadet/agent/project-plans/**'],
-    unattended: true,
-  },
-  'harness acceptance-form': {
-    mutates: true,
-    summary: 'Write a human-acceptance form for an epic, pre-filled from state.',
-    // It writes exactly one file, and only when that file does not exist: a form is a
-    // person's worksheet once they have touched it, and a regeneration would discard
-    // what they wrote. It never writes state — recording the gate is `harness confirm`.
-    writes: ['.cadet/agent/project-plans/**'],
     unattended: true,
   },
   'harness report': {

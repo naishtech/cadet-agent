@@ -168,6 +168,18 @@ now carries the work, and `cadet-agent.md` states what each stage must carry.
 
 ---
 
+## Change 2026-10-03 — the form route retired, and the Resume report retired with it
+
+| Retired instruction | Disposition |
+|---|---|
+| `harness play-form` / `harness acceptance-form` write a form a person fills in | ❌ DELETED as a route. Both human-owned gates are recorded from the person's own answer: ask them, then `harness confirm --gate <gate> --reason "<what they said>"`. The refusal worth keeping survives — the answer cannot be empty — checked when the record is written and again by `state validate`, which is the guarantee the form's blank fields provided, on one field instead of three. |
+| `templates/UserPlaythroughTemplate.md`, `templates/HumanAcceptanceTemplate.md` | ❌ DELETED with the generators that read them. No remaining reference; the templates existed to keep two generated forms from drifting. |
+| The record fields `witness` and `limitations` on a human gate | ✅ their substance moved into `reason`. `state validate` accepts either shape, so a record written under the old form keeps validating and no consumer's history is invalidated. |
+| `--artifact` on `harness confirm`, and the `--witness` / `--limitations` refusals | ❌ `--artifact` is now refused outright: `harness verify-design-review` is the command that takes an artifact. The two removed flags are still refused by name, so a caller who passes them is told rather than silently recorded. |
+| Resume Phase 1's session-state, epics/stories and gate tables; Phase 2a/2b's validation tables; the "structured state summary" and "cross-validation report" expected outputs | ❌ DELETED. The reply carries one line of orientation, the next action, and only a finding that blocks a transition or needs the user's decision. The rule now lives in the Response Contract of `cadet-agent.md`: a state fact that needs no action is the record, not the reply. |
+
+---
+
 ## Summary
 
 - **Total instructions reviewed**: 50+

@@ -193,8 +193,9 @@ export const GATE_BUILDERS = Object.freeze({
     // humanAcceptanceConfirmed has neither: the gate asks whether a PERSON played the
     // delivered work. A command cannot answer it, and neither can a reviewer's record —
     // the record's substance is the person's own account of what they played and what
-    // they saw, which is why the route is a form they fill in and `verify-play` refuses
-    // to record a `required` declaration on their behalf.
+    // they saw, so the route is to ask them for it and record their answer with
+    // `harness confirm --gate userPlaythroughConfirmed --reason "<their answer>"`, and
+    // `verify-play` refuses to record a `required` declaration on their behalf.
     automatedPath: null,
     command: null,
     projectCommand: false,

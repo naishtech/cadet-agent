@@ -98,7 +98,7 @@ Before transitioning from `review` to `validation`, the following gates must be 
 | Gate | Requirement | How to Satisfy |
 |------|-------------|----------------|
 | `designArtifactSyncConfirmed` | Requirements, design, project plan, and epics are mutually consistent | Cross-reference all planning artifacts. Update any stale docs. |
-| `humanAcceptanceConfirmed` | A person accepted the delivered work | Record it in two commands: `cadet-agent harness acceptance-form --epic <id>` writes a form filled in from state, you answer the three blank fields, and `cadet-agent harness confirm --gate humanAcceptanceConfirmed --artifact <the form> --reason "<why>" --expires-at <ISO-8601>` records it. No command can satisfy it. Required only when `.cadet/harness.json` sets `humanAcceptance.enabled`, and never on `validation → implementation` — the next-story loop stays unblocked. Work a user cannot reach takes a `non-user-facing` exception that names who judged it. |
+| `humanAcceptanceConfirmed` | A person accepted the delivered work | Ask the person and record their own answer: `cadet-agent harness confirm --gate humanAcceptanceConfirmed --reason "<what they said>" --expires-at <ISO-8601>`. No command can satisfy it, and there is no form to fill in. Required only when `.cadet/harness.json` sets `humanAcceptance.enabled`, and never on `validation → implementation` — the next-story loop stays unblocked. Work a user cannot reach takes a `non-user-facing` exception that names who judged it. |
 
 ---
 

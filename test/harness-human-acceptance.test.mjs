@@ -206,56 +206,30 @@ describe('human acceptance — 2. the next-story loop stays unblocked', () => {
 });
 
 describe('human acceptance — 3. closure requires acceptance or a valid exception', () => {
-  it('closes when a person has accepted the work, recorded from a form', () => {
+  it("closes when a person has accepted the work, recorded from their own answer", () => {
     const { dir, state } = fixture();
     try {
       const r = evaluateTransition(state, 'closed', { rootDir: dir, ...withPolicy(true) });
       assert.equal(r.allowed, false, 'sanity: the gate is doing something');
       const ok = fixture();
       try {
-        // The recorder's job, without the generator: a form is a file with three
-        // answers in it, and this is one. The generator is covered in
-        // harness-acceptance-form.test.mjs.
-        const form = join(ok.dir, 'HumanAcceptance.md');
-        writeFileSync(form, [
-          '# Human Acceptance: epic-1',
-          '',
-          'Accepted by: the owner',
-          'Date: 2026-09-30',
-          'Files: story-1.md',
-          'Environment: revision=abc1234, editor=6000.0.23f1',
-          '',
-          '## Witness',
-          '',
-          'played the tutorial level, the tower fired and the wave advanced',
-          '',
-          '## Scope reviewed',
-          '',
-          'the tutorial level only',
-          '',
-          '## Accepted limitations',
-          '',
-          'none',
-          '',
-          '---',
-          '',
-          '## Recording',
-          '',
-          'instructions, not part of the record',
-          '',
-        ].join('\n'));
-
+        // The record is a sentence the person said. There is no form and no artifact: the gate
+        // asks a person, and their answer is what the record holds.
+        const answer = 'Demo Person: launched the demo scene, filled the grid, and watched the item '
+          + 'count rise from 0 to 4 columns across 3 rows. Accepted no limitations.';
         const res = runCli(['harness', 'confirm', '--gate', HUMAN_ACCEPTANCE_GATE,
-          '--artifact', form, '--target', ok.dir, '--format', 'json']);
+          '--reason', answer, '--scope', 'epic-1', '--files', 'story-1.md',
+          '--target', ok.dir, '--format', 'json']);
         assert.equal(res.status, 0, res.stdout + res.stderr);
         const after = JSON.parse(readFileSync(join(ok.dir, '.cadet', 'state.json'), 'utf-8'));
         assert.equal(after.gates[HUMAN_ACCEPTANCE_GATE], true);
         const record = after.gateEvidence.find((e) => e.gate === HUMAN_ACCEPTANCE_GATE);
         assert.ok(record, 'the acceptance must leave a record');
-        assert.match(record.witness, /tutorial level/);
-        assert.equal(record.limitations, 'none');
+        assert.match(record.reason, /item count rise/, "the person's answer is the record");
         assert.equal(record.source, 'manual-confirmation');
-        assert.deepEqual(record.relevantFiles, ['story-1.md'], 'the form binds the files it names');
+        assert.equal(record.witness, undefined, 'the removed field must not be written back');
+        assert.equal(record.limitations, undefined, 'the removed field must not be written back');
+        assert.deepEqual(record.relevantFiles, ['story-1.md'], 'the record binds the files it names');
         const closure = evaluateTransition(after, 'closed', { rootDir: ok.dir, ...withPolicy(true) });
         assert.equal(closure.allowed, true, JSON.stringify(closure));
       } finally { rmSync(ok.dir, { recursive: true, force: true }); }
@@ -269,7 +243,7 @@ describe('human acceptance — 3. closure requires acceptance or a valid excepti
     //
     // The refusal is by NAME (code `flag-removed`), which is what C16 claims and what the flags did
     // not do: they had no parseArgs case at all, so they fell through into `opts.rest`, the command
-    // exited 0, and the values were discarded while the form's own values were recorded.
+    // exited 0, and the values were discarded while another source's values were recorded.
     const { dir } = fixture();
     try {
       const before = readFileSync(join(dir, '.cadet', 'state.json'));
@@ -279,44 +253,43 @@ describe('human acceptance — 3. closure requires acceptance or a valid excepti
       assert.equal(r.status, 1, r.stdout + r.stderr);
       assert.equal(r.json?.code, 'flag-removed');
       assert.deepEqual(r.json?.flags, ['--witness', '--limitations'], 'both flags are named');
-      assert.match(r.json?.error, /acceptance-form/, 'the refusal must name the command that works');
+      assert.match(r.json?.error, /--reason/, 'the refusal must name the route that works');
       assert.deepEqual(readFileSync(join(dir, '.cadet', 'state.json')), before, 'a refusal must not write');
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
-  it('refuses a confirmation with no form, naming the command that writes one', () => {
+  it('refuses a confirmation that carries no answer, because an empty attestation is not one', () => {
     const { dir } = fixture();
     try {
       const before = readFileSync(join(dir, '.cadet', 'state.json'));
       const r = runCli(['harness', 'confirm', '--gate', HUMAN_ACCEPTANCE_GATE,
         '--scope', 'epic-1', '--files', 'story-1.md', '--target', dir, '--format', 'json']);
       assert.equal(r.status, 1, r.stdout + r.stderr);
-      assert.equal(r.json?.code, 'acceptance-form-required');
-      assert.match(r.json?.error, /acceptance-form/);
+      assert.equal(r.json?.code, 'reason-required');
+      assert.match(r.json?.error, /--reason/);
       assert.deepEqual(readFileSync(join(dir, '.cadet', 'state.json')), before);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
-  it('refuses to accept a record whose limitations were blanked, whatever wrote it', () => {
-    // The witness twin of this test sits below. Together they say the gate cannot be
-    // satisfied without both answers, no matter which route produced the record: the
-    // blanking is caught at validation, not only at capture.
+  it('refuses to accept a record whose answer was blanked, whatever wrote it', () => {
+    // A hand-edited state.json is exactly what this gate must not be satisfiable by, so the
+    // requirement is checked at validation as well as at capture: the record IS the answer, and an
+    // answer that says nothing is not a record.
     const { dir, state } = fixture();
     try {
       state.gates[HUMAN_ACCEPTANCE_GATE] = true;
       state.gateEvidence = [{
         evidenceId: 'ev-2', gate: HUMAN_ACCEPTANCE_GATE, phase: HUMAN_ACCEPTANCE_TRANSITION_FROM,
         status: 'manual-confirmation', source: 'manual-confirmation', createdAt: new Date().toISOString(),
-        witness: 'played the tutorial level',
-        limitations: '   ',
+        reason: '   ',
       }];
       const r = validateState(state, {});
       assert.equal(r.valid, false);
-      assert.ok(r.errors.some((e) => /limitations/.test(e.message)), JSON.stringify(r.errors));
+      assert.ok(r.errors.some((e) => /reason/.test(e.message)), JSON.stringify(r.errors));
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
-  it('refuses to accept a record whose witness was removed by hand', () => {
+  it('refuses to accept a record with no answer at all', () => {
     const { dir, state } = fixture();
     try {
       state.gates[HUMAN_ACCEPTANCE_GATE] = true;
@@ -327,7 +300,24 @@ describe('human acceptance — 3. closure requires acceptance or a valid excepti
       }];
       const r = validateState(state, {});
       assert.equal(r.valid, false);
-      assert.ok(r.errors.some((e) => /witness/.test(e.message)), JSON.stringify(r.errors));
+      assert.ok(r.errors.some((e) => /reason/.test(e.message)), JSON.stringify(r.errors));
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('still accepts a record written under the removed form shape, because evidence it once took stays valid', () => {
+    // The compatibility window: `witness` + `limitations` were what the form wrote, and a consumer
+    // that recorded one before the removal must not have its history invalidated by an upgrade.
+    const { dir, state } = fixture();
+    try {
+      state.gates[HUMAN_ACCEPTANCE_GATE] = true;
+      state.gateEvidence = [{
+        evidenceId: 'ev-3', gate: HUMAN_ACCEPTANCE_GATE, phase: HUMAN_ACCEPTANCE_TRANSITION_FROM,
+        status: 'manual-confirmation', source: 'manual-confirmation', createdAt: new Date().toISOString(),
+        witness: 'played the tutorial level',
+        limitations: 'none',
+      }];
+      const r = validateState(state, {});
+      assert.equal(r.errors.some((e) => /reason/.test(e.message)), false, JSON.stringify(r.errors));
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 

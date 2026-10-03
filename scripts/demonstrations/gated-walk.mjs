@@ -75,8 +75,8 @@ function buildFixture() {
     }],
   };
   writeFileSync(join(dir, '.cadet', 'harness.json'), JSON.stringify(policy, null, 2));
-  // The managed framework files an install leaves behind: the commands generate artifacts from
-  // the templates here (the acceptance form, for one), so a fixture without them is not an install.
+  // The managed framework files an install leaves behind: the directive, the skills and the
+  // templates the commands read, so a fixture without them is not an install.
   cpSync(join(repoRoot, '.cadet', 'agent'), join(dir, '.cadet', 'agent'), { recursive: true });
 
   // A real test that describes behaviour the implementation does not have yet — the red step, and
@@ -220,18 +220,12 @@ async function satisfy(dir, gate, ctx) {
       return { r, why: "the project's own declared architecture checks" };
     }
     case 'humanAcceptanceConfirmed': {
-      const form = await at(['harness', 'acceptance-form', '--epic', 'INV-1']);
-      if (form.status !== 0) return { r: form, why: 'harness acceptance-form' };
-      const formPath = join(dir, '.cadet', 'agent', 'project-plans', 'INV-1', 'HumanAcceptance.md');
-      // The three fields the generator leaves for a person. The walk fills them the way a person
-      // would: the slot markers go, and real sentences take their place.
-      const filled = readFileSync(formPath, 'utf-8')
-        .replace(/<slot id="acceptor"[\s\S]*?\/>/, 'Demo Person (product owner)')
-        .replace(/<slot id="witness"[\s\S]*?\/>/, 'Launched the demo scene, filled the grid, and watched the item count rise from 0 to 4 columns across 3 rows.')
-        .replace(/<slot id="limitations"[\s\S]*?\/>/, 'none');
-      writeFileSync(formPath, filled);
-      const r = await at(['harness', 'confirm', '--gate', gate, '--artifact', formPath, '--reason', 'the demo walk was accepted', '--expires-at', EXPIRY, '--format', 'json']);
-      return { r, why: 'the generated acceptance form, recorded by harness confirm' };
+      // A human-owned gate, recorded from the person's own answer. The walk stands in for that
+      // person: there is no form and no artifact, so what they said is the record.
+      const r = await at(['harness', 'confirm', '--gate', gate,
+        '--reason', 'Demo Person (product owner) accepted the delivered work: launched the demo scene, filled the grid, watched the item count rise from 0 to 4 columns across 3 rows, and accepted no limitations.',
+        '--expires-at', EXPIRY, '--environment', 'host=demo', '--scope', 'INV-1', '--format', 'json']);
+      return { r, why: "the person's own answer, recorded by harness confirm" };
     }
     default: {
       // The gates whose automated path cannot exist everywhere: a judgement, or an editor this
@@ -290,7 +284,7 @@ async function main() {
     check((await at(['state', 'begin', '--epic', 'INV-1', '--story', 'stories/inventory-1.md'])).status === 0, 'state begin');
     {
       // `state.epics` is the planning index, and no command writes it: the framework reads it
-      // (`resume`, `reconcile`, `acceptance-form`) and the agent maintains it during planning. The
+      // (`resume`, `reconcile`) and the agent maintains it during planning. The
       // walk registers the epic as fixture setup, and this is recorded as a limitation rather than
       // presented as a framework step.
       const statePath = join(dir, '.cadet', 'state.json');
