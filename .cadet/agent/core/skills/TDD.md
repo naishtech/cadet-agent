@@ -81,4 +81,8 @@ After tests pass:
 - Set `gates.testsPassed` to `true` **only** when backed by the fresh green evidence record. Do not hand-edit the gate.
 - Update the story markdown file if using markdown tracking.
 - Do NOT transition to `review` until all implementation → review gates are satisfied and each is evidence-backed. Confirm with `cadet-agent state transition --to review --dry-run` (writes nothing) or by reading `gateEvidence`. Running the command **without** `--dry-run` applies the transition.
+- **Report the change in the reply the Response Contract defines**: what the software now does that it did
+  not before, then the changed files — one line per file, path first, taken from
+  `cadet-agent harness changes` — then the checks, then what is owed. The reader inspects the change in his
+  IDE, so a reply without the file lines is incomplete.
 </completion>
