@@ -180,6 +180,22 @@ now carries the work, and `cadet-agent.md` states what each stage must carry.
 
 ---
 
+## Change 2026-10-04 — the reply carries the changed files
+
+| Replaced instruction | Disposition |
+|---|---|
+| Response Contract: "**Changed** — what changed, then why, one line per change, with evidence record ids inline" | 🔁 SUPERSEDED by the four-part change report (behaviour, files, checks, owed). "One line per change" left "a change" undefined, and it read as a fact about the work rather than as an edit, so no rule required a file path. |
+| Response Contract: "no headings, no AC tables, no restatement of the story" | 🔁 AMENDED, and the intent is kept. The ban becomes "no AC tables, no framework-state tables, and no restatement of the story", with one named exception: the changed-file list, which is required because it is the reader's route into the code. The original clause had no exception, so an agent obeying it could not name a file. |
+| Response Contract: implementation row "what changed and why, what the checks show" | 🔁 SUPERSEDED by "what the software does now that it did not before, in the product's own terms; the files changed, one line per file, path first; the checks; what is unverified or deferred". The reader's decision changes from *is this correct and complete?* to *is this correct, can I inspect it, and does it match the story?* |
+| Response Contract: planning row "the artifact updated" | 🔁 AMENDED to "the artifact paths updated — one line per artifact", so the journey rule holds in the planning stages too. |
+| Language block: "Keep technical names exact: record ids, file paths, commands and code" | ✅ KEPT, and narrowed rather than loosened. A record id never appears alone: the plain-language name comes first (`AC-65 (the match-end banner …)`). The old wording rewarded the bare id. |
+| Language block | ➕ the language now covers every part of the reply, the change report's file lines included. |
+| `templates/ChangeReportTemplate.md` | ✅ KEPT unchanged. It already required the file table, and it is the document the reply now matches at reply scale. |
+| `cadet-agent harness changes` | ✅ KEPT unchanged. It already reported the inventory the reply needs; no new command and no new flag were added. |
+| CodeReview step 23 and TDD's Completion | ➕ each gained a pointer to the reply shape. The rule stays in the Response Contract; the skills name where it applies. |
+
+---
+
 ## Summary
 
 - **Total instructions reviewed**: 50+

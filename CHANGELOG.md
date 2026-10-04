@@ -13,6 +13,29 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Changed
+- **A reply that changes the repository carries the changed files.** The Response Contract's
+  implementation/review/validation row required "what changed and why, one line per change" and banned
+  headings and tables outright — so a "change" read as a fact about the work, no rule required a file
+  path, and the reply that reported a real change named no file the reader could open. The contract now
+  defines the change report in the reply as four parts in order: **behaviour** (what the software does now
+  that it did not before, in the product's own terms), **files** (one line per changed file, path first —
+  source, tests, JSON, configuration, assets and planning artifacts alike — taken from
+  `cadet-agent harness changes`, never from memory), **checks** (red before green, compile, analyzer,
+  verdict, limits stated), and **owed** (what is unverified, deferred, or waiting on the reader). The
+  Change Report template at `.cadet/reports/` already carried that file list; the reply now carries it too,
+  from the same command, so the two agree by construction.
+- **A record id never appears alone.** `AC-65 (the match-end banner — the world stops and the player is
+  told)`: the plain-language name comes first and the exact id sits beside it. Simplified Technical
+  English's "keep technical names exact" rule was rewarding the bare id, and the reader had to pay for a
+  lookup to learn what it meant.
+- **Simplified Technical English now covers the whole reply, the change report included** — the file
+  lines, the checks and the owed items are written in it, not only the prose around them.
+- **The planning row names artifact paths**, one line per artifact, so the same journey rule holds where
+  the artifacts are the deliverable.
+- **`Open first:`** names the file and symbol to read first, and only when the file list is long enough
+  that a reader needs an entry point.
+
 ## [0.61.0] — 2026-10-03
 
 ### Changed

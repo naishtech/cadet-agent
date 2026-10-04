@@ -191,7 +191,9 @@ The full set of legal transitions is the three gated rows above **plus** the ung
 
 ### The response contract
 
-The framework's only per-reply output is one line: `cadet-agent: ok`, or the problem in its place. `cadet-agent harness status` derives that line — read-only — from the state document and the run ledger, so it cannot claim a health nothing verified. `ok` means the record is readable, valid and fresh, and no recorded run stopped on a budget or failed to run. A gate that is unmet because the story is unfinished is normal, and is not reported. The rest of a reply carries the work: the decisions taken, what changed, what the checks show, and what is unverified or deferred.
+The framework's only per-reply output is one line: `cadet-agent: ok`, or the problem in its place. `cadet-agent harness status` derives that line — read-only — from the state document and the run ledger, so it cannot claim a health nothing verified. `ok` means the record is readable, valid and fresh, and no recorded run stopped on a budget or failed to run. A gate that is unmet because the story is unfinished is normal, and is not reported.
+
+The rest of a reply carries the work, in Simplified Technical English (ASD-STE100). A reply that changed the repository reports four parts, in order: **behaviour** — what the software does now that it did not before, in the product's own terms; **files** — one line per changed file, path first, taken from `cadet-agent harness changes` rather than from memory; **checks** — red before green, compile, analyzer, verdict; and **owed** — what is unverified, deferred, or waiting on the reader. The file list is the reply's only list, and it is required: it is how the reader finds the change in his IDE. A record id never appears alone — `AC-65 (the match-end banner — the world stops and the player is told)`.
 
 ### Harness
 

@@ -156,6 +156,9 @@ Every reply carries **one line about the framework, and no more**: `cadet-agent:
 - Use a verb, not a noun. Write "we decided", not "a decision was made".
 - Use one word for one meaning. Do not change a word for variety. Write `format` when you mean a format.
 - Keep technical names exact: record ids, file paths, commands and code.
+- **The language covers every part of the reply.** The change report's file lines, the checks and the owed
+  items are written in Simplified Technical English too, and not only the prose around them. A file line is
+  a sentence: `<path> — <what changed in it>`, one idea, active voice.
 - The language deletes no fact. It only makes the fact shorter.
 - If a cause matters, give it its own sentence.
 - A skill whose reply must carry content, such as `PlanningReview`'s questions, keeps that content. The language shortens the content. It does not remove it.
@@ -181,12 +184,39 @@ line; never compose one.
 
 | Stage | The reply must carry | The reader's decision |
 |---|---|---|
-| `context-resolution`, `requirements`, `architecture`, `spikes`, `story-breakdown` | the decisions being taken, the alternatives rejected and why, the questions that need the owner, the artifact updated, and what the plan now says | *do we agree on this plan?* |
-| `implementation`, `review`, `validation` | what changed and why, what the checks show — red then green, compile, analyzer, review verdict, findings — and what is unverified or deferred | *is this correct and complete?* |
+| `context-resolution`, `requirements`, `architecture`, `spikes`, `story-breakdown` | the decisions being taken, the alternatives rejected and why, the questions that need the owner, the artifact paths updated — one line per artifact — and what the plan now says | *do we agree on this plan?* |
+| `implementation`, `review`, `validation` | what the software does now that it did not before, in the product's own terms; the files changed, one line per file, path first; the checks — red then green, compile, analyzer, verdict; what is unverified or deferred | *is this correct, can I inspect it, and does it match the story?* |
 
-- **Changed** — what changed, then why, one line per change, with evidence record ids inline. This is the
-  Change Report at reply scale: no headings, no AC tables, no restatement of the story. State a limit or an
-  unmeasured claim where one exists rather than smoothing over it.
+**The change report in the reply** — a reply that reports a change to the repository carries four parts, in
+this order, written in Simplified Technical English (ASD-STE100, see **Language** above). A reply that
+changed nothing carries none of them.
+
+1. **Behaviour.** What the software does now that it did not before, written in the terms of the product
+   rather than of the framework. One sentence per behaviour change. A reader who stops after this part
+   knows what to re-test.
+2. **Files.** One line per changed file, the path first: `<path> — <what changed in it>`. The list covers
+   every kind of file the change touched — source, tests, JSON, configuration, assets, and the planning
+   artifacts. Take the paths from `cadet-agent harness changes`; never write them from memory, and never
+   omit a file the inventory reports, because a file the inventory lists and the reply omits is a change
+   the reader cannot see. `<what changed in it>` is one sentence on what that file now does that it did
+   not before — not a restatement of the diff, which the reader opens the file for.
+3. **Checks.** Red before green, then compile, analyzer and verdict. State a limit or an unmeasured claim
+   where one exists rather than smoothing over it.
+4. **Owed.** What is unverified, deferred, or waiting on the reader, naming the work item it belongs to in
+   plain words.
+
+- **This is the Change Report at reply scale, and the file list is its spine.** The full report at
+  `.cadet/reports/` builds the same list from the same command, so the two agree by construction.
+- **The file list is the ONE list a reply carries.** No AC tables, no framework-state tables, and no
+  restatement of the story. The list is required, not decoration: it is the reader's route into the code,
+  and a reply that changed files without it is incomplete rather than concise.
+- **Name the work, not the id.** A criterion, a finding or a gate appears in plain words first, with the
+  exact id beside it where the record needs one — `AC-65 (the match-end banner — the world stops and the
+  player is told)`. An id alone is a lookup the reader has to pay for, and it does not tell him what
+  changed.
+- **`Open first:` when the change is not small.** One line naming the file and the symbol to read first,
+  and why first, and only when the file list is long enough that a reader needs an entry point. Say
+  nothing when it is not.
 - **A policy appears only when it decided something**, named in the `why` of the change it decided.
   OperatingRules already requires surfacing resolved configuration when it materially affects the next
   action, and naming the default when you deviate from it; a standing policy line is identical every time
