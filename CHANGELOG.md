@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.63.0] — 2026-10-04
+
 ### Added
 - **`cadet-agent state brief` — the tier-0 summary of `state.json`.** The context plan named
   `.cadet/state.json` itself as an always-load reference. That document is not the current story: it is
