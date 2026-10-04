@@ -80,7 +80,11 @@ describe('context protocol — the plan', () => {
       assert.ok(refs.includes('.cadet/agent/core/cadet-agent.md'), 'tier 0 is always required');
       assert.ok(refs.includes('.cadet/agent/core/HarnessRuntime.md'));
       assert.ok(refs.includes('.cadet/harness.json'));
-      assert.ok(refs.includes('.cadet/state.json'));
+      // Tier 0 names the DERIVED BRIEF, not the state document (0.63.0). The document carries every
+      // work item ever closed and every change checkpoint ever recorded; a host that loaded it paid
+      // for the project's whole history to answer "what phase am I in".
+      assert.ok(refs.includes('.cadet/context/state-brief.md'), 'tier 0 is the brief, not the 94 KB document');
+      assert.ok(!refs.includes('.cadet/state.json'), 'the document itself is no longer an always-load reference');
       assert.ok(refs.includes('.cadet/agent/core/skills/TDD.md'), 'the phase dispatches its own skill');
       assert.ok(refs.includes('.cadet/agent/project-plans/epic-1/story-1.md'), 'the work item in flight');
 
@@ -91,7 +95,7 @@ describe('context protocol — the plan', () => {
       }
       assert.ok(r.json.budget.requiredTokens > 0);
       assert.equal(r.json.budget.fits, true);
-      assert.deepEqual(contextFiles(dir), ['plan.json']);
+      assert.deepEqual(contextFiles(dir), ['plan.json', 'state-brief.md']);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 

@@ -2078,6 +2078,127 @@ export function writeJsonAtomic(path, value) {
   return path;
 }
 
+/**
+ * The state brief: a derived summary of the state document, small enough to load
+ * every turn.
+ *
+ * WHY THIS EXISTS AND WHAT IT REPLACES. The context plan named `.cadet/state.json`
+ * itself as a tier-0 always-load reference, and that document is not the current
+ * story: it is the current story's live evidence plus append-only lists of every
+ * work item ever closed and every change checkpoint ever recorded. Measured in a
+ * real consumer, it reached 94,547 B — about 31,500 tokens — of which the current
+ * story was 31%, and it is re-sent on every turn. A host that loads it pays for the
+ * project's whole history to answer "what phase am I in".
+ *
+ * WHAT IT CARRIES. Only what the phase reads: the phase and the session settings,
+ * the active work item and its story and epic status, every gate in the policy with the
+ * newest evidence record for each, the last transition, and how much of the document
+ * compaction would archive. Nothing here is decided twice: every field is read
+ * from the document, and `latestEvidenceForGate` is the same reader a gate check
+ * uses, so the brief cannot disagree with the machinery about which record is live.
+ *
+ * WHAT IT DELIBERATELY OMITS. Evidence record bodies, the coverage index, the
+ * archive and the change log. A reader who needs those opens `.cadet/state.json`;
+ * the brief says so in its own first line. It is a summary, not a second record.
+ *
+ * Pure: no I/O, so a test drives it from a document and a caller decides where it
+ * is written.
+ */
+export function buildStateBrief(state) {
+  const s = isPlainObject(state) ? state : {};
+  const session = isPlainObject(s.session) ? s.session : {};
+  const work = isPlainObject(s.activeWorkItem) ? s.activeWorkItem : null;
+  const claimed = isPlainObject(s.gates) ? s.gates : {};
+  const epics = isPlainObject(s.epics) ? s.epics : {};
+
+  const gates = GATES.map((gate) => {
+    const latest = latestEvidenceForGate(s, gate);
+    return {
+      gate,
+      claimed: claimed[gate] === true,
+      status: latest ? latest.status : null,
+      evidenceId: latest ? latest.evidenceId : null,
+      at: latest ? latest.createdAt : null,
+    };
+  });
+
+  const epic = work?.epicId && isPlainObject(epics[work.epicId]) ? epics[work.epicId] : null;
+  const stories = isPlainObject(epic?.stories) ? epic.stories : {};
+  const storyStatuses = Object.values(stories);
+
+  // What `state compact --keep active` would move, counted by the same two pure
+  // functions compaction itself uses. Reported rather than implied, because the
+  // number growing without bound is the thing nobody notices.
+  const inline = Array.isArray(s.gateEvidence) ? s.gateEvidence.length : 0;
+  const { archived: archivableEvidence } = splitEvidence(s, { keep: 'active' });
+  const historyInline = Array.isArray(s.changeHistory) ? s.changeHistory.length : 0;
+  const { archived: archivableHistory } = compactHistory(
+    (Array.isArray(s.changeHistory) ? s.changeHistory : []).filter((e) => e?.type !== 'gate-exception'),
+  );
+
+  return {
+    workItemId: work ? `${work.epicId}::${work.storyId}` : null,
+    phase: session.currentPhase || null,
+    workflowPath: session.workflowPath || null,
+    trackingMode: session.trackingMode || null,
+    learnerTier: session.learnerTier || null,
+    operatingMode: session.operatingMode || null,
+    story: work?.storyId ? { id: work.storyId, status: stories[work.storyId] || null } : null,
+    epic: epic
+      ? {
+        id: work.epicId,
+        status: epic.status || null,
+        storiesDone: storyStatuses.filter((v) => v === 'done').length,
+        storiesTotal: storyStatuses.length,
+      }
+      : null,
+    gates,
+    evidence: { inline, archivable: archivableEvidence.length, superseded: (Array.isArray(s.gateEvidence) ? s.gateEvidence : []).filter((r) => r?.status === 'superseded').length },
+    history: { inline: historyInline, archivable: archivableHistory.length, entryLimit: HISTORY_ENTRIES_KEPT, charLimit: MAX_HISTORY_ENTRY_CHARS },
+    lastTransition: isPlainObject(s.lastTransition)
+      ? { from: s.lastTransition.from || null, to: s.lastTransition.to || null, at: s.lastTransition.at || null }
+      : null,
+    activeRunId: s.activeRunId || null,
+  };
+}
+
+/** Render a state brief as the text a host loads. */
+export function renderStateBrief(brief) {
+  const b = isPlainObject(brief) ? brief : {};
+  const lines = [];
+
+  lines.push(`state brief — ${b.workItemId || '(no active work item)'}`);
+  lines.push('The tier-0 summary of .cadet/state.json. Open that document for evidence records,');
+  lines.push('the coverage index and the archive; this file carries what the phase reads.');
+  lines.push('');
+  lines.push(`phase: ${b.phase || '(unset)'} · workflow: ${b.workflowPath || '(unset)'} · tracking: ${b.trackingMode || '(unset)'}`);
+  if (b.story) lines.push(`story: ${b.story.status || '(unset)'}`);
+  if (b.epic) lines.push(`epic: ${b.epic.status || '(unset)'} — ${b.epic.storiesDone} of ${b.epic.storiesTotal} stories done`);
+  lines.push('');
+  lines.push('gates (the newest evidence record for each)');
+  for (const row of Array.isArray(b.gates) ? b.gates : []) {
+    const state = row.claimed ? 'claimed' : 'UNMET';
+    const record = row.status
+      ? `${row.status}  ${row.evidenceId || '(no id)'}  ${row.at || ''}`.trimEnd()
+      : '(no evidence)';
+    lines.push(`  ${row.gate.padEnd(27)} ${state.padEnd(9)} ${record}`);
+  }
+  lines.push('');
+  const ev = b.evidence || {};
+  lines.push(`evidence inline: ${ev.inline} record(s), ${ev.superseded} superseded, ${ev.archivable} archivable`);
+  const hist = b.history || {};
+  lines.push(`change log: ${hist.inline} entr(ies), ${hist.archivable} archivable (keeps the most recent ${hist.entryLimit}, or ${hist.charLimit} characters per entry)`);
+  if (ev.archivable || hist.archivable) {
+    lines.push('  archive them with: cadet-agent state compact --keep active');
+  }
+  if (b.lastTransition) {
+    lines.push(`last transition: ${b.lastTransition.from} -> ${b.lastTransition.to} at ${b.lastTransition.at}`);
+  }
+  if (b.activeRunId) lines.push(`active run: ${b.activeRunId}`);
+
+  return `${lines.join('\n')}\n`;
+}
+
 /** Atomically write state.json. */
 export function writeState(targetDir, state) {
   return writeJsonAtomic(statePathFor(targetDir), state);
