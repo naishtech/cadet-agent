@@ -104,23 +104,27 @@ Cadet workflows are implemented as scoped skills. The global directive decides *
 
 ### Skill Inventory
 
-| Skill | Invocation | When to dispatch |
-|---|---|---|
-| **Planning Review** | `/cadet-planning-review` | When a plan is fuzzy, ambiguous, or contested — before Requirements/Architecture. |
-| **Requirements** | `/cadet-requirements` | Large changes, after workflow classification. |
-| **Architecture** | `/cadet-architecture` | Large changes, after requirements are finalized. |
-| **Design Review** | `/cadet-design-review` | At the end of `architectureComplete`, before story breakdown. Challenges the design — traceability, assumptions, unnecessary architecture, reachability, verification — and records `designReviewCompleted`. Required on that edge when `designReview.enabled` is set. |
-| **Spike** | `/cadet-spike` | When requirements or design contain unverified assumptions. |
-| **Story Breakdown** | `/cadet-breakdown` | Large changes, after architecture and any spikes. |
-| **TDD** | `/cadet-tdd` | Per story for large changes; per change for small changes. |
-| **Debugging** | `/cadet-debug` | On defect reports or unexpected behavior. |
-| **Visual Evidence** | `/cadet-visual-evidence` | From Debugging, Code Review, or Spike when a claim is about what was rendered — visibility, position, layout, UI state, or how it changes over time — and no assertion can reach it. A static claim needs a frame; a temporal claim (a unit advancing, a counter counting, a clip playing) needs a clip or timed frame sequence, and a still can never pass it. A model with no image input records `visionUnavailable` and continues; it never blocks the work. |
-| **Code Review** | `/cadet-review` | After each completed story or change — **non-skippable**. |
-| **Resume** | `/cadet-resume` | On session start, after a break, or when state is unclear. |
-| **Handoff** | `/cadet-handoff` | When ending a session, wrapping up, or handing work to a new chat. |
-| **MCP Setup** | `/cadet-mcp-setup` | When the agent needs Unity Editor connectivity via Unity CLI/MCP. |
-| **Agent Reviewer** | `/cadet-agent-reviewer` | Audit-only mode — never writes code; after a story or on demand. |
-| **Reconciliation** | `/cadet-reconcile` | When the artifacts may have drifted — before `validation → closed` to back `designArtifactSyncConfirmed`, at an epic boundary, or on demand. Never edits an artifact or advances a phase. |
+The **reply subject** is what that skill's reply reports, from the table in **Response Contract**. A
+skill does not get its own reply format: the subject decides the shape, and the subject is not fixed
+by the phase — an implementation turn can also report a plan change, a measurement or an answer.
+
+| Skill | Invocation | When to dispatch | Reply subject |
+|---|---|---|---|
+| **Planning Review** | `/cadet-planning-review` | When a plan is fuzzy, ambiguous, or contested — before Requirements/Architecture. | plan artifact |
+| **Requirements** | `/cadet-requirements` | Large changes, after workflow classification. | plan artifact |
+| **Architecture** | `/cadet-architecture` | Large changes, after requirements are finalized. | plan artifact |
+| **Design Review** | `/cadet-design-review` | At the end of `architectureComplete`, before story breakdown. Challenges the design — traceability, assumptions, unnecessary architecture, reachability, verification — and records `designReviewCompleted`. Required on that edge when `designReview.enabled` is set. | plan artifact, then verdict |
+| **Spike** | `/cadet-spike` | When requirements or design contain unverified assumptions. | measurement |
+| **Story Breakdown** | `/cadet-breakdown` | Large changes, after architecture and any spikes. | plan artifact |
+| **TDD** | `/cadet-tdd` | Per story for large changes; per change for small changes. | software change |
+| **Debugging** | `/cadet-debug` | On defect reports or unexpected behavior. | software change, then measurement |
+| **Visual Evidence** | `/cadet-visual-evidence` | From Debugging, Code Review, or Spike when a claim is about what was rendered — visibility, position, layout, UI state, or how it changes over time — and no assertion can reach it. A static claim needs a frame; a temporal claim (a unit advancing, a counter counting, a clip playing) needs a clip or timed frame sequence, and a still can never pass it. A model with no image input records `visionUnavailable` and continues; it never blocks the work. | measurement |
+| **Code Review** | `/cadet-review` | After each completed story or change — **non-skippable**. | verdict |
+| **Resume** | `/cadet-resume` | On session start, after a break, or when state is unclear. | answer |
+| **Handoff** | `/cadet-handoff` | When ending a session, wrapping up, or handing work to a new chat. | answer |
+| **MCP Setup** | `/cadet-mcp-setup` | When the agent needs Unity Editor connectivity via Unity CLI/MCP. | answer |
+| **Agent Reviewer** | `/cadet-agent-reviewer` | Audit-only mode — never writes code; after a story or on demand. | verdict |
+| **Reconciliation** | `/cadet-reconcile` | When the artifacts may have drifted — before `validation → closed` to back `designArtifactSyncConfirmed`, at an epic boundary, or on demand. Never edits an artifact or advances a phase. | verdict, or plan artifact |
 
 ### Dispatch Rules
 
@@ -178,31 +182,34 @@ line; never compose one.
   attempted and the framework refused, an expired deferral, a launch failure, a budget warning. Name the
   problem and nothing else.
 - Nothing else about the framework appears in a reply. The files are the record: a reader who wants the
-  phase, the gates or the evidence ids asks for them, or opens `.cadet/state.json`.
+  phase, the gates or the evidence ids runs `cadet-agent state brief` — the derived summary, small enough
+  to print — or opens `.cadet/state.json` for the records themselves.
 
-**The work** — the reply carries the work, and what it must carry depends on the stage:
+**The work** — what the reply must carry depends on **what it reports**, not on the phase. A phase can
+produce a code change, a plan change, a measurement, a verdict or an answer, and the reader's decision
+differs for each one. State the subject in the first sentence, so a reader knows which decision he is
+being asked for. When a turn produced more than one subject, report them in this order.
 
-| Stage | The reply must carry | The reader's decision |
+| The reply reports | It leads with | The reader decides |
 |---|---|---|
-| `context-resolution`, `requirements`, `architecture`, `spikes`, `story-breakdown` | the decisions being taken, the alternatives rejected and why, the questions that need the owner, the artifact paths updated — one line per artifact — and what the plan now says | *do we agree on this plan?* |
-| `implementation`, `review`, `validation` | what the software does now that it did not before, in the product's own terms; the files changed, one line per file, path first; the checks — red then green, compile, analyzer, verdict; what is unverified or deferred | *is this correct, can I inspect it, and does it match the story?* |
+| a change to the software | what the software does now that it did not before, in the product's own terms — then the files, the checks and the owed items (**the invariants** below) | can I re-test it? |
+| a change to a plan artifact | what the plan now says, the decisions taken, the alternatives rejected and why, and the questions that need the owner — one line per artifact path | do we agree on this plan? |
+| a measurement or an investigation | the question, what was measured, the number, and what it does NOT settle | does this answer the question? |
+| a review verdict | met, not met, or met in part; then the findings by severity, each naming its file | do I accept this, or send it back? |
+| nothing new — an answer, a diagnosis, a report | the answer, then the reasoning, then what it depends on | do I have what I need? |
 
-**The change report in the reply** — a reply that reports a change to the repository carries four parts, in
-this order, written in Simplified Technical English (ASD-STE100, see **Language** above). A reply that
-changed nothing carries none of them.
+**The invariants of a reply that touched the repository** — these do not change with the subject, and a
+reply that changed nothing carries none of them.
 
-1. **Behaviour.** What the software does now that it did not before, written in the terms of the product
-   rather than of the framework. One sentence per behaviour change. A reader who stops after this part
-   knows what to re-test.
-2. **Files.** One line per changed file, the path first: `<path> — <what changed in it>`. The list covers
+1. **Files.** One line per changed file, the path first: `<path> — <what changed in it>`. The list covers
    every kind of file the change touched — source, tests, JSON, configuration, assets, and the planning
    artifacts. Take the paths from `cadet-agent harness changes`; never write them from memory, and never
    omit a file the inventory reports, because a file the inventory lists and the reply omits is a change
    the reader cannot see. `<what changed in it>` is one sentence on what that file now does that it did
    not before — not a restatement of the diff, which the reader opens the file for.
-3. **Checks.** Red before green, then compile, analyzer and verdict. State a limit or an unmeasured claim
+2. **Checks.** Red before green, then compile, analyzer and verdict. State a limit or an unmeasured claim
    where one exists rather than smoothing over it.
-4. **Owed.** What is unverified, deferred, or waiting on the reader, naming the work item it belongs to in
+3. **Owed.** What is unverified, deferred, or waiting on the reader, naming the work item it belongs to in
    plain words.
 
 - **This is the Change Report at reply scale, and the file list is its spine.** The full report at

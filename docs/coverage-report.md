@@ -196,6 +196,28 @@ now carries the work, and `cadet-agent.md` states what each stage must carry.
 
 ---
 
+## 0.63.0 — the state brief, and the reply keyed to what it reports
+
+The context plan named `.cadet/state.json` itself as an always-load reference. That document is not the
+current story — it also holds one row per work item ever closed and one entry per change checkpoint ever
+recorded — so it grew with the project and never shrank. In a real consumer it reached 94,547 B, about
+31,500 tokens, of which the current story was 31%, and a host re-sent it on every turn. The same review
+found the reply contract keyed to the phase, which does not determine what a turn produced.
+
+| Instruction | Disposition |
+|---|---|
+| Context plan, tier 0: `.cadet/harness.json` and `.cadet/state.json` | ➕ REPLACED by the state brief. `.cadet/context/state-brief.md` is written by `harness context plan` before the plan is built, named and hashed at tier 0, and derived from the document by `state brief`. The document itself is no longer a required reference: it is the record to open, not reading to load every turn. |
+| Tier-0 reason, both files: "the active policy and the session state the phase reads" | ✅ KEPT as a shape, 🔁 corrected as content. Two different files carried the same sentence, so a reader could not tell which was which. Each now names what it is: the resolved policy, and the state the phase reads. |
+| Sources of the brief: `buildStateBrief`, `latestEvidenceForGate`, `splitEvidence`, `compactHistory` | ➕ ADDED in one place and derived, not restated. The gate rows use `latestEvidenceForGate`, the same reader a gate check uses, so the brief cannot disagree with the machinery about which record is live; the archivable counts use the same two pure functions compaction uses. A second reader would have been a second answer. |
+| Response Contract work table, keyed to stage (`context-resolution … story-breakdown` / `implementation, review, validation`) | 🔁 REPLACED, keyed to subject. A phase does not fix the reply: an implementation turn can also report a plan change, a measurement or an answer. Five subjects now name what the reply leads with and what the reader decides. |
+| The four-part change report (behaviour, files, checks, owed) | ✅ KEPT and DEMOTED to its invariants. Behaviour moved into the software-change row, where it already was the lede. Files, checks and owed became the **invariants** of a reply that touched the repository, because the three do not change with the subject. |
+| File list, one line per file, from `harness changes` | ✅ KEPT unchanged. This was the 0.62.0 change and it stands: it is the reader's route into the code. |
+| Per-skill response formats | ❌ NOT ADDED, and the reason is recorded. Fifteen skills would be fifteen places to drift, and Skill Dispatch rule 6 forbids a skill restating core content. The Skill Inventory gained one **reply subject** column instead; the shape stays in one table. |
+| `cadet-agent state brief` | ➕ ADDED as a read-only command, registered in `COMMANDS` and enumerated in the registry guard's `READ_ONLY_INVOCATIONS`, so "declared read-only" is asserted against "writes nothing". |
+| `harness context plan` writes | ➕ `.cadet/context/state-brief.md` added to its declared writes, because the plan is what writes it. |
+
+---
+
 ## Summary
 
 - **Total instructions reviewed**: 50+

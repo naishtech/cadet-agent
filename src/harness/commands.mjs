@@ -35,6 +35,10 @@ export const COMMANDS = {
     unattended: true,
   },
 
+  'state brief': {
+    mutates: false,
+    summary: 'Print the tier-0 summary of state.json: phase, active work item, every gate, and what compaction would archive.',
+  },
   'state validate': {
     mutates: false,
     summary: 'Validate .cadet/state.json against the current schema.',
@@ -141,7 +145,7 @@ export const COMMANDS = {
   'harness context plan': {
     mutates: true,
     summary: 'Write the context plan for the current phase: what must be loaded, and why.',
-    writes: ['.cadet/context/plan.json'],
+    writes: ['.cadet/context/plan.json', '.cadet/context/state-brief.md'],
     unattended: true,
   },
   'harness context record': {

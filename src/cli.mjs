@@ -30,6 +30,7 @@ import {
   selfBoundFiles,
   STATE_VERSION, sealedEvidence, recordEvidence, appendEvidence, sealWorkItem, toStateV4,
   isHistoryExternal, HISTORY_ENTRIES_KEPT, resetGatesForNewWorkItem,
+  buildStateBrief, renderStateBrief, writeStateBrief, CONTEXT_BRIEF_FILE,
 } from './harness/index.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -58,6 +59,7 @@ function showHelp() {
     npx cadet-agent@latest sync --target <dir>   Sync a specific directory
 
     cadet-agent state init          Create the first .cadet/state.json (never overwrites one)
+    cadet-agent state brief         Print the tier-0 summary: phase, work item, gates, archivable records
     cadet-agent state validate      Validate .cadet/state.json against the schema
     cadet-agent state validate --verify-sealed   Also read sealed evidence from commit trailers
     cadet-agent state migrate       Atomically migrate state to the current version (backup on write)
@@ -575,6 +577,23 @@ async function cmdState(opts) {
     return;
   }
 
+  if (sub === 'brief') {
+    // THE TIER-0 SUMMARY OF THE DOCUMENT (0.63.0). Read-only, and derived: every field is read from
+    // state.json, and the gate rows use `latestEvidenceForGate` — the same reader a gate check uses —
+    // so the brief cannot disagree with the machinery about which record is live. It exists because
+    // the context plan used to name the 94 KB document itself as an always-load reference.
+    const { exists, state } = readState(opts.targetDir);
+    if (!exists) fail(opts, 'No .cadet/state.json found.', () => 2);
+
+    const brief = buildStateBrief(state);
+    if (opts.format === 'json') {
+      emit(opts, '', { ok: true, brief });
+    } else {
+      emit(opts, renderStateBrief(brief).trimEnd());
+    }
+    return;
+  }
+
   if (sub === 'compact') {
     const { exists, state } = readState(opts.targetDir);
     if (!exists) fail(opts, 'No .cadet/state.json found.', () => 2);
@@ -850,7 +869,7 @@ async function cmdState(opts) {
     return;
   }
 
-  fail(opts, `Unknown state subcommand: ${sub || '(none)'}. Use validate|migrate|compact|begin|seal|transition.`);
+  fail(opts, `Unknown state subcommand: ${sub || '(none)'}. Use brief|validate|migrate|compact|begin|seal|transition.`);
 }
 
 /**
@@ -1790,6 +1809,10 @@ async function cmdHarness(opts) {
     const { exists, state } = readState(opts.targetDir);
 
     if (action === 'plan') {
+      // THE BRIEF IS WRITTEN BEFORE THE PLAN IS BUILT, so the plan can name it and hash it. A plan
+      // that named a file nobody had written would report its own tier-0 reference as MISSING, and
+      // the caller would have to run two commands to get one answer.
+      writeStateBrief(opts.targetDir, state);
       const plan = buildContextPlan({ targetDir: opts.targetDir, policy, state });
       const planPath = writeContextPlan(opts.targetDir, plan);
       const shown = relative(opts.targetDir, planPath).replace(/\\/g, '/');

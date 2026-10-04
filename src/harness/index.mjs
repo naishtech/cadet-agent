@@ -47,6 +47,7 @@ export {
   HISTORY_ENTRIES_KEPT, MAX_HISTORY_ENTRY_CHARS, historyEntryLength, compactHistory, DEFAULT_MAX_LIVE_EVIDENCE, retainLiveRecords,
   createEvidence, computeInputTreeHash, workItemIdOf, evidenceFreshness,
   latestEvidenceForGate, activeExceptions, requiredGates, conditionalEdgeGates, isUngatedForwardEdge,
+  buildStateBrief, renderStateBrief,
   evaluateTransition, resolveStrict,
   applyTransition, resetGatesForNewWorkItem, statePathFor, readState, writeState, writeJsonAtomic, StateError,
 } from './state.mjs';
@@ -72,7 +73,8 @@ export {
 } from './hosts.mjs';
 
 export {
-  CONTEXT_LEVELS, CONTEXT_DIR, CONTEXT_PLAN_FILE, CONTEXT_RECORD_FILE, PHASE_SKILL,
+  CONTEXT_LEVELS, CONTEXT_DIR, CONTEXT_PLAN_FILE, CONTEXT_RECORD_FILE, CONTEXT_BRIEF_FILE, PHASE_SKILL,
+  writeStateBrief,
   ContextProtocolError, planEntries, buildContextPlan, writeContextPlan, readContextPlan,
   buildContextRecord, writeContextRecord, readContextRecord, parseTranscript,
   validateContextRecord, describeContextState, declaresContextEnforcement,

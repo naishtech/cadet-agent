@@ -13,6 +13,36 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Added
+- **`cadet-agent state brief` — the tier-0 summary of `state.json`.** The context plan named
+  `.cadet/state.json` itself as an always-load reference. That document is not the current story: it is
+  the current story's live evidence plus one row per work item ever closed and one entry per change
+  checkpoint ever recorded, so it grows with the project and never shrinks. Measured in a real consumer
+  at 94,547 B — about 31,500 tokens — of which the current story was 31%, re-sent on every turn.
+  `state brief` prints the phase, the session settings, the active work item with its story and epic
+  status, every gate in the policy with the newest evidence record for each, the last transition, and how
+  many records and change-log entries compaction would archive. It is read-only and derived: every field
+  comes from the document, and the gate rows use `latestEvidenceForGate`, the same reader a gate check
+  uses, so the brief cannot disagree with the machinery about which record is live. On the same consumer
+  document it printed 1,745 B — 1.8% of the source.
+
+### Changed
+- **Tier 0 names the brief, not the state document.** `harness context plan` writes
+  `.cadet/context/state-brief.md` before it builds the plan, then names and hashes it at tier 0, so a
+  stale brief is detectable exactly like any other required reference and `budget.fits` measures what a
+  host actually loads. `.cadet/harness.json` and the brief also gained distinct reasons: both used to
+  carry "the active policy and the session state the phase reads", which told a reader nothing about
+  which file was which.
+- **The reply is keyed to what it reports, not to the phase.** The Response Contract's work table had one
+  row for the planning phases and one for implementation, review and validation. But a phase does not fix
+  the reply: an implementation turn can also report a plan change, a measurement, or an answer, and the
+  reader's decision differs for each. The table now names the five subjects — a change to the software, a
+  change to a plan artifact, a measurement or investigation, a review verdict, and nothing new — with what
+  the reply leads with and what the reader decides. The four-part change report became the **invariants**
+  of a reply that touched the repository (files, checks, owed), because those three do not change with the
+  subject. The Skill Inventory gained a **reply subject** column, and no skill got its own reply format:
+  the subject decides the shape, so there is one table to keep true instead of fifteen.
+
 ## [0.62.0] — 2026-10-04
 
 ### Changed

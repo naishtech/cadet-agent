@@ -28,6 +28,7 @@ import { join } from 'node:path';
 
 import { ContextManifest } from './context.mjs';
 import { sha256, timestamp } from './util.mjs';
+import { buildStateBrief, renderStateBrief } from './state.mjs';
 
 /** The levels a record may carry, strongest first. */
 export const CONTEXT_LEVELS = Object.freeze(['enforced', 'recorded', 'estimated', 'unavailable']);
@@ -36,6 +37,25 @@ export const CONTEXT_LEVELS = Object.freeze(['enforced', 'recorded', 'estimated'
 export const CONTEXT_DIR = '.cadet/context';
 export const CONTEXT_PLAN_FILE = 'plan.json';
 export const CONTEXT_RECORD_FILE = 'record.json';
+
+/**
+ * The derived summary of `.cadet/state.json` that tier 0 names, in place of the document.
+ *
+ * The document is not the current story: it is the current story's live evidence plus lists that
+ * only ever grow — one row per work item ever closed, one entry per change checkpoint. In a real
+ * consumer it reached 94,547 B, about 31,500 tokens, of which the current story was 31%. This file
+ * carries what the phase reads, and nothing else.
+ */
+export const CONTEXT_BRIEF_FILE = 'state-brief.md';
+const STATE_BRIEF = `${CONTEXT_DIR}/${CONTEXT_BRIEF_FILE}`;
+
+/** Write the tier-0 brief, before a plan names and hashes it. */
+export function writeStateBrief(targetDir, state) {
+  const path = join(targetDir, CONTEXT_DIR, CONTEXT_BRIEF_FILE);
+  mkdirSync(join(targetDir, CONTEXT_DIR), { recursive: true });
+  writeFileSync(path, renderStateBrief(buildStateBrief(state)), 'utf-8');
+  return path;
+}
 
 export class ContextProtocolError extends Error {
   constructor(message, code = 'context-protocol') {
@@ -103,11 +123,17 @@ export function planEntries({ targetDir, policy, state = null }) {
   required.push(entry(HARNESS_CONTRACT, {
     tier: 'tier0', reason: 'the lean runtime contract for gates, evidence and budgets', authority: 'framework', required: true,
   }));
-  for (const ref of ['.cadet/harness.json', '.cadet/state.json']) {
-    required.push(entry(ref, {
-      tier: 'tier0', reason: 'the active policy and the session state the phase reads', authority: 'session', required: true,
-    }));
-  }
+  required.push(entry('.cadet/harness.json', {
+    tier: 'tier0', reason: 'the resolved policy: budgets, the gate settings and the human-gate rules the phase obeys', authority: 'session', required: true,
+  }));
+  // THE STATE BRIEF, NOT THE STATE DOCUMENT (0.63.0). The document is not the current story — it
+  // holds every work item ever closed and every change checkpoint ever recorded, and it grows without
+  // bound. It was 94,547 B, about 31,500 tokens, of which the current story was 31%, and it was
+  // re-sent on every turn. The brief carries the phase, the work item, the gates and what is
+  // archivable; `state brief` prints it and `harness context plan` writes it here.
+  required.push(entry(STATE_BRIEF, {
+    tier: 'tier0', reason: 'the session state the phase reads: the phase, the active work item, every gate, and what compaction would archive', authority: 'session', required: true,
+  }));
 
   // The phase's own instruction: the skill the dispatch table names.
   const skillFile = phase === 'architectureComplete' && policy?.designReview?.enabled !== true

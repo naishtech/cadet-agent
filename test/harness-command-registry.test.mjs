@@ -56,6 +56,9 @@ function makeProject(stateDoc) {
  * nothing", and an untestable entry would be a hole in the assertion.
  */
 const READ_ONLY_INVOCATIONS = {
+  // The brief is derived: it reads state.json and prints, and a write here would be the summary
+  // editing the document it summarises.
+  'state brief': ['state', 'brief'],
   'state validate': ['state', 'validate'],
   'harness report': ['harness', 'report'],
   'harness status': ['harness', 'status'],
