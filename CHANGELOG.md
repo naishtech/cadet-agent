@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.62.0] — 2026-10-04
+
 ### Changed
 - **A reply that changes the repository carries the changed files.** The Response Contract's
   implementation/review/validation row required "what changed and why, one line per change" and banned
