@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 
 import {
   scanPackages, scanComponents, componentEdges,
-  indexComponents, buildDiagramModel, buildStructureModel, renderNoml, renderNomlSvg,
+  indexComponents, componentStatusMap, buildDiagramModel, buildStructureModel, renderNoml, renderNomlSvg,
   STATUS_COLORS,
 } from '../src/harness/index.mjs';
 
@@ -60,10 +60,12 @@ function makeProject({ withState = true } = {}) {
 }
 
 describe('C# package and component scan', () => {
-  it('discovers asmdef packages and resolves named references', () => {
+  it('discovers asmdef packages, resolves named references, and flags test assemblies', () => {
     const packages = scanPackages(fixtureDir);
-    assert.deepEqual(packages.map((p) => p.id), ['Cadet.Core', 'Cadet.Sample']);
+    assert.deepEqual(packages.map((p) => p.id), ['Cadet.Core', 'Cadet.Sample', 'Cadet.Tests.Core']);
     assert.deepEqual(packages.find((p) => p.id === 'Cadet.Sample').references, ['Cadet.Core']);
+    assert.equal(packages.find((p) => p.id === 'Cadet.Tests.Core').isTest, true);
+    assert.equal(packages.find((p) => p.id === 'Cadet.Core').isTest, false);
   });
 
   it('groups a package into components by namespace, and derives using-edges', () => {
@@ -151,6 +153,38 @@ describe('progress attribution', () => {
     });
     assert.equal(model.components.length, 3);
     assert.ok(model.components.every((c) => c.status === 'not-started'));
+  });
+
+  it('colours a component by all its work, not only the current epic', () => {
+    // Regression from a real project: a component finished in an earlier epic
+    // read red in a later epic's diagram, because colour came from that epic alone.
+    const packages = scanPackages(fixtureDir);
+    const { byFile, componentsByPkg, edgesByPkg } = indexComponents(fixtureDir, packages);
+    const core = packages.find((p) => p.id === 'Cadet.Core');
+    const state = {
+      epics: {
+        'epic-1': { status: 'complete', stories: { 's1.md': 'done' } },
+        'epic-2': { status: 'in-progress', stories: { 's1.md': 'in-progress' } },
+      },
+    };
+    const workItemFiles = new Map([
+      ['epic-1::s1.md', new Set(['Cadet.Core/Combat/CombatService.cs'])],
+      ['epic-2::s1.md', new Set(['Cadet.Core/Inventory/InventoryService.cs'])],
+    ]);
+    const model = buildDiagramModel({
+      pkg: core,
+      epicId: 'epic-2',
+      state,
+      components: componentsByPkg.get('Cadet.Core'),
+      edges: edgesByPkg.get('Cadet.Core'),
+      byFile,
+      workItemFiles,
+      allPackages: packages,
+      componentStatus: componentStatusMap({ state, byFile, workItemFiles }),
+    });
+    const status = Object.fromEntries(model.components.map((c) => [c.id, c.status]));
+    assert.equal(status['Cadet.Core.Inventory'], 'in-progress', "epic-2's own component");
+    assert.equal(status['Cadet.Core.Combat'], 'done', 'finished in epic-1, so green in epic-2 too');
   });
 });
 
@@ -244,6 +278,21 @@ describe('harness diagram (CLI)', () => {
       assert.equal(r.status, 0, r.stderr);
       assert.deepEqual(readdirSync(dir).sort(), before);
       assert.ok(!existsSync(join(dir, '.cadet', 'diagrams')));
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('excludes test assemblies by default, and includes them with --include-tests', () => {
+    const dir = tempDir('cadet-diagram-tests-');
+    try {
+      const base = runCli(['harness', 'diagram', '--target', dir, '--cs-root', fixtureDir, '--out', join(dir, 'a'), '--format', 'json']);
+      assert.equal(base.status, 0, base.stderr);
+      const ids = base.json.packages.map((p) => p.id);
+      assert.ok(ids.includes('Cadet.Core'));
+      assert.ok(!ids.includes('Cadet.Tests.Core'), 'a test assembly is excluded by default');
+
+      const withTests = runCli(['harness', 'diagram', '--target', dir, '--cs-root', fixtureDir, '--out', join(dir, 'b'), '--include-tests', '--format', 'json']);
+      assert.equal(withTests.status, 0, withTests.stderr);
+      assert.ok(withTests.json.packages.map((p) => p.id).includes('Cadet.Tests.Core'));
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

@@ -151,7 +151,7 @@ export {
 
 export {
   DIAGRAM_OUT_DIR, STATUS_COLORS, STATUS_CLASS,
-  collectWorkItemFiles, indexComponents, buildDiagramModel, buildStructureModel,
+  collectWorkItemFiles, indexComponents, componentStatusMap, buildDiagramModel, buildStructureModel,
   renderNoml, renderIndexHtml, renderPackageHtml, writeDiagramFiles, generateDiagrams,
 } from './diagram.mjs';
 

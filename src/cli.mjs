@@ -117,6 +117,7 @@ function showHelp() {
     --out          Output root for the generated diagram tree (harness diagram; default .cadet/diagrams)
     --cs-root      Root of the C# sources to scan (harness diagram; default the target directory)
     --package      Limit the diagram run to one package id (harness diagram)
+    --include-tests  Include Unity test assemblies, which are excluded by default (harness diagram)
     --agents-md    keep|overwrite|merge for an existing AGENTS.md (init/sync)
     --older-than-ms  Age bound, in ms, for records cleanup may delete (harness cleanup; required)
     --keep         always|active|<work-item ids> for what stays in state.json (state compact; required)
@@ -225,6 +226,7 @@ function parseArgs(argv) {
       case '--out': opts.out = value(a); break;
       case '--cs-root': opts.csRoot = value(a); break;
       case '--package': opts.packageId = value(a); break;
+      case '--include-tests': opts.includeTests = true; break;
       case '--write-coverage': opts.writeCoverage = true; break;
       case '--strict-orphans': opts.strictOrphans = true; break;
       case '--dry-run': opts.dryRun = true; break;
@@ -956,6 +958,7 @@ async function cmdHarness(opts) {
         csRoot,
         state: exists ? state : null,
         packageFilter: opts.packageId || null,
+        includeTests: opts.includeTests === true,
       });
     } catch (err) {
       fail(opts, `could not render the diagrams: ${err.message}`, () => 1, { ok: false, code: 'diagram-failed' });

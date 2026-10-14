@@ -16,13 +16,17 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 ### Added
 - **`cadet-agent harness diagram` — UML component diagrams coloured by workflow progress.** It
   renders the C# structure as one component diagram per (package × epic), and colours every
-  component by how far its work has gone: red not started, amber in progress, green done. Packages
+  component by how far its work has gone: red not started, amber in progress, green done. The colour
+  is cumulative across all epics, so a component finished by one epic is green in every diagram, not
+  only the one that finished it. Packages
   come from Unity `.asmdef` assemblies (and their `references`), or top-level folders when a tree has
   none; components are the namespaces inside a package. Progress is read from `state.json` and the
   evidence archive, joined to the files each story's evidence bound — so the diagram is the record,
   and there is no separate map to maintain. Each diagram is scoped to the components the epic
   touched plus their one-hop dependencies, with the remainder reported as an elided count, so a
-  package stays readable however large it grows. Output is a self-contained tree under
+  package stays readable however large it grows. Unity test assemblies are excluded by default —
+  recognised by their TestRunner/nunit references, not their names — and `--include-tests` keeps
+  them. Output is a self-contained tree under
   `.cadet/diagrams/`: a root `index.html`, an `index.html` per package, and a `.noml` (the UML
   source, the portable and tested artifact) plus a `.svg` per diagram.
 

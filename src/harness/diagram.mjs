@@ -125,12 +125,43 @@ function externalOf(pkg, allPackages) {
   return (pkg.references || []).map((id) => ({ id, name: byId.get(id) || id }));
 }
 
-function statusOf(touched) {
-  if (!touched || touched.size === 0) return 'not-started';
-  return [...touched.values()].every((s) => s === 'done') ? 'done' : 'in-progress';
+function statusOf(storyStatuses) {
+  if (!storyStatuses || storyStatuses.size === 0) return 'not-started';
+  return [...storyStatuses.values()].every((s) => s === 'done') ? 'done' : 'in-progress';
 }
 
-function makeModel({ pkg, epicId, epicStatus, components, edges, included, touched, allPackages }) {
+/**
+ * Every component's status, from every story in every epic that touched it.
+ *
+ * Cumulative on purpose: a component that is finished is green. Deriving the
+ * status from only the current epic made a built component read red in a later
+ * epic's diagram — measured on a real project, where one component was green in
+ * one epic and red in the next. The epic still decides what a diagram SHOWS; it
+ * no longer decides the colour.
+ */
+export function componentStatusMap({ state, byFile, workItemFiles }) {
+  const byComponent = new Map();
+  const epics = state?.epics && typeof state.epics === 'object' ? state.epics : {};
+  for (const [epicId, epic] of Object.entries(epics)) {
+    const stories = epic?.stories && typeof epic.stories === 'object' ? epic.stories : {};
+    for (const [storyFile, status] of Object.entries(stories)) {
+      const files = workItemFiles.get(`${epicId}::${storyFile}`);
+      if (!files) continue;
+      for (const file of files) {
+        const owner = byFile.get(toPosix(file));
+        if (!owner) continue;
+        const key = `${owner.packageId}::${owner.componentId}`;
+        if (!byComponent.has(key)) byComponent.set(key, new Map());
+        byComponent.get(key).set(`${epicId}::${storyFile}`, status);
+      }
+    }
+  }
+  const statuses = new Map();
+  for (const [key, stories] of byComponent) statuses.set(key, statusOf(stories));
+  return statuses;
+}
+
+function makeModel({ pkg, epicId, epicStatus, components, edges, included, statusByKey, allPackages }) {
   const inScope = components.filter((c) => included.has(c.id));
   const elided = components.filter((c) => !included.has(c.id));
   return {
@@ -140,7 +171,7 @@ function makeModel({ pkg, epicId, epicStatus, components, edges, included, touch
       id: c.id,
       name: c.name,
       namespace: c.namespace,
-      status: statusOf(touched.get(c.id)),
+      status: statusByKey.get(`${pkg.id}::${c.id}`) || 'not-started',
       files: c.files.map((f) => toPosix(f)),
     })),
     edges: edges.filter((e) => included.has(e.from) && included.has(e.to)),
@@ -155,19 +186,18 @@ function makeModel({ pkg, epicId, epicStatus, components, edges, included, touch
  * Returns a model with no components when the epic touched nothing in the package,
  * which the caller reads as "do not emit a diagram".
  */
-export function buildDiagramModel({ pkg, epicId, state, components, edges, byFile, workItemFiles, allPackages }) {
+export function buildDiagramModel({ pkg, epicId, state, components, edges, byFile, workItemFiles, allPackages, componentStatus = null }) {
   const epic = state?.epics?.[epicId] || null;
   const stories = epic?.stories && typeof epic.stories === 'object' ? epic.stories : {};
 
-  const touched = new Map();
-  for (const [storyFile, status] of Object.entries(stories)) {
+  // Scope is this epic's work: the components its stories touched.
+  const touched = new Set();
+  for (const storyFile of Object.keys(stories)) {
     const files = workItemFiles.get(`${epicId}::${storyFile}`);
     if (!files) continue;
     for (const file of files) {
       const owner = byFile.get(toPosix(file));
-      if (!owner || owner.packageId !== pkg.id) continue;
-      if (!touched.has(owner.componentId)) touched.set(owner.componentId, new Map());
-      touched.get(owner.componentId).set(storyFile, status);
+      if (owner && owner.packageId === pkg.id) touched.add(owner.componentId);
     }
   }
 
@@ -178,9 +208,10 @@ export function buildDiagramModel({ pkg, epicId, state, components, edges, byFil
     if (touched.has(edge.from)) oneHop.add(edge.to);
     if (touched.has(edge.to)) oneHop.add(edge.from);
   }
-  const included = new Set([...touched.keys(), ...oneHop]);
+  const included = new Set([...touched, ...oneHop]);
+  const statusByKey = componentStatus || componentStatusMap({ state, byFile, workItemFiles });
 
-  return makeModel({ pkg, epicId, epicStatus: epic?.status || 'planned', components, edges, included, touched, allPackages });
+  return makeModel({ pkg, epicId, epicStatus: epic?.status || 'planned', components, edges, included, statusByKey, allPackages });
 }
 
 /** Structure-only model: every component shown, every one "not started". */
@@ -193,7 +224,7 @@ export function buildStructureModel({ pkg, components, edges, allPackages }) {
     components,
     edges,
     included,
-    touched: new Map(),
+    statusByKey: new Map(),
     allPackages,
   });
 }
@@ -309,10 +340,16 @@ export function writeDiagramFiles(files) {
  * `summary`. `warning` is non-null when the run could not see any work, so the
  * output says why everything is red instead of implying nothing was built.
  */
-export function generateDiagrams({ rootDir, outDir, csRoot = rootDir, state = null, packageFilter = null }) {
-  const packages = scanPackages(csRoot).filter((p) => !packageFilter || p.id === packageFilter);
+export function generateDiagrams({ rootDir, outDir, csRoot = rootDir, state = null, packageFilter = null, includeTests = false }) {
+  const packages = scanPackages(csRoot)
+    // Test assemblies are excluded by default: they are numerous, each holds a
+    // single namespace, and their one-component diagrams crowd the index. The
+    // selection is by the assembly's TestRunner/nunit references, not its name.
+    .filter((p) => includeTests || !p.isTest)
+    .filter((p) => !packageFilter || p.id === packageFilter);
   const { byFile, componentsByPkg, edgesByPkg } = indexComponents(csRoot, packages);
   const workItemFiles = collectWorkItemFiles(rootDir, state);
+  const componentStatus = componentStatusMap({ state, byFile, workItemFiles });
   const epicIds = state?.epics && typeof state.epics === 'object' ? Object.keys(state.epics).sort() : [];
 
   const files = [];
@@ -331,7 +368,7 @@ export function generateDiagrams({ rootDir, outDir, csRoot = rootDir, state = nu
       warning = warning || 'no work record found (.cadet/state.json has no epics): rendering structure only — every component reads "not started".';
     } else {
       for (const epicId of epicIds) {
-        const model = buildDiagramModel({ pkg, epicId, state, components, edges, byFile, workItemFiles, allPackages: packages });
+        const model = buildDiagramModel({ pkg, epicId, state, components, edges, byFile, workItemFiles, allPackages: packages, componentStatus });
         if (model.components.length > 0) entries.push({ epicId, model });
       }
     }

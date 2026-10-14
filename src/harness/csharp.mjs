@@ -91,12 +91,27 @@ export function scanPackages(rootDir, { exclude = DEFAULT_EXCLUDED_DIRS } = {}) 
     }
     const dir = dirname(asmdefPath);
     const name = typeof json.name === 'string' && json.name ? json.name : basename(dir);
+    const declaredReferences = Array.isArray(json.references)
+      ? json.references.filter((r) => typeof r === 'string')
+      : [];
+    const precompiled = Array.isArray(json.precompiledReferences)
+      ? json.precompiledReferences.filter((r) => typeof r === 'string')
+      : [];
+    const optional = Array.isArray(json.optionalUnityReferences) ? json.optionalUnityReferences : [];
     const pkg = {
       id: toPosix(name),
       name,
       dir,
       asmdefPath,
-      rawReferences: Array.isArray(json.references) ? json.references.filter((r) => typeof r === 'string') : [],
+      // A Unity test assembly, recognised by what it references rather than by
+      // its name. Projects name test assemblies inconsistently, but a test
+      // assembly must reference the TestRunner or nunit to run under the Unity
+      // Test Framework, so that is the reliable signal.
+      isTest: optional.includes('TestAssemblies')
+        || declaredReferences.includes('UnityEngine.TestRunner')
+        || declaredReferences.includes('UnityEditor.TestRunner')
+        || precompiled.includes('nunit.framework.dll'),
+      rawReferences: declaredReferences,
       references: [],
     };
     byDir.set(dir, pkg);
@@ -136,6 +151,7 @@ function fallbackPackages(rootDir, files) {
     name,
     dir: name === '(root)' ? rootDir : join(rootDir, name),
     asmdefPath: null,
+    isTest: false,
     references: [],
   }));
 }

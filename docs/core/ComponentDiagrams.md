@@ -25,15 +25,25 @@ graph, and the diagrams should be read the same way.
 
 ## Progress and colour
 
-A component is coloured by the stories of that epic whose evidence `relevantFiles` land in it:
+A component is coloured by **every** story that touched it, in **any** epic — not only the stories
+of the diagram's own epic. A component finished in an earlier epic is therefore green in a later
+epic's diagram too. The epic decides what a diagram *shows*; it does not decide the colour.
 
 | Colour | Status | Meaning |
 |---|---|---|
-| 🔴 `#E05555` | `not-started` | no story of this epic touched it |
+| 🔴 `#E05555` | `not-started` | no story anywhere touched it |
 | 🟠 `#E8A840` | `in-progress` | some touching stories are `done`, but not all |
 | 🟢 `#4A9A5A` | `done` | every touching story is `done` |
 
 An epic that touches nothing in a package produces no diagram for that package.
+
+## Test assemblies
+
+Unity test assemblies are **excluded by default**. They are numerous, each usually holds a single
+namespace, and their one-component diagrams crowd the index. An assembly is recognised as a test
+assembly by what it references — `UnityEngine.TestRunner`, `UnityEditor.TestRunner`, or
+`nunit.framework.dll` in `precompiledReferences` — not by its name, because projects name test
+assemblies inconsistently. Pass `--include-tests` to keep them.
 
 ## Scope
 
@@ -51,6 +61,7 @@ whole package in. This is what keeps a package with many namespaces to a small, 
 ```bash
 cadet-agent harness diagram                        # write the default tree
 cadet-agent harness diagram --package Cadet.Core   # restrict to one package id
+cadet-agent harness diagram --include-tests        # keep Unity test assemblies
 cadet-agent harness diagram --cs-root src/Game     # scan a subtree instead of the target root
 cadet-agent harness diagram --out ./docs/diagrams  # write somewhere else
 cadet-agent harness diagram --format json          # the model, for CI and tests

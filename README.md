@@ -275,15 +275,17 @@ See `docs/guidance/HarnessTroubleshooting.md` for stale evidence, budget exhaust
 
 The picture is the record, not a separate map to maintain. Progress is read from `.cadet/state.json` and the evidence archive, joined to the files each story's evidence bound (`relevantFiles`).
 
-- **Packages** come from Unity `.asmdef` assembly definitions and their `references`, falling back to top-level folders when a tree has none.
+- **Packages** come from Unity `.asmdef` assembly definitions and their `references`, falling back to top-level folders when a tree has none. Unity test assemblies are left out by default; pass `--include-tests` to keep them.
 - **Components** are the namespaces inside a package.
 - **Scope** is the components the epic touched, plus their one-hop dependencies; anything else is reported as an elided count, so a package stays readable however large it grows.
+- **Colour is cumulative.** A component shows its progress across *all* epics, so a component finished by one epic is green in every diagram, not only the one that finished it.
 
 The generator writes a self-contained tree under `.cadet/diagrams/`: an `index.html` at the root, an `index.html` per package, and a `.noml` (the UML source — the portable, testable artifact) plus a `.svg` per (package × epic). Open `.cadet/diagrams/index.html` to navigate. Rendering is done by [nomnoml](https://github.com/skanaar/nomnoml) (MIT), the CLI's only runtime dependency; no browser, Java, or CDN is involved.
 
 ```bash
 cadet-agent harness diagram                       # default output: .cadet/diagrams
 cadet-agent harness diagram --package Cadet.Core  # one package only
+cadet-agent harness diagram --include-tests       # keep Unity test assemblies
 cadet-agent harness diagram --out ./docs/diagrams # somewhere else
 ```
 
