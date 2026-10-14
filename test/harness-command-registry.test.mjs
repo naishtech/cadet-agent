@@ -184,6 +184,7 @@ describe('global --dry-run', () => {
     'harness confirm': ['harness', 'confirm', '--gate', 'testsPassed'],
     'harness verify': ['harness', 'verify', '--gate', 'testsPassed'],
     'harness verify-acs': ['harness', 'verify-acs'],
+    'harness diagram': ['harness', 'diagram'],
   };
 
   for (const [key, args] of Object.entries(MUTATING_INVOCATIONS)) {

@@ -13,6 +13,25 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Added
+- **`cadet-agent harness diagram` — UML component diagrams coloured by workflow progress.** It
+  renders the C# structure as one component diagram per (package × epic), and colours every
+  component by how far its work has gone: red not started, amber in progress, green done. Packages
+  come from Unity `.asmdef` assemblies (and their `references`), or top-level folders when a tree has
+  none; components are the namespaces inside a package. Progress is read from `state.json` and the
+  evidence archive, joined to the files each story's evidence bound — so the diagram is the record,
+  and there is no separate map to maintain. Each diagram is scoped to the components the epic
+  touched plus their one-hop dependencies, with the remainder reported as an elided count, so a
+  package stays readable however large it grows. Output is a self-contained tree under
+  `.cadet/diagrams/`: a root `index.html`, an `index.html` per package, and a `.noml` (the UML
+  source, the portable and tested artifact) plus a `.svg` per diagram.
+
+### Changed
+- **`src/harness/` gains its first runtime dependency.** `nomnoml` (MIT, one transitive dependency,
+  `graphre`) renders the diagrams to SVG with no browser or DOM. The harness was dependency-free
+  before this change; the `.noml` artifact it emits is genuine UML rather than a flowchart, which is
+  what the dependency buys. CI now runs `npm ci` before `npm test`.
+
 ## [0.63.0] — 2026-10-04
 
 ### Added

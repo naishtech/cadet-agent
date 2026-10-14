@@ -210,6 +210,15 @@ export const COMMANDS = {
     mutates: false,
     summary: 'Report available CLI/Unity/MCP/hook/token/cost telemetry.',
   },
+  'harness diagram': {
+    mutates: true,
+    summary: 'Render UML component diagrams per package, coloured by workflow progress.',
+    // The tree is fully generated: one .noml + .svg per (package × epic), plus an
+    // index.html per package and at the root. `--out` may redirect it, but the
+    // default is the declared path, which is what the guard keys on.
+    writes: ['.cadet/diagrams/**'],
+    unattended: true,
+  },
   'harness cleanup': {
     mutates: true,
     summary: 'Apply the retention policy to .cadet/runs/, deleting run records.',

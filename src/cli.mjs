@@ -31,6 +31,7 @@ import {
   STATE_VERSION, sealedEvidence, recordEvidence, appendEvidence, sealWorkItem, toStateV4,
   isHistoryExternal, HISTORY_ENTRIES_KEPT, resetGatesForNewWorkItem,
   buildStateBrief, renderStateBrief, writeStateBrief, CONTEXT_BRIEF_FILE,
+  generateDiagrams, writeDiagramFiles, DIAGRAM_OUT_DIR,
 } from './harness/index.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -87,6 +88,7 @@ function showHelp() {
     cadet-agent harness cleanup     Apply the retention policy to .cadet/runs/
     cadet-agent harness capabilities  Report available CLI/Unity/MCP/hook/token/cost telemetry
     cadet-agent harness status      Print the one-line framework health line (ok, or the problem)
+    cadet-agent harness diagram     Render UML component diagrams per package, coloured by progress
 
   Options:
     --target, -t  Target directory (default: current working directory)
@@ -112,6 +114,9 @@ function showHelp() {
     --relative-to  Directory the emitted links are relative to (harness changes; default .cadet/reports)
     --include-cadet  Keep .cadet/ bookkeeping among the listed files (harness changes)
     --plans-dir    Directory holding the planning artifacts (harness reconcile; default .cadet/agent/project-plans)
+    --out          Output root for the generated diagram tree (harness diagram; default .cadet/diagrams)
+    --cs-root      Root of the C# sources to scan (harness diagram; default the target directory)
+    --package      Limit the diagram run to one package id (harness diagram)
     --agents-md    keep|overwrite|merge for an existing AGENTS.md (init/sync)
     --older-than-ms  Age bound, in ms, for records cleanup may delete (harness cleanup; required)
     --keep         always|active|<work-item ids> for what stays in state.json (state compact; required)
@@ -215,6 +220,11 @@ function parseArgs(argv) {
       case '--relative-to': opts.relativeTo = value(a); break;
       case '--include-cadet': opts.includeCadet = true; break;
       case '--plans-dir': opts.plansDir = value(a); break;
+      // harness diagram: where the tree lands, which sources to scan, and an
+      // optional single-package filter.
+      case '--out': opts.out = value(a); break;
+      case '--cs-root': opts.csRoot = value(a); break;
+      case '--package': opts.packageId = value(a); break;
       case '--write-coverage': opts.writeCoverage = true; break;
       case '--strict-orphans': opts.strictOrphans = true; break;
       case '--dry-run': opts.dryRun = true; break;
@@ -923,6 +933,48 @@ async function cmdHarness(opts) {
         const bound = c.requiresForUnattended.length ? ` [unattended requires ${c.requiresForUnattended.join(', ')}]` : '';
         console.log(`    ${c.mutates ? 'WRITES ' : 'read   '} ${c.command}${bound}`);
       }
+    }
+    return;
+  }
+
+  if (sub === 'diagram') {
+    // UML component diagrams, one per (package × epic), coloured by progress.
+    //
+    // The work record is READ, never required: on a repository with no state the
+    // generator still draws the structure and says why every component is red,
+    // which is the same "report, do not fail silently" posture `state validate`
+    // takes for a missing document. The UML source and the SVG both come from one
+    // model, so they cannot disagree.
+    const { exists, state } = readState(opts.targetDir);
+    const csRoot = resolve(opts.targetDir, opts.csRoot || '.');
+    const outDir = resolve(opts.targetDir, opts.out || DIAGRAM_OUT_DIR);
+    let result;
+    try {
+      result = generateDiagrams({
+        rootDir: opts.targetDir,
+        outDir,
+        csRoot,
+        state: exists ? state : null,
+        packageFilter: opts.packageId || null,
+      });
+    } catch (err) {
+      fail(opts, `could not render the diagrams: ${err.message}`, () => 1, { ok: false, code: 'diagram-failed' });
+    }
+    writeDiagramFiles(result.files);
+    const { summary } = result;
+    const shownOut = relative(opts.targetDir, outDir).replace(/\\/g, '/') || '.';
+    if (opts.format === 'json') {
+      emit(opts, '', { ok: true, ...summary, outDir: shownOut });
+    } else {
+      console.log(`✅ Component diagrams written to ${shownOut} (${summary.packages.length} package(s), ${summary.diagrams} diagram(s)).`);
+      for (const pkg of summary.packages) {
+        for (const d of pkg.diagrams) {
+          const elided = d.elided ? `, ${d.elided} elided` : '';
+          console.log(`   ${pkg.name} / ${d.epic}: ${d.counts.done} done, ${d.counts['in-progress']} in progress, ${d.counts['not-started']} not started${elided}`);
+        }
+      }
+      if (summary.warning) console.log(`   ⚠️  ${summary.warning}`);
+      console.log(`   Open: ${join(shownOut, 'index.html')}`);
     }
     return;
   }

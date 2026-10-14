@@ -144,3 +144,15 @@ export {
 } from './commands.mjs';
 
 export { computeStatus, STATUS_OK_LINE, STATUS_PREFIX } from './status.mjs';
+
+export {
+  DEFAULT_EXCLUDED_DIRS, scanPackages, scanComponents, componentEdges,
+} from './csharp.mjs';
+
+export {
+  DIAGRAM_OUT_DIR, STATUS_COLORS, STATUS_CLASS,
+  collectWorkItemFiles, indexComponents, buildDiagramModel, buildStructureModel,
+  renderNoml, renderIndexHtml, renderPackageHtml, writeDiagramFiles, generateDiagrams,
+} from './diagram.mjs';
+
+export { renderSvg as renderNomlSvg, nomnomlVersion } from './noml.mjs';
