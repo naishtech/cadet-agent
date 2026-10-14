@@ -219,6 +219,14 @@ export const COMMANDS = {
     writes: ['.cadet/diagrams/**'],
     unattended: true,
   },
+  'harness verify-diagrams': {
+    mutates: false,
+    summary: 'Check the committed diagram tree against a freshly computed model.',
+    // Read-only by construction: it regenerates the model in memory and compares
+    // it with the files on disk. It does not write the tree — a check that
+    // repaired the thing it checks would prove nothing — and `harness reconcile`
+    // calls the same function, so the two cannot disagree.
+  },
   'harness cleanup': {
     mutates: true,
     summary: 'Apply the retention policy to .cadet/runs/, deleting run records.',

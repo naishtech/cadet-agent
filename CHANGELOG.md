@@ -14,6 +14,10 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 ## [Unreleased]
 
 ### Added
+- **`cadet-agent harness verify-diagrams` — is the committed diagram tree still current?** Read-only:
+  it recomputes the model in memory and compares it with the files on disk, reporting what is missing,
+  changed or left over, and exits 1 on any drift. It deliberately does not regenerate, because a check
+  that repaired the thing it checks would always pass. This is the command to put in CI.
 - **`cadet-agent harness diagram` — UML component diagrams coloured by workflow progress.** It
   renders the C# structure as one component diagram per (package × epic), and colours every
   component by how far its work has gone: red not started, amber in progress, green done. The colour
@@ -33,6 +37,12 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
   a `.noml` (the UML source, the portable and tested artifact) plus a `.svg` per diagram.
 
 ### Changed
+- **The diagrams are part of story closure, and a stale tree blocks it.** `harness reconcile` reports
+  a blocking `diagram-drift` finding when the committed tree no longer matches the code and the work
+  record — which is exactly what `designArtifactSyncConfirmed` refuses closure on — and the CodeReview
+  skill regenerates the tree at the story boundary, after the statuses that colour it are written. The
+  tree is committed, not git-ignored. Opt-in by presence: a repository that has never generated one has
+  no manifest and is not checked.
 - **`src/harness/` gains its first runtime dependency.** `nomnoml` (MIT, one transitive dependency,
   `graphre`) renders the diagrams to SVG with no browser or DOM. The harness was dependency-free
   before this change; the `.noml` artifact it emits is genuine UML rather than a flowchart, which is

@@ -9,7 +9,7 @@ You are executing the Cadet **Reconciliation** skill. This skill is the primary 
 
 ## Gate Check
 
-No phase gate applies: this skill reports, and never advances `currentPhase` or flips a gate. Its gate relationships are supplying the basis for `designArtifactSyncConfirmed` (the `validation → closed` gate, "Requirements, design, plan, epics mutually consistent"), which nothing else in the framework checks, and stating whether `humanAcceptanceConfirmed` still holds. When `.cadet/harness.json` sets `humanAcceptance.enabled`, read the acceptance record at closure: an acceptance whose witness or limitations is empty, or whose bound files changed since it was recorded, does not hold, and the report says so rather than passing the gate on the strength of the `true` flag alone. Never write the acceptance yourself — it is a person's record.
+No phase gate applies: this skill reports, and never advances `currentPhase` or flips a gate. Its gate relationships are supplying the basis for `designArtifactSyncConfirmed` (the `validation → closed` gate, "Requirements, design, plan, epics mutually consistent"), which nothing else in the framework checks, and stating whether `humanAcceptanceConfirmed` still holds. **A `diagram-drift` finding is blocking for that same gate**: the component diagrams are derived from the code and from `state.json`, so a tree that no longer matches is the chain disagreeing with itself one step further down, and `designArtifactSyncConfirmed` is supported only when the run reports no unexcused blocking finding. When `.cadet/harness.json` sets `humanAcceptance.enabled`, read the acceptance record at closure: an acceptance whose witness or limitations is empty, or whose bound files changed since it was recorded, does not hold, and the report says so rather than passing the gate on the strength of the `true` flag alone. Never write the acceptance yourself — it is a person's record.
 
 Apply `.cadet/agent/core/RepositoryRoleBoundary.md` before story or gate work. If this is the framework source repo, offer to reconcile the in-flight contribution instead.
 
@@ -23,7 +23,7 @@ Answer one question: **does the planning chain still agree with itself?** Requir
 
 Reconciliation is deliberately split in two, and the split is the point:
 
-- **The mechanical pass** (`cadet-agent harness reconcile`) proves what can be proven from the artifacts: unresolved links, state-vs-markdown status disagreements, stories orphaned on disk or tracked but missing, an epic with no stories, an expired deferral, a story marked done with no evidence behind it, and a required document that is missing. These are measurements.
+- **The mechanical pass** (`cadet-agent harness reconcile`) proves what can be proven from the artifacts: unresolved links, state-vs-markdown status disagreements, stories orphaned on disk or tracked but missing, an epic with no stories, an expired deferral, a story marked done with no evidence behind it, a required document that is missing, and a generated diagram tree that no longer matches the code and the record. These are measurements.
 - **The semantic pass** is yours, and it is the reason this skill exists: contradictions between documents, drifted intent, a design decision quietly abandoned. These are judgements, and they must be presented as judgements.
 
 Never blur the two. A judgement dressed as a measurement is worse than no finding at all, because a reader cannot tell which rows to check.

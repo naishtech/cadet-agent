@@ -154,7 +154,7 @@ export {
   collectWorkItemFiles, indexComponents, componentWorkMap, statusesFromWork, componentStatusMap,
   componentSlugs, buildDiagramModel, buildStructureModel,
   renderNoml, renderIndexHtml, renderPackageHtml, renderComponentHtml,
-  writeDiagramFiles, syncDiagramTree, generateDiagrams,
+  writeDiagramFiles, syncDiagramTree, generateDiagrams, diagramDrift,
 } from './diagram.mjs';
 
 export { renderSvg as renderNomlSvg, nomnomlVersion } from './noml.mjs';

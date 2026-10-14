@@ -65,6 +65,7 @@ cadet-agent harness diagram --include-tests        # keep Unity test assemblies
 cadet-agent harness diagram --cs-root src/Game     # scan a subtree instead of the target root
 cadet-agent harness diagram --out ./docs/diagrams  # write somewhere else
 cadet-agent harness diagram --format json          # the model, for CI and tests
+cadet-agent harness verify-diagrams                # check the committed tree is current (read-only)
 ```
 
 The command is **mutating** and honours `--dry-run`. Its declared writes are `.cadet/diagrams/**`.
@@ -85,8 +86,35 @@ The command is **mutating** and honours `--dry-run`. Its declared writes are `.c
 The HTML is self-contained (inline SVG and CSS), so a double-click renders it with no sibling assets
 and no network. A re-run **prunes** the files a previous run wrote and this one did not — for example
 after `--include-tests` is dropped — using the manifest, so it deletes its own output and nothing else,
-even when `--out` points into a shared directory. Consumers should add `.cadet/diagrams/` to
-`.gitignore`.
+even when `--out` points into a shared directory.
+
+**Commit the tree.** It is generated, but it is reviewed: it belongs in version control next to the
+change that moved it, which is what makes "stale" a question with an answer. Do not add
+`.cadet/diagrams/` to `.gitignore`.
+
+## Keeping it current
+
+The tree is derived from the code and from `state.json`, so it moves when either does: a new
+namespace, a changed `using`, a package split, a story turning `done`. It is part of closure, not a
+side tool.
+
+- **Regenerate at story closure.** The CodeReview skill runs `cadet-agent harness diagram` after the
+  story and epic records are updated — their statuses colour the diagrams — and commits the tree with
+  the change.
+- **Check it with `cadet-agent harness verify-diagrams`.** Read-only: it recomputes the model in
+  memory and compares it with the committed files, reporting `missing`, `changed` and `extra`, and
+  exits 1 on any drift. It deliberately does not regenerate, because a check that repaired the thing
+  it checks would always pass. This is the command to put in CI.
+- **Closure refuses a stale tree.** `cadet-agent harness reconcile` reports a **blocking**
+  `diagram-drift` finding when the tree no longer matches, and `designArtifactSyncConfirmed` — the
+  `validation → closed` gate — is supported only when the run reports no blocking finding.
+- **Opt-in by presence.** A repository that has never generated the tree has no manifest and is not
+  checked, so adopting the framework changes nothing until diagrams exist.
+
+The comparison is by bytes, which holds only because the output is deterministic: our `.noml` and
+pages, nomnoml pinned by `package-lock.json`, posix paths, and relative links, so no absolute path or
+timestamp reaches the tree. Run `npm ci` rather than `npm install`, or a different nomnoml patch
+release would legitimately report as drift.
 
 ## Drill-down
 

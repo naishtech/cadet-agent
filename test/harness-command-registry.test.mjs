@@ -63,6 +63,9 @@ const READ_ONLY_INVOCATIONS = {
   'harness report': ['harness', 'report'],
   'harness status': ['harness', 'status'],
   'harness capabilities': ['harness', 'capabilities'],
+  // The diagram check regenerates the model in memory and compares it with the
+  // committed tree. A write here would be the check repairing the thing it checks.
+  'harness verify-diagrams': ['harness', 'verify-diagrams'],
   'harness matrix-check': ['harness', 'matrix-check'],
   'harness changes': ['harness', 'changes'],
   'harness reconcile': ['harness', 'reconcile'],

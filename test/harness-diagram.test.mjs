@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import {
   scanPackages, scanComponents, componentEdges,
   indexComponents, componentStatusMap, buildDiagramModel, buildStructureModel, renderNoml, renderNomlSvg,
-  STATUS_COLORS,
+  diagramDrift, STATUS_COLORS,
 } from '../src/harness/index.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -347,6 +347,60 @@ describe('harness diagram (CLI)', () => {
       assert.ok(!page.includes('<strong>the</strong>'), 'the word "record" in prose is not a declaration');
       assert.ok(page.includes('epic-1-combat'), 'the work that touched it');
       assert.ok(page.includes('Cadet.Core.Inventory.html'), 'a depends-on link to a sibling');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('reports clean right after generation, then names each kind of drift', () => {
+    const dir = makeProject();
+    try {
+      assert.equal(runCli(['harness', 'diagram', '--target', dir, '--format', 'json']).status, 0);
+      const outDir = join(dir, '.cadet', 'diagrams');
+      const victim = join(outDir, 'Cadet.Core', 'components', 'Cadet.Core.Combat.html');
+      const original = readFileSync(victim, 'utf-8');
+
+      assert.equal(diagramDrift({ rootDir: dir, outDir }).ok, true, 'a fresh tree is clean');
+
+      rmSync(victim);
+      assert.deepEqual(diagramDrift({ rootDir: dir, outDir }).missing, ['Cadet.Core/components/Cadet.Core.Combat.html']);
+
+      writeFileSync(victim, 'not what we generated');
+      assert.deepEqual(diagramDrift({ rootDir: dir, outDir }).changed, ['Cadet.Core/components/Cadet.Core.Combat.html']);
+      writeFileSync(victim, original);
+
+      const manifestPath = join(outDir, '.diagrams-manifest.json');
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+      manifest.files.push('Cadet.Core/orphan.html');
+      writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+      assert.deepEqual(diagramDrift({ rootDir: dir, outDir }).extra, ['Cadet.Core/orphan.html']);
+      assert.equal(diagramDrift({ rootDir: dir, outDir }).ok, false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('is not checked at all when no tree was ever generated', () => {
+    const dir = makeProject();
+    try {
+      const drift = diagramDrift({ rootDir: dir, outDir: join(dir, '.cadet', 'diagrams') });
+      assert.equal(drift.available, false);
+      assert.equal(drift.ok, true, 'absence is not drift: the check is opt-in by presence');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('verify-diagrams exits 0 when current and 1 when the model has moved', () => {
+    const dir = makeProject();
+    try {
+      assert.equal(runCli(['harness', 'diagram', '--target', dir, '--format', 'json']).status, 0);
+
+      const clean = runCli(['harness', 'verify-diagrams', '--target', dir, '--format', 'json']);
+      assert.equal(clean.status, 0, clean.stderr);
+      assert.equal(clean.json.ok, true);
+
+      // A new namespace is a new component, so the model moves and the tree is stale.
+      writeFileSync(join(dir, 'Cadet.Core', 'Combat', 'Extra.cs'),
+        'namespace Cadet.Core.Combat.Extra { public class Extra { } }\n');
+      const stale = runCli(['harness', 'verify-diagrams', '--target', dir, '--format', 'json']);
+      assert.equal(stale.status, 1, 'a stale tree must fail the command');
+      assert.equal(stale.json.ok, false);
+      assert.ok(stale.json.missing.length + stale.json.changed.length > 0);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

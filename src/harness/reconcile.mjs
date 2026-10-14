@@ -56,6 +56,7 @@ import { basename, dirname, isAbsolute, join, relative } from 'node:path';
 
 import { PHASES } from './policy.mjs';
 import { activeExceptionEntries } from './state.mjs';
+import { diagramDrift, DIAGRAM_OUT_DIR } from './diagram.mjs';
 import {
   collectWorkItems,
   parseReachabilityDeclaration,
@@ -659,7 +660,33 @@ export function reconcileArtifacts(targetDir, {
     }
   }
 
-  // ── 4. Sort, number, and summarise ────────────────────────────────────────
+  // ── 4. The generated diagram tree ─────────────────────────────────────────
+  //
+  // The diagrams are DERIVED — from the code and from `state.json` — so a tree
+  // that no longer matches is a projection of the record that has stopped
+  // agreeing with the record: exactly the class of inconsistency this module
+  // exists to find, one step further down the chain.
+  //
+  // BLOCKING, not a warning. `designArtifactSyncConfirmed` is supported only when
+  // the run reports no unexcused blocking finding, so a warning here would report
+  // the drift and gate nothing.
+  //
+  // Opt-in by PRESENCE: a repository that has never generated the tree has no
+  // manifest and is not checked, so adopting this release changes nothing until
+  // diagrams are actually produced.
+  const drift = diagramDrift({ rootDir: targetDir, state });
+  if (drift.available && !drift.ok) {
+    const counts = [];
+    if (drift.missing.length) counts.push(`${drift.missing.length} missing`);
+    if (drift.changed.length) counts.push(`${drift.changed.length} changed`);
+    if (drift.extra.length) counts.push(`${drift.extra.length} extra`);
+    add('diagram-drift', 'blocking', 'diagrams', `${toPosix(DIAGRAM_OUT_DIR)}/`,
+      `the committed diagram tree no longer matches the code and the work record (${counts.join(', ')} file(s)). `
+      + 'Run `cadet-agent harness diagram` and commit the result, so the diagrams travel with the change that moved them.',
+      [...drift.missing, ...drift.changed, ...drift.extra].slice(0, 3).join(', ') || null);
+  }
+
+  // ── 5. Sort, number, and summarise ────────────────────────────────────────
   findings.sort((a, b) => {
     const s = (SEVERITY_RANK[a.severity] ?? 9) - (SEVERITY_RANK[b.severity] ?? 9);
     if (s !== 0) return s;

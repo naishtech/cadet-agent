@@ -13,9 +13,10 @@
  */
 
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, renameSync, unlinkSync, rmdirSync, existsSync } from 'node:fs';
-import { join, dirname, relative } from 'node:path';
+import { join, dirname, relative, resolve } from 'node:path';
 import { scanPackages, scanComponents, componentEdges, toPosix } from './csharp.mjs';
 import { renderSvg } from './noml.mjs';
+import { readState } from './state.mjs';
 
 /** Where the generated tree lands, relative to the target repository. */
 export const DIAGRAM_OUT_DIR = '.cadet/diagrams';
@@ -664,4 +665,71 @@ export function generateDiagrams({ rootDir, outDir, csRoot = rootDir, state = nu
     warning,
   };
   return { files, summary };
+}
+
+/**
+ * Compare the tree on disk with a freshly computed model.
+ *
+ * Read-only: it regenerates in memory and reads what is committed. Both
+ * `harness verify-diagrams` and `harness reconcile` call it, so the standalone
+ * check and the closure finding cannot disagree about the same tree.
+ *
+ * Opt-in by PRESENCE: a repository that has never generated the tree has no
+ * manifest, is not checked, and sees reconcile exactly as it was.
+ *
+ * The comparison is by bytes. That is sound only because the tree is
+ * deterministic — our `.noml` and pages, nomnoml pinned by the lockfile, posix
+ * paths, and relative links, so no absolute path or timestamp reaches the
+ * output. A nomnoml bump that changes the SVG therefore reads as drift, which is
+ * honest: the committed artifact really has changed.
+ */
+export function diagramDrift({ rootDir, outDir = DIAGRAM_OUT_DIR, csRoot = rootDir, state = null, includeTests = false, packageFilter = null }) {
+  const outDirAbs = resolve(rootDir, outDir);
+  const manifestPath = join(outDirAbs, DIAGRAM_MANIFEST);
+  if (!existsSync(manifestPath)) {
+    return { available: false, ok: true, reason: 'no diagram tree was generated', missing: [], changed: [], extra: [], expected: 0, recorded: 0 };
+  }
+
+  // Read the record when the caller did not supply one. Comparing against a
+  // structure-only model would report every work-coloured tree as drifted, and a
+  // false verdict here would stop a correct project at closure.
+  const doc = state ?? readState(rootDir).state ?? null;
+  const { files } = generateDiagrams({ rootDir, outDir: outDirAbs, csRoot, state: doc, includeTests, packageFilter });
+  const expected = new Map(files.map((file) => [toPosix(relative(outDirAbs, file.path)), file.content]));
+
+  const missing = [];
+  const changed = [];
+  for (const [rel, content] of expected) {
+    let onDisk;
+    try {
+      onDisk = readFileSync(join(outDirAbs, rel), 'utf-8');
+    } catch {
+      missing.push(rel);
+      continue;
+    }
+    if (onDisk !== content) changed.push(rel);
+  }
+
+  let recorded = [];
+  try {
+    const parsed = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+    if (Array.isArray(parsed?.files)) recorded = parsed.files;
+  } catch {
+    // An unreadable manifest is itself drift; it is reported as `changed` below.
+  }
+  const extra = recorded.filter((rel) => !expected.has(rel));
+
+  missing.sort();
+  changed.sort();
+  extra.sort();
+  return {
+    available: true,
+    ok: missing.length === 0 && changed.length === 0 && extra.length === 0,
+    reason: null,
+    missing,
+    changed,
+    extra,
+    expected: expected.size,
+    recorded: recorded.length,
+  };
 }

@@ -249,6 +249,7 @@ cadet-agent harness cleanup --older-than-ms <n>  # apply the retention policy (b
 cadet-agent harness capabilities                 # available CLI/Unity/MCP/hook/token/cost telemetry
 cadet-agent harness capabilities --verify-host   # probe the configured interception, per action
 cadet-agent harness diagram                      # render UML component diagrams per package, coloured by progress
+cadet-agent harness verify-diagrams              # check the committed diagram tree is current (read-only)
 ```
 
 Every command supports `--format human|json` and exits nonzero for invalid state, failed verification, budget exhaustion, stale evidence, or safety rejection.
@@ -288,7 +289,10 @@ cadet-agent harness diagram                       # default output: .cadet/diagr
 cadet-agent harness diagram --package Cadet.Core  # one package only
 cadet-agent harness diagram --include-tests       # keep Unity test assemblies
 cadet-agent harness diagram --out ./docs/diagrams # somewhere else
+cadet-agent harness verify-diagrams               # is the committed tree still current?
 ```
+
+The tree is **committed** and is part of closure: the CodeReview skill regenerates it once the story and epic records are updated, and `harness reconcile` reports a blocking `diagram-drift` finding when it no longer matches — which is what `designArtifactSyncConfirmed` refuses closure on. `harness verify-diagrams` is the read-only check for CI.
 
 ## Examples
 

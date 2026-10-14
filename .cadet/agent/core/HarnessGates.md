@@ -67,7 +67,13 @@ Hard gates are structurally enforced checkpoints tracked in `.cadet/state.json â
     </gate>
   </transition>
   <transition from="validation" to="closed">
-    <gate id="designArtifactSyncConfirmed">Requirements, design, plan, epics mutually consistent.</gate>
+    <gate id="designArtifactSyncConfirmed">
+      Requirements, design, plan, epics mutually consistent â€” and the generated artifacts derived from them still agree. Backed by
+      `cadet-agent harness reconcile`, including its `diagram-drift` finding: the component diagrams under `.cadet/diagrams/`
+      are derived from the code and from `state.json`, so a tree that no longer matches either is a blocking inconsistency,
+      fixed by `cadet-agent harness diagram` and committed with the change that moved it. A repository that has never
+      generated a tree has no manifest and is not checked.
+    </gate>
     <gate id="humanAcceptanceConfirmed">
       A person accepted the delivered work. Human-owned: no command and no reviewer's record can
       stand in for them, so `harness verify` refuses this gate outright.

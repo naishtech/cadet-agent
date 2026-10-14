@@ -31,7 +31,7 @@ import {
   STATE_VERSION, sealedEvidence, recordEvidence, appendEvidence, sealWorkItem, toStateV4,
   isHistoryExternal, HISTORY_ENTRIES_KEPT, resetGatesForNewWorkItem,
   buildStateBrief, renderStateBrief, writeStateBrief, CONTEXT_BRIEF_FILE,
-  generateDiagrams, syncDiagramTree, DIAGRAM_OUT_DIR,
+  generateDiagrams, syncDiagramTree, diagramDrift, DIAGRAM_OUT_DIR,
 } from './harness/index.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -89,6 +89,7 @@ function showHelp() {
     cadet-agent harness capabilities  Report available CLI/Unity/MCP/hook/token/cost telemetry
     cadet-agent harness status      Print the one-line framework health line (ok, or the problem)
     cadet-agent harness diagram     Render UML component diagrams per package, coloured by progress
+    cadet-agent harness verify-diagrams  Check the committed diagram tree is current (read-only)
 
   Options:
     --target, -t  Target directory (default: current working directory)
@@ -114,10 +115,10 @@ function showHelp() {
     --relative-to  Directory the emitted links are relative to (harness changes; default .cadet/reports)
     --include-cadet  Keep .cadet/ bookkeeping among the listed files (harness changes)
     --plans-dir    Directory holding the planning artifacts (harness reconcile; default .cadet/agent/project-plans)
-    --out          Output root for the generated diagram tree (harness diagram; default .cadet/diagrams)
-    --cs-root      Root of the C# sources to scan (harness diagram; default the target directory)
-    --package      Limit the diagram run to one package id (harness diagram)
-    --include-tests  Include Unity test assemblies, which are excluded by default (harness diagram)
+    --out          Output root for the generated diagram tree (harness diagram|verify-diagrams; default .cadet/diagrams)
+    --cs-root      Root of the C# sources to scan (harness diagram|verify-diagrams; default the target directory)
+    --package      Limit the diagram run to one package id (harness diagram|verify-diagrams)
+    --include-tests  Include Unity test assemblies, which are excluded by default (harness diagram|verify-diagrams)
     --agents-md    keep|overwrite|merge for an existing AGENTS.md (init/sync)
     --older-than-ms  Age bound, in ms, for records cleanup may delete (harness cleanup; required)
     --keep         always|active|<work-item ids> for what stays in state.json (state compact; required)
@@ -980,6 +981,50 @@ async function cmdHarness(opts) {
       if (summary.warning) console.log(`   ⚠️  ${summary.warning}`);
       console.log(`   Open: ${join(shownOut, 'index.html')}`);
     }
+    return;
+  }
+
+  if (sub === 'verify-diagrams') {
+    // Read-only: does the committed tree still match the code and the record?
+    //
+    // It shares one function with `harness reconcile`, so this command and the
+    // closure finding cannot disagree about the same tree — and it deliberately
+    // does not regenerate, because a check that repaired the thing it checks
+    // would always pass.
+    const { exists, state } = readState(opts.targetDir);
+    const csRoot = resolve(opts.targetDir, opts.csRoot || '.');
+    const outDir = resolve(opts.targetDir, opts.out || DIAGRAM_OUT_DIR);
+    const drift = diagramDrift({
+      rootDir: opts.targetDir,
+      outDir,
+      csRoot,
+      state: exists ? state : null,
+      packageFilter: opts.packageId || null,
+      includeTests: opts.includeTests === true,
+    });
+    const shownOut = relative(opts.targetDir, outDir).replace(/\\/g, '/') || '.';
+    if (!drift.available) {
+      emit(opts, `ℹ️  No diagram tree at ${shownOut} — nothing to verify.`, { ok: true, available: false, reason: drift.reason, outDir: shownOut });
+      return;
+    }
+    if (opts.format === 'json') {
+      emit(opts, '', {
+        ok: drift.ok,
+        available: true,
+        outDir: shownOut,
+        expected: drift.expected,
+        missing: drift.missing,
+        changed: drift.changed,
+        extra: drift.extra,
+      });
+    } else if (drift.ok) {
+      console.log(`✅ Diagrams are current: ${drift.expected} file(s) match the code and the work record.`);
+    } else {
+      console.error(`❌ Diagrams are stale: ${drift.missing.length} missing, ${drift.changed.length} changed, ${drift.extra.length} extra file(s).`);
+      for (const file of [...drift.missing, ...drift.changed, ...drift.extra].slice(0, 10)) console.error(`   ${file}`);
+      console.error('   Run "cadet-agent harness diagram" and commit the result.');
+    }
+    if (!drift.ok) process.exit(1);
     return;
   }
 
