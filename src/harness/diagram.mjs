@@ -12,13 +12,16 @@
  * hand-maintained map.
  */
 
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, renameSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, renameSync, unlinkSync, rmdirSync, existsSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { scanPackages, scanComponents, componentEdges, toPosix } from './csharp.mjs';
 import { renderSvg } from './noml.mjs';
 
 /** Where the generated tree lands, relative to the target repository. */
 export const DIAGRAM_OUT_DIR = '.cadet/diagrams';
+
+/** Records the files a run wrote, so the next run can prune only its own output. */
+export const DIAGRAM_MANIFEST = '.diagrams-manifest.json';
 
 /** The three progress states and their colours, as specified. */
 export const STATUS_COLORS = Object.freeze({
@@ -325,12 +328,73 @@ ${sections}
 
 /** Write generated files atomically, creating directories as needed. */
 export function writeDiagramFiles(files) {
-  for (const file of files) {
-    mkdirSync(dirname(file.path), { recursive: true });
-    const tmp = `${file.path}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    writeFileSync(tmp, file.content, 'utf-8');
-    renameSync(tmp, file.path);
+  for (const file of files) writeFileAtomic(file.path, file.content);
+}
+
+function writeFileAtomic(path, content) {
+  mkdirSync(dirname(path), { recursive: true });
+  const tmp = `${path}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  writeFileSync(tmp, content, 'utf-8');
+  renameSync(tmp, path);
+}
+
+/** Remove empty directories under `dir`, deepest first. `dir` itself is kept. */
+function pruneEmptyDirs(dir) {
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return;
   }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const full = join(dir, entry.name);
+    pruneEmptyDirs(full);
+    try {
+      if (readdirSync(full).length === 0) rmdirSync(full);
+    } catch {
+      // Left in place if it is not empty or cannot be removed.
+    }
+  }
+}
+
+/**
+ * Write the tree, and remove what a PREVIOUS run wrote and this one did not.
+ *
+ * Without this a re-run leaves stale artifacts: running once with test
+ * assemblies and then again without left every test-assembly directory in place,
+ * so the tree claimed 30 packages when the model had 6. A manifest of the files
+ * this command wrote is the only safe way to prune — it deletes its own output
+ * and nothing else, even when `--out` points into a shared directory.
+ */
+export function syncDiagramTree(outDir, files) {
+  const manifestPath = join(outDir, DIAGRAM_MANIFEST);
+  let previous = [];
+  try {
+    const parsed = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+    if (Array.isArray(parsed?.files)) previous = parsed.files;
+  } catch {
+    // No manifest, or an unreadable one: nothing can be proven ours to delete.
+  }
+
+  const next = files.map((file) => toPosix(relative(outDir, file.path)));
+  const keep = new Set(next);
+
+  let removed = 0;
+  for (const rel of previous) {
+    if (keep.has(rel)) continue;
+    try {
+      unlinkSync(join(outDir, rel));
+      removed += 1;
+    } catch {
+      // Already gone; the count is of files actually removed.
+    }
+  }
+  if (removed > 0) pruneEmptyDirs(outDir);
+
+  writeDiagramFiles(files);
+  writeFileAtomic(manifestPath, `${JSON.stringify({ generatedBy: 'cadet-agent harness diagram', files: [...next].sort() }, null, 2)}\n`);
+  return { written: files.length, removed };
 }
 
 /**

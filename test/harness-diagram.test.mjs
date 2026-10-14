@@ -295,4 +295,21 @@ describe('harness diagram (CLI)', () => {
       assert.ok(withTests.json.packages.map((p) => p.id).includes('Cadet.Tests.Core'));
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
+
+  it('prunes the files a previous run wrote and this one did not', () => {
+    // A re-run without test assemblies must remove the ones an earlier run wrote,
+    // or the tree claims packages the model no longer has.
+    const dir = makeProject({ withState: false });
+    try {
+      const first = runCli(['harness', 'diagram', '--target', dir, '--cs-root', fixtureDir, '--include-tests', '--format', 'json']);
+      assert.equal(first.status, 0, first.stderr);
+      assert.ok(existsSync(join(dir, '.cadet', 'diagrams', 'Cadet.Tests.Core', 'structure.noml')));
+
+      const second = runCli(['harness', 'diagram', '--target', dir, '--cs-root', fixtureDir, '--format', 'json']);
+      assert.equal(second.status, 0, second.stderr);
+      assert.ok(second.json.removed > 0, 'the files the test assembly owned are pruned');
+      assert.ok(!existsSync(join(dir, '.cadet', 'diagrams', 'Cadet.Tests.Core')), 'the stale directory is gone');
+      assert.ok(existsSync(join(dir, '.cadet', 'diagrams', 'Cadet.Core', 'structure.noml')), 'kept files survive');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
 });

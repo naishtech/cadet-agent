@@ -150,9 +150,9 @@ export {
 } from './csharp.mjs';
 
 export {
-  DIAGRAM_OUT_DIR, STATUS_COLORS, STATUS_CLASS,
+  DIAGRAM_OUT_DIR, DIAGRAM_MANIFEST, STATUS_COLORS, STATUS_CLASS,
   collectWorkItemFiles, indexComponents, componentStatusMap, buildDiagramModel, buildStructureModel,
-  renderNoml, renderIndexHtml, renderPackageHtml, writeDiagramFiles, generateDiagrams,
+  renderNoml, renderIndexHtml, renderPackageHtml, writeDiagramFiles, syncDiagramTree, generateDiagrams,
 } from './diagram.mjs';
 
 export { renderSvg as renderNomlSvg, nomnomlVersion } from './noml.mjs';

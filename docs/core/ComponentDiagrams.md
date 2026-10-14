@@ -74,6 +74,7 @@ The command is **mutating** and honours `--dry-run`. Its declared writes are `.c
 ```
 .cadet/diagrams/
   index.html                 # one link per package, with a status rollup
+  .diagrams-manifest.json    # the files this command wrote, so a re-run can prune
   <package-id>/
     index.html               # one embedded diagram per epic, plus the legend
     <epic-id>.noml           # the UML source — portable, and what the tests assert
@@ -81,7 +82,10 @@ The command is **mutating** and honours `--dry-run`. Its declared writes are `.c
 ```
 
 The HTML is self-contained (inline SVG and CSS), so a double-click renders it with no sibling assets
-and no network. Consumers should add `.cadet/diagrams/` to `.gitignore`.
+and no network. A re-run **prunes** the files a previous run wrote and this one did not — for example
+after `--include-tests` is dropped — using the manifest, so it deletes its own output and nothing else,
+even when `--out` points into a shared directory. Consumers should add `.cadet/diagrams/` to
+`.gitignore`.
 
 ## The renderer, and its licence
 

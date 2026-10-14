@@ -31,7 +31,7 @@ import {
   STATE_VERSION, sealedEvidence, recordEvidence, appendEvidence, sealWorkItem, toStateV4,
   isHistoryExternal, HISTORY_ENTRIES_KEPT, resetGatesForNewWorkItem,
   buildStateBrief, renderStateBrief, writeStateBrief, CONTEXT_BRIEF_FILE,
-  generateDiagrams, writeDiagramFiles, DIAGRAM_OUT_DIR,
+  generateDiagrams, syncDiagramTree, DIAGRAM_OUT_DIR,
 } from './harness/index.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -963,11 +963,11 @@ async function cmdHarness(opts) {
     } catch (err) {
       fail(opts, `could not render the diagrams: ${err.message}`, () => 1, { ok: false, code: 'diagram-failed' });
     }
-    writeDiagramFiles(result.files);
+    const written = syncDiagramTree(outDir, result.files);
     const { summary } = result;
     const shownOut = relative(opts.targetDir, outDir).replace(/\\/g, '/') || '.';
     if (opts.format === 'json') {
-      emit(opts, '', { ok: true, ...summary, outDir: shownOut });
+      emit(opts, '', { ok: true, ...summary, outDir: shownOut, removed: written.removed });
     } else {
       console.log(`✅ Component diagrams written to ${shownOut} (${summary.packages.length} package(s), ${summary.diagrams} diagram(s)).`);
       for (const pkg of summary.packages) {
@@ -976,6 +976,7 @@ async function cmdHarness(opts) {
           console.log(`   ${pkg.name} / ${d.epic}: ${d.counts.done} done, ${d.counts['in-progress']} in progress, ${d.counts['not-started']} not started${elided}`);
         }
       }
+      if (written.removed) console.log(`   Pruned ${written.removed} file(s) left by a previous run.`);
       if (summary.warning) console.log(`   ⚠️  ${summary.warning}`);
       console.log(`   Open: ${join(shownOut, 'index.html')}`);
     }
