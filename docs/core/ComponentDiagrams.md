@@ -116,6 +116,33 @@ pages, nomnoml pinned by `package-lock.json`, posix paths, and relative links, s
 timestamp reaches the tree. Run `npm ci` rather than `npm install`, or a different nomnoml patch
 release would legitimately report as drift.
 
+## What moves the tree
+
+The model reads three things and nothing else, so most of what changes in a repository leaves the tree
+alone:
+
+| Input | Where it comes from |
+|---|---|
+| The packages, namespaces and `using` edges | the C# sources and their `.asmdef` files |
+| Each component's colour | `state.json → epics[*].stories[*]` — `planned`, `in-progress`, `done` |
+| Which stories touched which component | the evidence `relevantFiles`, inline in `state.json` and in `.cadet/archive/evidence/` |
+
+Everything else in `state.json` is never read: the phase, the gates, `activeWorkItem`, `activeRunId`,
+`lastTransition`, `changeHistory`, and further evidence records that name files already attributed. A
+write to any of them regenerates **byte-identical** output, so `git` shows no diff and
+`harness verify-diagrams` stays clean. Measured against the reference project: a state write that
+changed the phase, set three gates, changed the run id, appended a duplicate evidence record and added
+a change-history entry left all 106 files identical.
+
+So the tree churns once per story that has a footprint — when a story's status changes, and when its
+first evidence names a file in a component it had not touched. Two consequences worth knowing:
+
+- **"Started" on its own does not move it.** A story that is `in-progress` but has had nothing verified
+  yet owns no files, touches no component, and changes no colour. The first `harness verify` for that
+  story is what puts it on the diagram. The colour is derived from evidence, and that is deliberate:
+  it is what keeps the diagram a record rather than a claim.
+- **A story with no evidence appears on no component page**, for the same reason.
+
 ## Drill-down
 
 Every component box in a package diagram is clickable and opens that component's page. The package
