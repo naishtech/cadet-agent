@@ -89,6 +89,26 @@ describe('C# package and component scan', () => {
       assert.deepEqual(scanComponents(packages[0]).map((c) => c.namespace), ['Gameplay']);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
+
+  it('maps a using to the longest PREFIX namespace, never a longer sibling', () => {
+    // Regression, caught on a real project that has both `…Rendering` and
+    // `…Rendering.Crowd`: `using …Rendering;` must not resolve to the longer sibling.
+    const dir = tempDir('cadet-ns-prefix-');
+    try {
+      const write = (rel, body) => {
+        const path = join(dir, rel);
+        mkdirSync(dirname(path), { recursive: true });
+        writeFileSync(path, body);
+        return path;
+      };
+      const components = [
+        { id: 'A.B', namespace: 'A.B', files: [write('ab/F.cs', 'namespace A.B { class F {} }\n')] },
+        { id: 'A.B.C', namespace: 'A.B.C', files: [write('abc/G.cs', 'namespace A.B.C { class G {} }\n')] },
+        { id: 'Z', namespace: 'Z', files: [write('z/H.cs', 'using A.B;\nnamespace Z { class H {} }\n')] },
+      ];
+      assert.deepEqual(componentEdges(components), [{ from: 'Z', to: 'A.B', kind: 'uses' }]);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
 });
 
 describe('progress attribution', () => {

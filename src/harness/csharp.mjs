@@ -194,9 +194,14 @@ export function scanComponents(pkg, { packages = [pkg], exclude = DEFAULT_EXCLUD
  * Best-effort component dependencies from `using` directives.
  *
  * A `using` names a namespace, which is matched to the longest component
- * namespace that is a prefix of it (or vice versa), so `using A.B.C` maps to a
- * component `A.B`. This is an approximation by design: it reads declarations,
- * not the compiled type graph, and it says so in the docs.
+ * namespace that is a PREFIX of it: `using A.B.C` maps to a component `A.B` (or
+ * `A.B.C` when that exists), because a namespace nested deeper is a different
+ * component. The reverse match was a bug the real-project test caught: with both
+ * `Dolven.Game.Rendering` and `Dolven.Game.Rendering.Crowd` present, a plain
+ * `using Dolven.Game.Rendering;` was attributed to the longer `…Crowd` sibling.
+ *
+ * This is an approximation by design: it reads declarations, not the compiled
+ * type graph, and it says so in the docs.
  */
 export function componentEdges(components) {
   const byNamespace = new Map(components.filter((c) => c.namespace).map((c) => [c.namespace, c.id]));
@@ -205,7 +210,7 @@ export function componentEdges(components) {
   const resolve = (ns) => {
     let best = null;
     for (const candidate of namespaces) {
-      if (ns === candidate || ns.startsWith(`${candidate}.`) || candidate.startsWith(`${ns}.`)) {
+      if (ns === candidate || ns.startsWith(`${candidate}.`)) {
         if (!best || candidate.length > best.length) best = candidate;
       }
     }
