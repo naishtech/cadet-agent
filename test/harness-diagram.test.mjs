@@ -208,9 +208,9 @@ describe('UML source', () => {
       `#.inprogress: fill=${STATUS_COLORS['in-progress']}`,
       `#.done: fill=${STATUS_COLORS.done}`,
       '[<frame>P|',
-      '  [<done> A]',
-      '  [<inprogress> B]',
-      '  [A] uses --> [B]',
+      '  [<done id=c0> A]',
+      '  [<inprogress id=c1> B]',
+      '  [c0] uses --> [c1]',
       ']',
       '// elided 2 component(s) touched by no story and no 1-hop dependency',
       '',
@@ -310,6 +310,43 @@ describe('harness diagram (CLI)', () => {
       assert.ok(second.json.removed > 0, 'the files the test assembly owned are pruned');
       assert.ok(!existsSync(join(dir, '.cadet', 'diagrams', 'Cadet.Tests.Core')), 'the stale directory is gone');
       assert.ok(existsSync(join(dir, '.cadet', 'diagrams', 'Cadet.Core', 'structure.noml')), 'kept files survive');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('makes each diagram node drill down to its component page', () => {
+    const dir = makeProject();
+    try {
+      const r = runCli(['harness', 'diagram', '--target', dir, '--format', 'json']);
+      assert.equal(r.status, 0, r.stderr);
+      const pkgDir = join(dir, '.cadet', 'diagrams', 'Cadet.Core');
+      const page = readFileSync(join(pkgDir, 'index.html'), 'utf-8');
+
+      const raw = /data-drill="([^"]*)"/.exec(page);
+      assert.ok(raw, 'the package page carries a per-diagram drill map');
+      const map = JSON.parse(raw[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&'));
+
+      const svg = readFileSync(join(pkgDir, 'epic-1-combat.svg'), 'utf-8');
+      for (const [nodeId, hit] of Object.entries(map)) {
+        // The key is the node identity nomnoml writes into the SVG; if they ever
+        // disagree the click handler silently does nothing, so pin them together.
+        assert.ok(svg.includes(`data-name="${nodeId}"`), `the SVG carries node ${nodeId}`);
+        assert.match(hit.u, /^components\/.+\.html$/);
+        assert.ok(existsSync(join(pkgDir, hit.u)), `${hit.u} exists`);
+      }
+      assert.ok(Object.keys(map).length >= 2, 'both components of the epic are drillable');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('writes a drill-down page per component: files, types, links and work', () => {
+    const dir = makeProject();
+    try {
+      runCli(['harness', 'diagram', '--target', dir, '--format', 'json']);
+      const page = readFileSync(join(dir, '.cadet', 'diagrams', 'Cadet.Core', 'components', 'Cadet.Core.Combat.html'), 'utf-8');
+      assert.ok(page.includes('CombatService.cs'), 'the file it owns');
+      assert.ok(page.includes('<strong>CombatService</strong>'), 'a type it declares');
+      assert.ok(!page.includes('<strong>the</strong>'), 'the word "record" in prose is not a declaration');
+      assert.ok(page.includes('epic-1-combat'), 'the work that touched it');
+      assert.ok(page.includes('Cadet.Core.Inventory.html'), 'a depends-on link to a sibling');
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

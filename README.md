@@ -279,8 +279,9 @@ The picture is the record, not a separate map to maintain. Progress is read from
 - **Components** are the namespaces inside a package.
 - **Scope** is the components the epic touched, plus their one-hop dependencies; anything else is reported as an elided count, so a package stays readable however large it grows.
 - **Colour is cumulative.** A component shows its progress across *all* epics, so a component finished by one epic is green in every diagram, not only the one that finished it.
+- **Drill down.** Click any component box to open that component's page: the files it owns (linked to source), the types it declares, what it depends on and is used by, and the stories that touched it.
 
-The generator writes a self-contained tree under `.cadet/diagrams/`: an `index.html` at the root, an `index.html` per package, and a `.noml` (the UML source — the portable, testable artifact) plus a `.svg` per (package × epic). Open `.cadet/diagrams/index.html` to navigate. Rendering is done by [nomnoml](https://github.com/skanaar/nomnoml) (MIT), the CLI's only runtime dependency; no browser, Java, or CDN is involved.
+The generator writes a self-contained tree under `.cadet/diagrams/`: an `index.html` at the root, an `index.html` per package, a page per component, and a `.noml` (the UML source — the portable, testable artifact) plus a `.svg` per (package × epic). Open `.cadet/diagrams/index.html` to navigate. Rendering is done by [nomnoml](https://github.com/skanaar/nomnoml) (MIT), the CLI's only runtime dependency; no browser, Java, or CDN is involved.
 
 ```bash
 cadet-agent harness diagram                       # default output: .cadet/diagrams

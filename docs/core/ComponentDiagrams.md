@@ -76,7 +76,8 @@ The command is **mutating** and honours `--dry-run`. Its declared writes are `.c
   index.html                 # one link per package, with a status rollup
   .diagrams-manifest.json    # the files this command wrote, so a re-run can prune
   <package-id>/
-    index.html               # one embedded diagram per epic, plus the legend
+    index.html               # the component index, then one clickable diagram per epic
+    components/<slug>.html   # the drill-down page for one component
     <epic-id>.noml           # the UML source — portable, and what the tests assert
     <epic-id>.svg            # the rendered diagram
 ```
@@ -86,6 +87,26 @@ and no network. A re-run **prunes** the files a previous run wrote and this one 
 after `--include-tests` is dropped — using the manifest, so it deletes its own output and nothing else,
 even when `--out` points into a shared directory. Consumers should add `.cadet/diagrams/` to
 `.gitignore`.
+
+## Drill-down
+
+Every component box in a package diagram is clickable and opens that component's page. The package
+page also lists every component, so a component is reachable even when no diagram happens to show it.
+
+A component page carries:
+
+- **Files** — the `.cs` files the component owns, linked to the source.
+- **Types** — the `class` / `struct` / `interface` / `enum` / `record` declarations in those files.
+  This is a text scan, not a parse: a declaration must start a line and name a PascalCase identifier,
+  so an unusual naming style is missed rather than guessed at.
+- **Depends on** / **Used by** — its component neighbours in the package, each a link to their page.
+- **Work** — the epics and stories that touched it, with their status.
+
+The click works offline. nomnoml renders SVG and nothing else — it has no notion of pages — so it
+supplies only the node identity: a node written `[<done id=c3> …]` carries `data-name="c3"` in the
+SVG. The page embeds a `c3 → page` map per diagram and applies it to the inline SVG with a few lines
+of inline script. The map and the SVG are generated from one model, and a test pins the two together,
+because a mismatch would make a box silently unclickable.
 
 ## The renderer, and its licence
 

@@ -59,6 +59,70 @@ function nomlName(value) {
 }
 
 /**
+ * Deterministic, nomnoml-safe node ids, one per component.
+ *
+ * A node rendered as `[<done id=c3> Name]` carries `data-name="c3"` in the SVG
+ * — nomnoml sets the node group's data-name to the id — which is what lets a box
+ * be made clickable without parsing the diagram's geometry. Edges must reference
+ * the id too: a plain `[Name]` reference would be a different node to nomnoml,
+ * and it would draw a duplicate box.
+ */
+function nomlIds(model) {
+  const ids = new Map();
+  [...model.components].sort((a, b) => a.id.localeCompare(b.id)).forEach((c, i) => ids.set(c.id, `c${i}`));
+  return ids;
+}
+
+/** Readable, unique file slugs for component pages, assigned in sorted order. */
+export function componentSlugs(components) {
+  const used = new Set();
+  const out = new Map();
+  for (const c of [...components].sort((a, b) => a.id.localeCompare(b.id))) {
+    const base = c.id.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'component';
+    let slug = base;
+    let n = 2;
+    while (used.has(slug.toLowerCase())) slug = `${base}-${n++}`;
+    used.add(slug.toLowerCase());
+    out.set(c.id, slug);
+  }
+  return out;
+}
+
+/**
+ * The types a component declares, best-effort, read from its files.
+ *
+ * A declaration must START the line (after whitespace and modifiers) and name a
+ * PascalCase identifier. That shape is what keeps the word "record" in a comment
+ * from being read as a `record` declaration — a false positive a real project
+ * produced, listing types literally called "and" and "the".
+ *
+ * This is still a text scan and not a parse, and the docs say so: an unusual
+ * style (a lowercase type name) is missed rather than guessed at.
+ */
+const TYPE_RE = /^[ \t]*(?:(?:public|internal|private|protected|sealed|abstract|static|partial|readonly|unsafe|ref|file)\s+)*(class|struct|interface|enum|record)\s+(?:class\s+|struct\s+)?([A-Z]\w*)/gm;
+
+function parseTypes(files) {
+  const types = [];
+  const seen = new Set();
+  for (const file of files) {
+    let text;
+    try {
+      text = readFileSync(file, 'utf-8');
+    } catch {
+      continue;
+    }
+    TYPE_RE.lastIndex = 0;
+    let m;
+    while ((m = TYPE_RE.exec(text)) !== null) {
+      if (seen.has(m[2])) continue;
+      seen.add(m[2]);
+      types.push({ kind: m[1], name: m[2], file: toPosix(file) });
+    }
+  }
+  return types.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
  * Evidence files per work item: inline records first, then the archive.
  *
  * The archive matters because a closed work item's evidence leaves `state.json`
@@ -128,21 +192,25 @@ function externalOf(pkg, allPackages) {
   return (pkg.references || []).map((id) => ({ id, name: byId.get(id) || id }));
 }
 
-function statusOf(storyStatuses) {
-  if (!storyStatuses || storyStatuses.size === 0) return 'not-started';
-  return [...storyStatuses.values()].every((s) => s === 'done') ? 'done' : 'in-progress';
+function statusFromStatuses(statuses) {
+  if (!statuses || statuses.length === 0) return 'not-started';
+  return statuses.every((s) => s === 'done') ? 'done' : 'in-progress';
 }
 
 /**
- * Every component's status, from every story in every epic that touched it.
+ * The work items that touched each component, from every epic.
  *
  * Cumulative on purpose: a component that is finished is green. Deriving the
  * status from only the current epic made a built component read red in a later
  * epic's diagram — measured on a real project, where one component was green in
  * one epic and red in the next. The epic still decides what a diagram SHOWS; it
- * no longer decides the colour.
+ * does not decide the colour.
+ *
+ * Keyed by `<packageId>::<componentId>`; the value is a Map of work-item id to
+ * `{ epicId, storyId, status }`, so a component page can name the stories behind
+ * a component and not only its colour.
  */
-export function componentStatusMap({ state, byFile, workItemFiles }) {
+export function componentWorkMap({ state, byFile, workItemFiles }) {
   const byComponent = new Map();
   const epics = state?.epics && typeof state.epics === 'object' ? state.epics : {};
   for (const [epicId, epic] of Object.entries(epics)) {
@@ -155,13 +223,25 @@ export function componentStatusMap({ state, byFile, workItemFiles }) {
         if (!owner) continue;
         const key = `${owner.packageId}::${owner.componentId}`;
         if (!byComponent.has(key)) byComponent.set(key, new Map());
-        byComponent.get(key).set(`${epicId}::${storyFile}`, status);
+        byComponent.get(key).set(`${epicId}::${storyFile}`, { epicId, storyId: storyFile, status });
       }
     }
   }
+  return byComponent;
+}
+
+/** Every component's status, derived from the work that touched it. */
+export function statusesFromWork(work) {
   const statuses = new Map();
-  for (const [key, stories] of byComponent) statuses.set(key, statusOf(stories));
+  for (const [key, items] of work) {
+    statuses.set(key, statusFromStatuses([...items.values()].map((w) => w.status)));
+  }
   return statuses;
+}
+
+/** Convenience: the work map and the status map together. */
+export function componentStatusMap(args) {
+  return statusesFromWork(componentWorkMap(args));
 }
 
 function makeModel({ pkg, epicId, epicStatus, components, edges, included, statusByKey, allPackages }) {
@@ -234,7 +314,7 @@ export function buildStructureModel({ pkg, components, edges, allPackages }) {
 
 /** The UML artifact: deterministic nomnoml source for a model. */
 export function renderNoml(model) {
-  const nameOf = new Map(model.components.map((c) => [c.id, nomlName(c.namespace || c.name)]));
+  const ids = nomlIds(model);
   const lines = [
     '#direction: right',
     `#.${STATUS_CLASS['not-started']}: fill=${STATUS_COLORS['not-started']}`,
@@ -243,10 +323,11 @@ export function renderNoml(model) {
     `[<frame>${nomlName(model.package.name)}|`,
   ];
   for (const component of [...model.components].sort((a, b) => a.id.localeCompare(b.id))) {
-    lines.push(`  [<${STATUS_CLASS[component.status]}> ${nomlName(component.namespace || component.name)}]`);
+    const name = nomlName(component.namespace || component.name);
+    lines.push(`  [<${STATUS_CLASS[component.status]} id=${ids.get(component.id)}> ${name}]`);
   }
   for (const edge of [...model.edges].sort((a, b) => `${a.from}\u0000${a.to}`.localeCompare(`${b.from}\u0000${b.to}`))) {
-    lines.push(`  [${nameOf.get(edge.from)}] uses --> [${nameOf.get(edge.to)}]`);
+    lines.push(`  [${ids.get(edge.from)}] uses --> [${ids.get(edge.to)}]`);
   }
   lines.push(']');
   if (model.elided.count > 0) {
@@ -271,6 +352,9 @@ const STYLE = `
   .inprogress { background: ${STATUS_COLORS['in-progress']}; }
   .done { background: ${STATUS_COLORS.done}; }
   .diagram { border: 1px solid #ddd; padding: 1rem; margin: .5rem 0 1.5rem; overflow: auto; }
+  .diagram g[title] { cursor: pointer; }
+  .diagram g[title]:hover { opacity: .82; }
+  ul { padding-left: 1.1rem; } ul.components { list-style: none; padding-left: 0; columns: 2; }
   table { border-collapse: collapse; } td, th { text-align: left; padding: .2rem .8rem .2rem 0; }
   .note { color: #666; }
 `;
@@ -302,16 +386,48 @@ ${packages.length === 0
 `;
 }
 
-/** A package page: one embedded diagram per epic. */
-export function renderPackageHtml(pkg, entries) {
+/**
+ * Click-to-drill: nomnoml sets each node group's `data-name` to the node's id,
+ * so the mapping from id to page is enough to make a box a link. Attached to the
+ * inline SVG, so it works from a plain double-click on the file.
+ */
+const DRILL_SCRIPT = `document.querySelectorAll('.diagram[data-drill]').forEach(function (box) {
+  var map = JSON.parse(box.getAttribute('data-drill'));
+  box.querySelectorAll('g[data-name]').forEach(function (g) {
+    var hit = map[g.getAttribute('data-name')];
+    if (!hit) return;
+    g.setAttribute('title', 'Open ' + hit.n);
+    g.addEventListener('click', function (e) { e.stopPropagation(); location.href = hit.u; });
+  });
+});`;
+
+function statusName(status) {
+  return PNG[status] || status;
+}
+
+/** A package page: a component index, then one clickable diagram per epic. */
+export function renderPackageHtml({ pkg, components, slugs, componentStatus, entries }) {
+  const statusOf = (id) => componentStatus.get(`${pkg.id}::${id}`) || 'not-started';
+  const index = [...components]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((c) => `<li><span class="sw ${STATUS_CLASS[statusOf(c.id)]}"></span>`
+      + `<a href="components/${escapeHtml(slugs.get(c.id))}.html">${escapeHtml(c.namespace || c.name)}</a>`
+      + ` <span class="note">${escapeHtml(statusName(statusOf(c.id)))}</span></li>`)
+    .join('\n');
+
   const sections = entries.map(({ epicId, model, svg }) => {
     const counts = statusCounts([model]);
+    const ids = nomlIds(model);
+    const drill = {};
+    for (const c of model.components) {
+      drill[ids.get(c.id)] = { u: `components/${slugs.get(c.id)}.html`, n: c.namespace || c.name };
+    }
     const elision = model.elided.count > 0
       ? `<p class="note">${model.elided.count} component(s) elided (touched by no story and no 1-hop dependency).</p>`
       : '';
     return `<h2>${escapeHtml(epicId)}</h2>
-<p class="note">epic status: ${escapeHtml(model.epic.status)} — ${counts.done} done, ${counts['in-progress']} in progress, ${counts['not-started']} not started</p>
-<div class="diagram">${svg}</div>
+<p class="note">epic status: ${escapeHtml(model.epic.status)} — ${counts.done} done, ${counts['in-progress']} in progress, ${counts['not-started']} not started. Click a component to open it.</p>
+<div class="diagram" data-drill="${escapeHtml(JSON.stringify(drill))}">${svg}</div>
 ${elision}`;
   }).join('\n');
 
@@ -321,7 +437,51 @@ ${elision}`;
 <p><a href="../index.html">&larr; all packages</a></p>
 <h1>${escapeHtml(pkg.name)}</h1>
 ${legendHtml()}
+<h2>Components</h2>
+<ul class="components">
+${index}
+</ul>
 ${sections}
+${entries.length ? `<script>${DRILL_SCRIPT}</script>` : ''}
+</body></html>
+`;
+}
+
+/** The drill-down target: what a component is, contains, depends on, and comes from. */
+export function renderComponentHtml({ pkg, component, status, slugs, components, edges, work, files, types, rootRel }) {
+  const name = component.namespace || component.name;
+  const byId = new Map(components.map((c) => [c.id, c]));
+  const link = (c) => `<a href="${escapeHtml(slugs.get(c.id))}.html">${escapeHtml(c.namespace || c.name)}</a>`;
+
+  const dependsOn = edges.filter((e) => e.from === component.id).map((e) => byId.get(e.to)).filter(Boolean);
+  const usedBy = edges.filter((e) => e.to === component.id).map((e) => byId.get(e.from)).filter(Boolean);
+  const toHref = (file) => (rootRel && rootRel !== '.' ? `${rootRel}/${file}` : file);
+
+  const list = (items, empty) => (items.length
+    ? `<ul>${items.map((i) => `<li>${i}</li>`).join('')}</ul>`
+    : `<p class="note">${empty}</p>`);
+
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(name)} — component</title><style>${STYLE}</style></head>
+<body>
+<p><a href="../index.html">&larr; ${escapeHtml(pkg.name)}</a> · <a href="../../index.html">all packages</a></p>
+<h1>${escapeHtml(name)}</h1>
+<p><span class="sw ${STATUS_CLASS[status]}"></span> ${escapeHtml(statusName(status))} · package ${escapeHtml(pkg.name)}</p>
+
+<h2>Files (${files.length})</h2>
+${list(files.map((f) => `<a href="${escapeHtml(toHref(f))}">${escapeHtml(f)}</a>`), 'No files.')}
+
+<h2>Types (${types.length})</h2>
+${list(types.map((t) => `${escapeHtml(t.kind)} <strong>${escapeHtml(t.name)}</strong> <span class="note">${escapeHtml(t.file)}</span>`), 'No type declarations were found.')}
+
+<h2>Depends on (${dependsOn.length})</h2>
+${list(dependsOn.map(link), 'Nothing else in this package.')}
+
+<h2>Used by (${usedBy.length})</h2>
+${list(usedBy.map(link), 'Nothing else in this package.')}
+
+<h2>Work (${work.length})</h2>
+${list(work.map((w) => `${escapeHtml(w.epicId)} / ${escapeHtml(w.storyId)} — ${escapeHtml(statusName(w.status))}`), 'No story has touched this component yet.')}
 </body></html>
 `;
 }
@@ -413,7 +573,8 @@ export function generateDiagrams({ rootDir, outDir, csRoot = rootDir, state = nu
     .filter((p) => !packageFilter || p.id === packageFilter);
   const { byFile, componentsByPkg, edgesByPkg } = indexComponents(csRoot, packages);
   const workItemFiles = collectWorkItemFiles(rootDir, state);
-  const componentStatus = componentStatusMap({ state, byFile, workItemFiles });
+  const componentWork = componentWorkMap({ state, byFile, workItemFiles });
+  const componentStatus = statusesFromWork(componentWork);
   const epicIds = state?.epics && typeof state.epics === 'object' ? Object.keys(state.epics).sort() : [];
 
   const files = [];
@@ -436,7 +597,6 @@ export function generateDiagrams({ rootDir, outDir, csRoot = rootDir, state = nu
         if (model.components.length > 0) entries.push({ epicId, model });
       }
     }
-    if (entries.length === 0) continue;
 
     const rendered = entries.map(({ epicId, model }) => {
       const noml = renderNoml(model);
@@ -448,11 +608,42 @@ export function generateDiagrams({ rootDir, outDir, csRoot = rootDir, state = nu
       files.push({ path: join(pkgDir, `${safeName(epicId)}.noml`), content: noml });
       files.push({ path: join(pkgDir, `${safeName(epicId)}.svg`), content: svg });
     }
-    files.push({ path: join(pkgDir, 'index.html'), content: renderPackageHtml(pkg, rendered) });
+
+    // A page per component, for every component in the package: the package index
+    // links them all, so no component page is unreachable, and a diagram node can
+    // point at one without the link ever dangling.
+    const slugs = componentSlugs(components);
+    const componentDir = join(pkgDir, 'components');
+    const rootRel = toPosix(relative(componentDir, rootDir)) || '.';
+    for (const component of components) {
+      const key = `${pkg.id}::${component.id}`;
+      files.push({
+        path: join(componentDir, `${slugs.get(component.id)}.html`),
+        content: renderComponentHtml({
+          pkg,
+          component,
+          status: componentStatus.get(key) || 'not-started',
+          slugs,
+          components,
+          edges,
+          work: [...(componentWork.get(key)?.values() || [])]
+            .sort((a, b) => `${a.epicId}/${a.storyId}`.localeCompare(`${b.epicId}/${b.storyId}`)),
+          files: component.files.map((f) => rel(rootDir, f)),
+          types: parseTypes(component.files).map((t) => ({ ...t, file: rel(rootDir, t.file) })),
+          rootRel,
+        }),
+      });
+    }
+
+    files.push({
+      path: join(pkgDir, 'index.html'),
+      content: renderPackageHtml({ pkg, components, slugs, componentStatus, entries: rendered }),
+    });
 
     summaryPackages.push({
       id: pkg.id,
       name: pkg.name,
+      components: components.length,
       diagrams: rendered.map((r) => ({
         epic: r.epicId,
         components: r.model.components.length,

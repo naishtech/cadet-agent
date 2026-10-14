@@ -151,8 +151,10 @@ export {
 
 export {
   DIAGRAM_OUT_DIR, DIAGRAM_MANIFEST, STATUS_COLORS, STATUS_CLASS,
-  collectWorkItemFiles, indexComponents, componentStatusMap, buildDiagramModel, buildStructureModel,
-  renderNoml, renderIndexHtml, renderPackageHtml, writeDiagramFiles, syncDiagramTree, generateDiagrams,
+  collectWorkItemFiles, indexComponents, componentWorkMap, statusesFromWork, componentStatusMap,
+  componentSlugs, buildDiagramModel, buildStructureModel,
+  renderNoml, renderIndexHtml, renderPackageHtml, renderComponentHtml,
+  writeDiagramFiles, syncDiagramTree, generateDiagrams,
 } from './diagram.mjs';
 
 export { renderSvg as renderNomlSvg, nomnomlVersion } from './noml.mjs';

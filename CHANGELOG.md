@@ -26,9 +26,11 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
   touched plus their one-hop dependencies, with the remainder reported as an elided count, so a
   package stays readable however large it grows. Unity test assemblies are excluded by default —
   recognised by their TestRunner/nunit references, not their names — and `--include-tests` keeps
-  them. Output is a self-contained tree under
-  `.cadet/diagrams/`: a root `index.html`, an `index.html` per package, and a `.noml` (the UML
-  source, the portable and tested artifact) plus a `.svg` per diagram.
+  them. Every component box is **clickable** and opens that component's page — its files (linked to
+  source), the types it declares, what it depends on and is used by, and the stories that touched it —
+  and the package page lists every component, so none is unreachable. Output is a self-contained tree
+  under `.cadet/diagrams/`: a root `index.html`, an `index.html` and a component page per package, and
+  a `.noml` (the UML source, the portable and tested artifact) plus a `.svg` per diagram.
 
 ### Changed
 - **`src/harness/` gains its first runtime dependency.** `nomnoml` (MIT, one transitive dependency,
