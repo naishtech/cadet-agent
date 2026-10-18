@@ -218,6 +218,27 @@ found the reply contract keyed to the phase, which does not determine what a tur
 
 ---
 
+## 0.64.0 — the diagrams are part of closure, and a session opens on the brief
+
+This release adds a generated artifact that is derived from the code **and** from the work record: UML
+component diagrams, coloured by how far each component's work has gone. A derived artifact drifts, so the
+release also had to say who regenerates it, when, and what refuses a stale tree. The same release removed
+the last two places where a session opened the whole state document, and made the context plan find the
+story of a project that nests its plans.
+
+| Instruction | Disposition |
+|---|---|
+| Tier 0 / session start: read `.cadet/state.json` | 🔁 REPLACED by the brief, in every surface that opens a session. `Resume.md` Phase 1 runs `state brief` and uses `state validate` for the schema check; the document is opened only to read a record the brief names. The directive's *"Read state on session start"* says the same, and the four adapter surfaces that seeded a host's skill index with *"Inspect `.cadet/state.json`"* (`.agents`, `.claude`, `.continue`, `.github/prompts`) now name the command. |
+| `harness context plan`, the story and epic references | 🔁 REPLACED by resolution. The plan joined the plans root with the ids in `state.json`, which assumes the packaged layout; on a consumer that nests its plans it reported the host's OWN active story as `MISSING` on every phase. `resolveWorkItemDocs` finds the story by its own filename through the reconciler's bounded walk, takes the story's directory as the epic's, and reports a duplicate filename as ambiguous rather than choosing between two. |
+| Evidence record: command, result, exit code, verdict | ✏️ EXTENDED by `durationMs` and `outputBytes`, both optional and nullable. The loop already measured both and wrote them to the attempt SPAN and to nothing else, so the record an operator reads could not show how long a command took — and a real red was indistinguishable from a command that never launched without opening the run ledger. |
+| `state brief` gate rows and epic line | ➕ ADDED. Each gate row carries the duration beside it, and the epic line carries `remaining:`, naming every story not yet `done` with its status — the field `Resume.md` Phase 2b compares against the epic markdown, which a count cannot support. Both are derived from the transition table and the document, so the brief cannot disagree with the transition it predicts. |
+| `designArtifactSyncConfirmed` (validation → closed) | ✏️ EXTENDED, not replaced. The gate named the planning chain; it now also names the artifacts derived from that chain, through `harness reconcile`'s blocking `diagram-drift` row, fixed by `harness diagram`. Opt-in by presence: a repository that has never generated a tree has no manifest and is not checked, so no existing consumer is broken by the new row. |
+| CodeReview, the review steps | ➕ ADDED as step 24: regenerate the diagram tree, commit it, and confirm it with `harness verify-diagrams`. It is placed after the statuses are written, because the statuses colour the tree, and before closure, which refuses a stale one. |
+| `harness diagram`, `harness verify-diagrams` | ➕ ADDED as declared commands. Generation writes `.cadet/diagrams/**`; verification is read-only and deliberately never regenerates, because a check that repaired the thing it checks would always pass. Both are covered by `harness-diagram.test.mjs`, and `verify-diagrams` is enumerated in the registry guard's `READ_ONLY_INVOCATIONS`. |
+| `nomnoml` as a runtime dependency of `src/harness/` | ➕ ADDED, with the reason recorded rather than assumed. The harness was dependency-free; the dependency buys genuine UML in a `.noml` artifact that can be tested, with no browser and no DOM. CI now installs dependencies before it runs the tests. |
+
+---
+
 ## Summary
 
 - **Total instructions reviewed**: 50+

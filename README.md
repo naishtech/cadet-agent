@@ -163,7 +163,7 @@ flowchart TD
 
 ### Resuming a Session
 
-Use the `/cadet-resume` slash command to pick up where you left off. It reads `.cadet/state.json` and reports the current phase, epic/story progress, and outstanding gates — then dispatches the right skill for the next step. It also checks the current branch and working tree, so leftover changes from a previous task are resolved (commit, stash, push, or move to a new branch) before a new task begins. If no state file exists, it initializes a fresh session from `context-resolution`.
+Use the `/cadet-resume` slash command to pick up where you left off. It runs `cadet-agent state brief`, the tier-0 summary of `.cadet/state.json`, and it checks the document with `cadet-agent state validate`. The brief prints the phase, the active work item, every gate with its newest evidence record, and the legal edge out of the current phase. A session therefore opens a bounded summary, not a record that grows with the project — the document also holds every work item ever closed and every change checkpoint ever recorded. It also checks the current branch and working tree, so leftover changes from a previous task are resolved (commit, stash, push, or move to a new branch) before a new task begins. If no state file exists, it initializes a fresh session from `context-resolution`.
 
 ### Phase Gating
 
