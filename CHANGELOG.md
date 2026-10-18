@@ -14,6 +14,16 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 ## [Unreleased]
 
 ### Changed
+- **An evidence record now says what the run cost.** The verification loop measured every attempt's
+  duration and output size and wrote both to the attempt SPAN, and to nothing else — so `state.json →
+  gateEvidence`, the record an operator reads and a later session summarises, carried the command, the
+  exit code and the verdict but not how long the command took or whether it said anything. The only way to
+  tell a real red from a command that never launched was to open the run ledger, which cost ~7,000 tokens
+  of JSON in one session for two numbers. `createEvidence` now accepts `durationMs` and `outputBytes`,
+  `harness verify` passes the ones it already measures, `harness.schema.json#/$defs/evidence` describes
+  them (optional and nullable, so every existing document stays valid and no state migration is needed),
+  and `state brief` prints the duration beside the gate row. A command that never ran carries neither
+  field, rather than a zero that would read as a very fast failure.
 - **The context plan finds the active work item instead of assuming where it is.** The plan built the story
   and epic references by joining the plans root with the ids from `state.json`, which assumes the PACKAGED
   layout. A real project nests its plans (`<project>/epics/<epic-N>/`) and names its epic document as it
