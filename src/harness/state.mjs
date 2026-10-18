@@ -2153,9 +2153,11 @@ export function legalEdgesFrom(phase, policy = null) {
  * the brief says so in its own first line. It is a summary, not a second record.
  *
  * Pure: no I/O, so a test drives it from a document and a caller decides where it
- * is written.
+ * is written. The resolved work-item paths come IN through `docs`, because finding
+ * them needs the filesystem: the caller resolves them, and this stays a function of
+ * its arguments.
  */
-export function buildStateBrief(state, policy = null) {
+export function buildStateBrief(state, policy = null, docs = null) {
   const s = isPlainObject(state) ? state : {};
   const session = isPlainObject(s.session) ? s.session : {};
   const work = isPlainObject(s.activeWorkItem) ? s.activeWorkItem : null;
@@ -2204,7 +2206,9 @@ export function buildStateBrief(state, policy = null) {
     trackingMode: session.trackingMode || null,
     learnerTier: session.learnerTier || null,
     operatingMode: session.operatingMode || null,
-    story: work?.storyId ? { id: work.storyId, status: stories[work.storyId] || null } : null,
+    story: work?.storyId
+      ? { id: work.storyId, status: stories[work.storyId] || null, at: docs?.story || null }
+      : null,
     epic: epic
       ? {
         id: work.epicId,
@@ -2212,6 +2216,7 @@ export function buildStateBrief(state, policy = null) {
         storiesDone: storyStatuses.filter((v) => v === 'done').length,
         storiesTotal: storyStatuses.length,
         remaining,
+        at: docs?.epic || null,
       }
       : null,
     next,
@@ -2235,9 +2240,16 @@ export function renderStateBrief(brief) {
   lines.push('the coverage index and the archive; this file carries what the phase reads.');
   lines.push('');
   lines.push(`phase: ${b.phase || '(unset)'} · workflow: ${b.workflowPath || '(unset)'} · tracking: ${b.trackingMode || '(unset)'}`);
-  if (b.story) lines.push(`story: ${b.story.status || '(unset)'}`);
+  if (b.story) {
+    lines.push(`story: ${b.story.status || '(unset)'}`);
+    // WHERE THE STORY IS. A resume needs the file, and the path is not derivable from the document:
+    // a real project nests its plans, so the host either resolves them (as `harness context plan` does)
+    // or goes looking. The caller resolves and passes it in, which keeps this builder pure.
+    if (b.story.at) lines.push(`  at: ${b.story.at}`);
+  }
   if (b.epic) {
     lines.push(`epic: ${b.epic.status || '(unset)'} — ${b.epic.storiesDone} of ${b.epic.storiesTotal} stories done`);
+    if (b.epic.at) lines.push(`  at: ${b.epic.at}`);
     const remaining = Array.isArray(b.epic.remaining) ? b.epic.remaining : [];
     if (remaining.length) {
       lines.push(`  remaining: ${remaining.map((r) => `${r.id} (${r.status || 'unset'})`).join(', ')}`);

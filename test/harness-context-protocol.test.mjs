@@ -21,7 +21,7 @@ import {
   validatePolicy,
   CONTEXT_LEVELS, PHASE_SKILL, PHASES, planEntries, buildContextPlan, buildContextRecord,
   parseTranscript, validateContextRecord, describeContextState, readContextPlan, readContextRecord,
-  declaresContextEnforcement,
+  declaresContextEnforcement, resolveWorkItemDocs,
 } from '../src/harness/index.mjs';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -484,6 +484,71 @@ describe('context protocol — adapter conformance', () => {
         // line itself is asserted in the verdict block above.
         assert.match(r.stderr + r.stdout, /No run records found/);
       }
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});
+
+/**
+ * The plan finds the work item; it does not assume where it is.
+ *
+ * WHY THIS BLOCK EXISTS. The plan built the story and epic paths by joining the plans root with the ids
+ * from `state.json`, which assumes the PACKAGED layout. A real project nests its plans one level deeper
+ * and names the epic document as it pleases, so on a correct project the plan reported the host's OWN
+ * active story as MISSING, and its epic as absent, on every phase of every story. Measured in
+ * `dolven-tactics` on 2026-10-19: `.cadet/agent/project-plans/epic-13-magical-network/story-14-...`
+ * against a file at `.cadet/agent/project-plans/dolven-tactics-mvp/epics/epic-13-magical-network/`.
+ */
+describe('context protocol — the work item is found, not assumed', () => {
+  const stateOf = (dir) => JSON.parse(readFileSync(join(dir, '.cadet/state.json'), 'utf-8'));
+
+  it('finds a nested story, and the epic beside it under whatever name it has', () => {
+    const dir = fixture();
+    try {
+      const nested = join(dir, '.cadet/agent/project-plans/dolven-tactics-mvp/epics/epic-1');
+      mkdirSync(nested, { recursive: true });
+      writeFileSync(join(nested, 'Epic.md'), '# the epic\n');
+      writeFileSync(join(nested, 'story-1.md'), 'Status: in-progress\n## AC-1\nGiven a\nWhen b\nThen c\n');
+      rmSync(join(dir, '.cadet/agent/project-plans/epic-1/story-1.md'));
+
+      const state = stateOf(dir);
+      const docs = resolveWorkItemDocs(dir, state);
+      assert.equal(docs.story, '.cadet/agent/project-plans/dolven-tactics-mvp/epics/epic-1/story-1.md');
+      assert.equal(docs.epic, '.cadet/agent/project-plans/dolven-tactics-mvp/epics/epic-1/Epic.md',
+        'the epic is found beside the story, and reported under the name it actually has');
+      assert.deepEqual(docs.ambiguous, []);
+
+      const plan = buildContextPlan({ targetDir: dir, policy: validatePolicy({}), state, docs });
+      const story = plan.required.find((i) => i.reference === docs.story);
+      assert.ok(story, 'the resolved path is what the plan requires');
+      assert.equal(story.present, true, 'and it is present, so there is no false MISSING');
+      const epic = plan.advisory.find((i) => i.reference === docs.epic);
+      assert.ok(epic && epic.present, 'the epic is advisory, at its real path');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('reports a duplicate filename as ambiguous instead of guessing which one is active', () => {
+    const dir = fixture();
+    try {
+      // The same filename under two different projects. Both are real candidates, and the packaged path
+      // does not exist in this fixture, so an unresolved row stays visibly absent.
+      const a = join(dir, '.cadet/agent/project-plans/alpha/epics/epic-1');
+      const b = join(dir, '.cadet/agent/project-plans/beta/epics/epic-1');
+      mkdirSync(a, { recursive: true });
+      mkdirSync(b, { recursive: true });
+      writeFileSync(join(a, 'story-1.md'), 'Status: in-progress\n');
+      writeFileSync(join(b, 'story-1.md'), 'Status: in-progress\n');
+      rmSync(join(dir, '.cadet/agent/project-plans/epic-1/story-1.md'));
+
+      const state = stateOf(dir);
+      const docs = resolveWorkItemDocs(dir, state);
+      assert.equal(docs.story, null, 'two candidates: the plan does not choose');
+      assert.equal(docs.ambiguous.length, 2);
+      assert.equal(docs.ambiguous.every((p) => p.endsWith('story-1.md')), true);
+
+      const plan = buildContextPlan({ targetDir: dir, policy: validatePolicy({}), state, docs });
+      const story = plan.required.find((i) => i.reason.startsWith('the active story'));
+      assert.match(story.reason, /2 files named story-1\.md/, 'the plan says WHY it could not resolve it');
+      assert.equal(story.present, false, 'and the packaged path is still reported, and still absent');
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

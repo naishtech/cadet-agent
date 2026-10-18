@@ -228,4 +228,24 @@ describe('state brief — the tier-0 summary', () => {
     assert.match(rendered, /next: validation -> implementation \(ungated\)/);
     assert.match(rendered, /remaining: story-5b\.md \(in-progress\)/);
   });
+
+  it('says where the work item is, and invents no path when none was resolved', () => {
+    const base = stateWithHistory({ records: 4, historyEntries: 1 });
+
+    // A host needs the story's file. The path is not derivable from the document — a real project nests
+    // its plans — so the caller resolves it and passes it in. With nothing passed, nothing is claimed.
+    const bare = renderStateBrief(buildStateBrief(base, null));
+    assert.equal(bare.includes('  at: '), false, 'no path is invented');
+
+    const resolved = renderStateBrief(buildStateBrief(base, null, {
+      story: '.cadet/agent/project-plans/p/epics/epic-12/story-5b.md',
+      epic: '.cadet/agent/project-plans/p/epics/epic-12/Epic.md',
+    }));
+    assert.ok(resolved.includes('  at: .cadet/agent/project-plans/p/epics/epic-12/story-5b.md'));
+    assert.ok(resolved.includes('  at: .cadet/agent/project-plans/p/epics/epic-12/Epic.md'));
+
+    const json = buildStateBrief(base, null, { story: 'a/story.md' });
+    assert.equal(json.story.at, 'a/story.md');
+    assert.equal(json.epic.at, null, 'an unresolved epic stays null rather than guessed');
+  });
 });

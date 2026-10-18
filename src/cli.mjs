@@ -13,6 +13,7 @@ import {
   parseDesignReviewArtifact, describeDesignReviewGaps, FINDING_DISPOSITIONS,
   DESIGN_REVIEW_GATE, HUMAN_ACCEPTANCE_GATE,
   CONTEXT_LEVELS, buildContextPlan, writeContextPlan, readContextPlan, buildContextRecord,
+  resolveWorkItemDocs,
   writeContextRecord, readContextRecord, parseTranscript, validateContextRecord,
   describeContextState, ContextProtocolError,
   enforcementMatrix, describeEnforcement, INTERCEPTION_ACTIONS,
@@ -585,7 +586,9 @@ async function cmdState(opts) {
     const { exists, state } = readState(opts.targetDir);
     if (!exists) fail(opts, 'No .cadet/state.json found.', () => 2);
 
-    const brief = buildStateBrief(state, loadPolicy(opts.targetDir));
+    // The story and epic paths are resolved HERE and passed in: the builder is pure, and finding a work
+    // item's own documents needs the filesystem. A host that can see the path needs no second lookup.
+    const brief = buildStateBrief(state, loadPolicy(opts.targetDir), resolveWorkItemDocs(opts.targetDir, state));
     if (opts.format === 'json') {
       emit(opts, '', { ok: true, brief });
     } else {
@@ -1812,8 +1815,10 @@ async function cmdHarness(opts) {
       // THE BRIEF IS WRITTEN BEFORE THE PLAN IS BUILT, so the plan can name it and hash it. A plan
       // that named a file nobody had written would report its own tier-0 reference as MISSING, and
       // the caller would have to run two commands to get one answer.
-      writeStateBrief(opts.targetDir, state, policy);
-      const plan = buildContextPlan({ targetDir: opts.targetDir, policy, state });
+      // Resolved once and shared, so the brief that is written and the plan that hashes it agree.
+      const docs = resolveWorkItemDocs(opts.targetDir, state);
+      writeStateBrief(opts.targetDir, state, policy, docs);
+      const plan = buildContextPlan({ targetDir: opts.targetDir, policy, state, docs });
       const planPath = writeContextPlan(opts.targetDir, plan);
       const shown = relative(opts.targetDir, planPath).replace(/\\/g, '/');
       const fit = plan.budget.fits === null ? 'no context budget declared'

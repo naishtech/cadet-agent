@@ -14,6 +14,19 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 ## [Unreleased]
 
 ### Changed
+- **The context plan finds the active work item instead of assuming where it is.** The plan built the story
+  and epic references by joining the plans root with the ids from `state.json`, which assumes the PACKAGED
+  layout. A real project nests its plans (`<project>/epics/<epic-N>/`) and names its epic document as it
+  pleases, so on a correct project the plan reported the host's OWN active story as `MISSING`, and its epic
+  as absent, on every phase of every story. Measured in `dolven-tactics` on 2026-10-19: the plan looked for
+  `.cadet/agent/project-plans/epic-13-magical-network/story-14-…` while the file sat at
+  `.cadet/agent/project-plans/dolven-tactics-mvp/epics/epic-13-magical-network/story-14-…`.
+  `resolveWorkItemDocs` finds the story by its own FILENAME through the reconciler's bounded walk (one
+  implementation, two consumers), takes the story's directory as the epic's, accepts a match only when the
+  epic id names a directory between the plans root and the file, and reports a duplicate filename as
+  ambiguous rather than choosing between them. A row that still cannot be resolved keeps the packaged
+  path and says why, so `MISSING` stays honest. `state brief` now prints where the work item is, and the
+  path comes in as an argument, so `buildStateBrief` stays a pure function of what it is given.
 - **The Resume skill reads the brief, not the record.** `state brief` shipped in 0.63.0 and replaced
   `.cadet/state.json` at tier 0 of the context plan, but the two documents that start a session still told a
   host to read the document: `Resume.md` Phase 1 ("Read and validate it against `.cadet/state.schema.json`")
