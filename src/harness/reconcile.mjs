@@ -248,8 +248,13 @@ export function parseEpicHeader(text) {
 /**
  * Every directory under `root`, breadth-first and depth-bounded. Skipping the
  * usual game-repo ballast keeps a walk of a real project cheap.
+ *
+ * EXPORTED, because the context plan needs the same discovery this module worked out for the
+ * reconciler. A real project nests its plans (`<project>/epics/<epic-N>/`) and names its own files,
+ * so a plan built from fixed paths reports a correct project's own story as missing — the lesson
+ * REQUIRED_ARTIFACTS above already records. One walk, two consumers.
  */
-function walkDirs(root, maxDepth = MAX_SCAN_DEPTH) {
+export function walkDirs(root, maxDepth = MAX_SCAN_DEPTH) {
   const found = [];
   let level = [root];
   for (let depth = 0; depth <= maxDepth && level.length > 0; depth++) {

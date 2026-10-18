@@ -23,12 +23,13 @@
  * rules: what a phase requires, what a record may claim, and when the two disagree.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
 
 import { ContextManifest } from './context.mjs';
 import { sha256, timestamp } from './util.mjs';
 import { buildStateBrief, renderStateBrief } from './state.mjs';
+import { PLANS_DEFAULT_DIR, walkDirs } from './reconcile.mjs';
 
 /** The levels a record may carry, strongest first. */
 export const CONTEXT_LEVELS = Object.freeze(['enforced', 'recorded', 'estimated', 'unavailable']);
@@ -49,11 +50,18 @@ export const CONTEXT_RECORD_FILE = 'record.json';
 export const CONTEXT_BRIEF_FILE = 'state-brief.md';
 const STATE_BRIEF = `${CONTEXT_DIR}/${CONTEXT_BRIEF_FILE}`;
 
-/** Write the tier-0 brief, before a plan names and hashes it. */
-export function writeStateBrief(targetDir, state) {
+/**
+ * Write the tier-0 brief, before a plan names and hashes it.
+ *
+ * `policy` is passed through so the written brief and the printed one are the SAME rendering. The
+ * brief's legal-edge line reports an opt-in gate (reachability, the playthrough, human acceptance,
+ * architecture fitness) only when the resolved policy requires it, so a caller that omits the policy
+ * writes a brief that under-reports the edge the transition itself would enforce.
+ */
+export function writeStateBrief(targetDir, state, policy = null, docs = null) {
   const path = join(targetDir, CONTEXT_DIR, CONTEXT_BRIEF_FILE);
   mkdirSync(join(targetDir, CONTEXT_DIR), { recursive: true });
-  writeFileSync(path, renderStateBrief(buildStateBrief(state)), 'utf-8');
+  writeFileSync(path, renderStateBrief(buildStateBrief(state, policy, docs)), 'utf-8');
   return path;
 }
 
@@ -105,6 +113,88 @@ function entry(reference, { tier, reason, authority, required }) {
   return { reference: normalise(reference), tier, reason, authority, required };
 }
 
+/** A repo-relative path with forward slashes, as a plan entry's reference must be. */
+function relativePath(targetDir, abs) {
+  return normalise(relative(targetDir, abs));
+}
+
+/**
+ * Where the active work item's own documents are.
+ *
+ * WHY THIS EXISTS. The plan built these two paths by joining the plans root with the ids from
+ * `state.json`, which assumes the PACKAGED layout. A real project nests its plans and names its own
+ * folders — this repository keeps `.cadet/agent/project-plans/dolven-tactics-mvp/epics/<epic>/` — so the
+ * plan reported the host's own active story as MISSING on every phase of every story, and its epic as
+ * absent. A check that fires on a correct project teaches its reader to ignore the output; the
+ * reconciler records that same lesson, for this same repository, in its REQUIRED_ARTIFACTS comment.
+ *
+ * THE RULE, and it is deliberately narrow. Find the story by its own FILENAME, which is what
+ * `state.json` already holds, using the reconciler's bounded walk. Accept a match only when the epic id
+ * names one of its parent directories, so a same-named file under another epic cannot be taken for it.
+ * The story's own directory IS the epic's directory, and the epic document is whatever `epic.md` is
+ * called there, because the case varies between projects.
+ *
+ * TWO MATCHES ARE REPORTED, NOT GUESSED. A duplicate filename comes back in `ambiguous` so the plan can
+ * say so, rather than resolving to whichever the filesystem happened to list first.
+ *
+ * Reads directories and parses nothing. A missing or unreadable tree returns nulls instead of throwing,
+ * so the plan still reports the row — as MISSING, which is then true.
+ */
+export function resolveWorkItemDocs(targetDir, state, { plansDir = PLANS_DEFAULT_DIR } = {}) {
+  const epicId = state?.activeWorkItem?.epicId || null;
+  const storyId = state?.activeWorkItem?.storyId || null;
+  if (!epicId || !storyId) return { story: null, epic: null, ambiguous: [], root: plansDir };
+
+  const epicWanted = String(epicId).toLowerCase();
+  // `storyId` is a filename in most documents and a path in a few, so compare on the last segment.
+  const wanted = String(storyId).replace(/\\/g, '/').split('/').pop().toLowerCase();
+  const root = join(targetDir, plansDir);
+  const matches = [];
+
+  for (const dir of walkDirs(root)) {
+    // The epic id must name a directory BETWEEN the plans root and the file. Comparing only the relative
+    // part stops a drive letter or a user's own folder name from ever satisfying the test.
+    const rel = relative(root, dir).replace(/\\/g, '/').toLowerCase();
+    if (!rel.split('/').includes(epicWanted)) continue;
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch { continue; }
+    for (const item of entries) {
+      if (item.isFile() && item.name.toLowerCase() === wanted) matches.push(join(dir, item.name));
+    }
+  }
+
+  if (matches.length === 0) return { story: null, epic: null, ambiguous: [], root: plansDir };
+  if (matches.length > 1) {
+    return { story: null, epic: null, ambiguous: matches.map((p) => relativePath(targetDir, p)), root: plansDir };
+  }
+
+  const story = matches[0];
+  let epic = null;
+  try {
+    const epicFile = readdirSync(dirname(story), { withFileTypes: true })
+      .find((item) => item.isFile() && item.name.toLowerCase() === 'epic.md');
+    if (epicFile) epic = join(dirname(story), epicFile.name);
+  } catch { /* the epic document is advisory: its absence is reported, not raised */ }
+
+  return {
+    story: relativePath(targetDir, story),
+    epic: epic ? relativePath(targetDir, epic) : null,
+    ambiguous: [],
+    root: plansDir,
+  };
+}
+
+/** Why a work-item document could not be resolved, said in the plan's own words. */
+function unresolvedReason(work, storyId) {
+  if (work.ambiguous.length > 0) {
+    return `${work.ambiguous.length} files named ${storyId} under ${work.root}, so the plan will not `
+      + `guess which one is active: ${work.ambiguous.join(', ')}`;
+  }
+  return `not found under ${work.root}`;
+}
+
 /**
  * What the current phase requires, and what merely helps.
  *
@@ -112,10 +202,13 @@ function entry(reference, { tier, reason, authority, required }) {
  * from state and the framework's own layout rather than from a new policy key, because a policy
  * that restates the framework's folder conventions is another thing to keep in step.
  */
-export function planEntries({ targetDir, policy, state = null }) {
+export function planEntries({ targetDir, policy, state = null, docs = null }) {
   const phase = state?.session?.currentPhase || 'context-resolution';
   const required = [];
   const advisory = [];
+  // Resolved once per plan. A caller may pass what it already resolved, so a plan and the brief it
+  // writes do not walk the planning tree twice for the same answer.
+  const work = docs || resolveWorkItemDocs(targetDir, state);
 
   required.push(entry(KICKOFF, {
     tier: 'tier0', reason: 'always-load: the directive that routes every other decision', authority: 'framework', required: true,
@@ -149,13 +242,23 @@ export function planEntries({ targetDir, policy, state = null }) {
   const epicId = state?.activeWorkItem?.epicId || null;
   const storyId = state?.activeWorkItem?.storyId || null;
   if (epicId && storyId) {
-    required.push(entry(join('.cadet/agent/project-plans', epicId, storyId), {
-      tier: 'tier1', reason: 'the active story: its status, its acceptance criteria, its reachability', authority: 'session', required: true,
+    // The resolved path when the tree has the file; the packaged layout's guess otherwise, so an
+    // unresolvable story is still reported as MISSING rather than dropped from the required set.
+    required.push(entry(work.story || join(PLANS_DEFAULT_DIR, epicId, storyId), {
+      tier: 'tier1',
+      reason: work.story
+        ? 'the active story: its status, its acceptance criteria, its reachability'
+        : `the active story: its status, its acceptance criteria, its reachability — ${unresolvedReason(work, storyId)}`,
+      authority: 'session', required: true,
     }));
   }
   if (epicId) {
-    advisory.push(entry(join('.cadet/agent/project-plans', epicId, 'Epic.md'), {
-      tier: 'tier1', reason: 'the epic this story belongs to', authority: 'repository', required: false,
+    advisory.push(entry(work.epic || join(PLANS_DEFAULT_DIR, epicId, 'Epic.md'), {
+      tier: 'tier1',
+      reason: work.epic
+        ? 'the epic this story belongs to'
+        : `the epic this story belongs to — ${unresolvedReason(work, storyId)}`,
+      authority: 'repository', required: false,
     }));
   }
 
@@ -178,8 +281,8 @@ export function planEntries({ targetDir, policy, state = null }) {
  * Build the plan: the entries above, resolved through `ContextManifest` so each carries its hash,
  * size, estimated tokens and budget effect.
  */
-export function buildContextPlan({ targetDir, policy, state = null } = {}) {
-  const { phase, required, advisory } = planEntries({ targetDir, policy, state });
+export function buildContextPlan({ targetDir, policy, state = null, docs = null } = {}) {
+  const { phase, required, advisory } = planEntries({ targetDir, policy, state, docs });
 
   // A plan is a READING, not a load, and the load bounds must not bound it.
   //

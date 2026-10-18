@@ -180,4 +180,87 @@ describe('state brief — the tier-0 summary', () => {
       assert.match(written, /Open that document for evidence records/, 'the brief says what it omits');
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
+
+  it('names the legal edge out of the current phase, with the gates it carries', () => {
+    const brief = buildStateBrief(stateWithHistory({ records: 4, historyEntries: 2 }), null);
+    const edge = brief.next.find((e) => e.to === 'review');
+
+    assert.ok(edge, 'implementation -> review is the gated edge out of implementation');
+    assert.deepEqual(
+      edge.gates,
+      ['testsPassed', 'compileCheckConfirmed', 'unityAnalyzerClean', 'storyTrackingUpdated'],
+      'the same four gates the transition itself requires',
+    );
+  });
+
+  it('reports an opt-in gate only when the resolved policy requires it', () => {
+    const base = stateWithHistory({ records: 4, historyEntries: 1 });
+    // `review -> validation` is the edge that carries every opt-in gate, so it is where a brief that
+    // ignored the policy would differ from the transition that enforces it.
+    const state = { ...base, session: { ...base.session, currentPhase: 'review' } };
+
+    const off = buildStateBrief(state, null);
+    const on = buildStateBrief(state, {
+      reachability: { enabled: true }, userPlay: { enabled: true }, humanAcceptance: { enabled: true },
+    });
+    const edgeOff = off.next.find((e) => e.to === 'validation');
+    const edgeOn = on.next.find((e) => e.to === 'validation');
+
+    assert.ok(!edgeOff.gates.includes('reachabilityAddressed'), 'absent when the repository has not opted in');
+    assert.ok(edgeOn.gates.includes('reachabilityAddressed'), 'and appended when it has');
+    assert.ok(edgeOn.gates.includes('userPlaythroughConfirmed'));
+  });
+
+  it('names the stories still not done, and the ungated next-story loop', () => {
+    const base = stateWithHistory({ records: 4, historyEntries: 1 });
+    const brief = buildStateBrief(base, null);
+    assert.deepEqual(brief.epic.remaining.map((r) => r.id), ['story-5b.md', 'story-5c.md'], 'done stories are not listed');
+
+    // `closed` is terminal and `validation -> implementation` is the next-story loop, which carries no
+    // gate by design. A brief that hid that edge would leave the loop undiscoverable.
+    const state = { ...base, session: { ...base.session, currentPhase: 'validation' } };
+    const loop = buildStateBrief(state, null).next.find((e) => e.to === 'implementation');
+    assert.ok(loop, 'the next-story loop is a legal edge');
+    assert.equal(loop.ungated, true);
+
+    const rendered = renderStateBrief(buildStateBrief(state, null));
+    assert.match(rendered, /next: validation -> closed \(needs designArtifactSyncConfirmed\)/);
+    assert.match(rendered, /next: validation -> implementation \(ungated\)/);
+    assert.match(rendered, /remaining: story-5b\.md \(in-progress\)/);
+  });
+
+  it('says where the work item is, and invents no path when none was resolved', () => {
+    const base = stateWithHistory({ records: 4, historyEntries: 1 });
+
+    // A host needs the story's file. The path is not derivable from the document — a real project nests
+    // its plans — so the caller resolves it and passes it in. With nothing passed, nothing is claimed.
+    const bare = renderStateBrief(buildStateBrief(base, null));
+    assert.equal(bare.includes('  at: '), false, 'no path is invented');
+
+    const resolved = renderStateBrief(buildStateBrief(base, null, {
+      story: '.cadet/agent/project-plans/p/epics/epic-12/story-5b.md',
+      epic: '.cadet/agent/project-plans/p/epics/epic-12/Epic.md',
+    }));
+    assert.ok(resolved.includes('  at: .cadet/agent/project-plans/p/epics/epic-12/story-5b.md'));
+    assert.ok(resolved.includes('  at: .cadet/agent/project-plans/p/epics/epic-12/Epic.md'));
+
+    const json = buildStateBrief(base, null, { story: 'a/story.md' });
+    assert.equal(json.story.at, 'a/story.md');
+    assert.equal(json.epic.at, null, 'an unresolved epic stays null rather than guessed');
+  });
+
+  it('prints the wall clock beside a record that carries one, and nothing when it does not', () => {
+    const state = stateWithHistory({ records: 4, historyEntries: 1 });
+    // The wall clock is how a reader tells a real red from a command that never launched, and it belongs
+    // on the row rather than in a run ledger: this repository's false reds took 182 ms, its genuine Unity
+    // pass takes tens of seconds.
+    for (const record of state.gateEvidence) record.durationMs = 84294;
+
+    const withClock = renderStateBrief(buildStateBrief(state, null));
+    assert.match(withClock, /84294 ms/);
+    assert.equal(buildStateBrief(state, null).gates.find((g) => g.durationMs !== null).durationMs, 84294);
+
+    const without = renderStateBrief(buildStateBrief(stateWithHistory({ records: 4, historyEntries: 1 }), null));
+    assert.equal(/\d+ ms/.test(without), false, 'a record with no duration shows nothing, not zero');
+  });
 });

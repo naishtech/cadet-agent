@@ -47,6 +47,47 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
   `graphre`) renders the diagrams to SVG with no browser or DOM. The harness was dependency-free
   before this change; the `.noml` artifact it emits is genuine UML rather than a flowchart, which is
   what the dependency buys. CI now runs `npm ci` before `npm test`.
+- **An evidence record now says what the run cost.** The verification loop measured every attempt's
+  duration and output size and wrote both to the attempt SPAN, and to nothing else — so `state.json →
+  gateEvidence`, the record an operator reads and a later session summarises, carried the command, the
+  exit code and the verdict but not how long the command took or whether it said anything. The only way to
+  tell a real red from a command that never launched was to open the run ledger, which cost ~7,000 tokens
+  of JSON in one session for two numbers. `createEvidence` now accepts `durationMs` and `outputBytes`,
+  `harness verify` passes the ones it already measures, `harness.schema.json#/$defs/evidence` describes
+  them (optional and nullable, so every existing document stays valid and no state migration is needed),
+  and `state brief` prints the duration beside the gate row. A command that never ran carries neither
+  field, rather than a zero that would read as a very fast failure.
+- **The context plan finds the active work item instead of assuming where it is.** The plan built the story
+  and epic references by joining the plans root with the ids from `state.json`, which assumes the PACKAGED
+  layout. A real project nests its plans (`<project>/epics/<epic-N>/`) and names its epic document as it
+  pleases, so on a correct project the plan reported the host's OWN active story as `MISSING`, and its epic
+  as absent, on every phase of every story. Measured in `dolven-tactics` on 2026-10-19: the plan looked for
+  `.cadet/agent/project-plans/epic-13-magical-network/story-14-…` while the file sat at
+  `.cadet/agent/project-plans/dolven-tactics-mvp/epics/epic-13-magical-network/story-14-…`.
+  `resolveWorkItemDocs` finds the story by its own FILENAME through the reconciler's bounded walk (one
+  implementation, two consumers), takes the story's directory as the epic's, accepts a match only when the
+  epic id names a directory between the plans root and the file, and reports a duplicate filename as
+  ambiguous rather than choosing between them. A row that still cannot be resolved keeps the packaged
+  path and says why, so `MISSING` stays honest. `state brief` now prints where the work item is, and the
+  path comes in as an argument, so `buildStateBrief` stays a pure function of what it is given.
+- **The Resume skill reads the brief, not the record.** `state brief` shipped in 0.63.0 and replaced
+  `.cadet/state.json` at tier 0 of the context plan, but the two documents that start a session still told a
+  host to read the document: `Resume.md` Phase 1 ("Read and validate it against `.cadet/state.schema.json`")
+  and the directive's *"Read state on session start"*. Measured on a real consumer whose record is 78,193 B:
+  opening it cost 26,064 tokens, of which 18,085 were appended history a resume never reads, while the live
+  keys it needed were 1,049 and the brief answers the same question in 484.
+  `Resume.md` now runs `state brief`, uses `state validate` for the schema check, and opens the document only
+  to read a record the brief names. The four adapter surfaces that seeded a host's skill index with
+  *"Inspect `.cadet/state.json`"* (`.agents`, `.claude`, `.continue`, `.github/prompts`) now name the command.
+- **The brief reports the legal edge out of the current phase, and what is left in the epic.**
+  `state transition --to <phase> --dry-run` takes a target phase a reader otherwise guesses. The brief prints
+  `next: implementation -> review (needs testsPassed, compileCheckConfirmed, unityAnalyzerClean,
+  storyTrackingUpdated)`, read from the same `TRANSITIONS` table and `requiredGates` function the transition
+  itself calls, so an opt-in gate (reachability, the playthrough, human acceptance, architecture fitness) is
+  reported exactly when the resolved policy requires it, and a repository that enables none sees the frozen
+  lists unchanged. The epic line gains `remaining:`, naming each story still not `done` with its status —
+  the field `Resume.md` Phase 2b compares against the epic markdown, which a count cannot support. Both are
+  derived, and `buildStateBrief` stays pure.
 
 ## [0.63.0] — 2026-10-04
 
