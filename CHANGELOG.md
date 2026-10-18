@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.63.1] — 2026-10-19
+
 ### Added
 - **`cadet-agent harness verify-diagrams` — is the committed diagram tree still current?** Read-only:
   it recomputes the model in memory and compares it with the files on disk, reporting what is missing,
