@@ -269,6 +269,16 @@
         "exitCode": { "type": ["integer", "null"] },
         "artifactPath": { "type": ["string", "null"] },
         "artifactHash": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "durationMs": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "How long the recorded command took, in milliseconds. The runner already measures this for the attempt span; it is carried onto the record because `gateEvidence` is what an operator reads, and the wall clock is how a genuine test run is told from a command that never launched - the false reds in this repository's own history took 182 ms while the real Unity pass takes tens of seconds. Null when nothing ran, as in a manual confirmation."
+        },
+        "outputBytes": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "How many bytes the recorded command wrote, across stdout and stderr. A non-zero exit code with a sub-second duration and no output is the signature of a launch failure, which is why the size is recorded beside the duration rather than left in the run ledger."
+        },
         "inputTreeHash": { "$ref": "#/$defs/sha256" },
         "criteriaHash": { "$ref": "#/$defs/sha256" },
         "relevantFiles": { "type": "array", "items": { "type": "string" } },

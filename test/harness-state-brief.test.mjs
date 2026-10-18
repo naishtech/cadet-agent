@@ -248,4 +248,19 @@ describe('state brief — the tier-0 summary', () => {
     assert.equal(json.story.at, 'a/story.md');
     assert.equal(json.epic.at, null, 'an unresolved epic stays null rather than guessed');
   });
+
+  it('prints the wall clock beside a record that carries one, and nothing when it does not', () => {
+    const state = stateWithHistory({ records: 4, historyEntries: 1 });
+    // The wall clock is how a reader tells a real red from a command that never launched, and it belongs
+    // on the row rather than in a run ledger: this repository's false reds took 182 ms, its genuine Unity
+    // pass takes tens of seconds.
+    for (const record of state.gateEvidence) record.durationMs = 84294;
+
+    const withClock = renderStateBrief(buildStateBrief(state, null));
+    assert.match(withClock, /84294 ms/);
+    assert.equal(buildStateBrief(state, null).gates.find((g) => g.durationMs !== null).durationMs, 84294);
+
+    const without = renderStateBrief(buildStateBrief(stateWithHistory({ records: 4, historyEntries: 1 }), null));
+    assert.equal(/\d+ ms/.test(without), false, 'a record with no duration shows nothing, not zero');
+  });
 });

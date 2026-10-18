@@ -531,6 +531,11 @@ export async function runVerificationLoop({
           ? `budget-blocked: ${hardStop.reason}`
           : (launch.launchFailed ? `launch-failed: ${launch.reason}` : describeResult(result))),
       exitCode: result.exitCode,
+      // Carried onto the record, not only onto the attempt below it. An operator reading
+      // `gateEvidence` sees how long the command took and how much it wrote, which is how a real red is
+      // told from a command that never launched.
+      durationMs: result.durationMs ?? null,
+      outputBytes: result.outputBytes ?? null,
       artifactPath: result.artifactPath,
       artifactHash: result.artifactHash,
       inputTreeHash,

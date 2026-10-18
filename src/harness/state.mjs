@@ -1143,6 +1143,8 @@ export function createEvidence({
   command = null,
   result = null,
   exitCode = null,
+  durationMs = null,
+  outputBytes = null,
   artifactPath = null,
   artifactHash = null,
   inputTreeHash,
@@ -1172,6 +1174,13 @@ export function createEvidence({
     command,
     result,
     exitCode,
+    // WHAT THE RUN COST. Both are measured for the attempt span already, and neither was written where
+    // an operator reads a gate: `state.json -> gateEvidence` carried the command, the exit code and the
+    // verdict, but not how long the command took or whether it said anything. The wall clock is the
+    // cheapest way to tell a real red from a process that never launched, and this repository's own
+    // policy tells a reader to do exactly that. Null when nothing ran.
+    durationMs,
+    outputBytes,
     artifactPath,
     artifactHash,
     inputTreeHash,
@@ -2172,6 +2181,10 @@ export function buildStateBrief(state, policy = null, docs = null) {
       status: latest ? latest.status : null,
       evidenceId: latest ? latest.evidenceId : null,
       at: latest ? latest.createdAt : null,
+      // WHAT THE RUN COST, so a reader can tell a real red from a command that never launched without
+      // opening the run ledger. Absent on every record written before the fields existed.
+      durationMs: latest && typeof latest.durationMs === 'number' ? latest.durationMs : null,
+      outputBytes: latest && typeof latest.outputBytes === 'number' ? latest.outputBytes : null,
     };
   });
 
@@ -2265,8 +2278,12 @@ export function renderStateBrief(brief) {
   lines.push('gates (the newest evidence record for each)');
   for (const row of Array.isArray(b.gates) ? b.gates : []) {
     const state = row.claimed ? 'claimed' : 'UNMET';
+    // The wall clock beside the verdict. This repository's false reds took 182 ms and its genuine Unity
+    // pass takes tens of seconds, so the number is the difference between a test result and a command
+    // that never ran. Omitted when the record does not carry one, rather than shown as zero.
+    const took = typeof row.durationMs === 'number' ? `${Math.round(row.durationMs)} ms  ` : '';
     const record = row.status
-      ? `${row.status}  ${row.evidenceId || '(no id)'}  ${row.at || ''}`.trimEnd()
+      ? `${row.status}  ${took}${row.evidenceId || '(no id)'}  ${row.at || ''}`.trimEnd()
       : '(no evidence)';
     lines.push(`  ${row.gate.padEnd(27)} ${state.padEnd(9)} ${record}`);
   }

@@ -313,3 +313,49 @@ describe('verification — runCommand reports launch failure on a real process',
     assert.equal(r.launchFailed, false);
   });
 });
+
+// ── The record says what the run cost ──────────────────────────────────
+
+/**
+ * WHY THIS BLOCK EXISTS. The wall clock and the output size were measured for every attempt and written
+ * to the attempt span, and to nothing else. `gateEvidence` — the record an operator actually reads, and
+ * the one a later session summarises — carried the command, the exit code and the verdict, so the only
+ * way to tell a real red from a command that never launched was to open the run ledger. That distinction
+ * is not a nicety: a forged red satisfies red-before-green, and the false reds in this repository's own
+ * history took 182 ms against a 30-to-90 second genuine Unity pass.
+ */
+describe('verification — the evidence record carries what the run cost', () => {
+  it('writes the duration and the output size onto the record', async () => {
+    const deps = loopDeps([fakeResult({
+      exitCode: 1, stderr: 'AssertionError: expected 1 to equal 2', durationMs: 30000, outputBytes: 4096,
+    })]);
+    const result = await runVerificationLoop({
+      gate: 'testsPassed', command: 'bash test-gate.sh', workItemId: 'w', phase: 'implementation',
+      policy, requireRedFirst: false, runCommandImpl: deps.runCommandImpl, sleepImpl: deps.sleepImpl,
+      resolveInterpreterImpl: notRequired,
+    });
+
+    assert.equal(result.status, 'failed');
+    const record = result.attempts[0].evidence;
+    assert.equal(record.durationMs, 30000);
+    assert.equal(record.outputBytes, 4096);
+  });
+
+  it('claims no duration when the command never ran, rather than reporting zero', async () => {
+    const deps = loopDeps([fakeResult({ exitCode: 0 })]);
+    const result = await runVerificationLoop({
+      gate: 'testsPassed', command: 'bash run-tests.sh', workItemId: 'w', phase: 'implementation',
+      policy, requireRedFirst: false, runCommandImpl: deps.runCommandImpl, sleepImpl: deps.sleepImpl,
+      resolveInterpreterImpl: () => ({
+        required: true, ok: false, interpreter: 'bash', usable: [], shims: ['C:/Windows/System32/bash.exe'],
+        reason: 'the WSL stub',
+      }),
+    });
+
+    assert.equal(deps.commands.length, 0, 'the preflight refuses before anything executes');
+    const record = result.attempts[0].evidence;
+    assert.equal(record.status, 'blocked');
+    assert.equal(record.durationMs, null, 'nothing ran, so no time is claimed');
+    assert.equal(record.outputBytes, null);
+  });
+});
