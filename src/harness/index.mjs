@@ -74,7 +74,7 @@ export {
 
 export {
   CONTEXT_LEVELS, CONTEXT_DIR, CONTEXT_PLAN_FILE, CONTEXT_RECORD_FILE, CONTEXT_BRIEF_FILE, PHASE_SKILL,
-  writeStateBrief,
+  writeStateBrief, resolveWorkItemDocs,
   ContextProtocolError, planEntries, buildContextPlan, writeContextPlan, readContextPlan,
   buildContextRecord, writeContextRecord, readContextRecord, parseTranscript,
   validateContextRecord, describeContextState, declaresContextEnforcement,
