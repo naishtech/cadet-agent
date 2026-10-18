@@ -1366,7 +1366,6 @@ export function activeExceptions(state, { workItemId, now = new Date() } = {}) {
 
 // ── Transitions ─────────────────────────────────────────────────────────────
 
-/** Required gates for a transition target, or null when the target is not gated. */
 /**
  * Gates required on an edge that carries no entry in `TRANSITIONS`.
  *
@@ -1386,6 +1385,16 @@ export function conditionalEdgeGates(fromPhase, toPhase, policy = null) {
   return policy?.designReview?.enabled === true ? [DESIGN_REVIEW_GATE] : [];
 }
 
+/**
+ * The gates a transition to `toPhase` requires: `{ from, gates, revalidate }`, or `null` when the target
+ * is not the target of a gated transition.
+ *
+ * The shape is an OBJECT, not a bare list. The caller reads `.gates`, and `.revalidate` names the gates
+ * this edge re-examines under strict closure. Corrected here because the previous one-line comment said
+ * only "required gates for a transition target" and said nothing about the object, and a caller that read
+ * it as a list then got an object it treated as empty — which reported a gated edge as ungated. A comment
+ * a reader can act on wrongly is worse than no comment.
+ */
 export function requiredGates(toPhase, { reachability = false, humanAcceptance = false, architectureFitness = false, userPlay = false } = {}) {
   for (const [from, spec] of Object.entries(TRANSITIONS)) {
     if (spec.to === toPhase) {
@@ -2079,6 +2088,47 @@ export function writeJsonAtomic(path, value) {
 }
 
 /**
+ * The legal edges out of a phase: what `state transition --to <phase>` would accept.
+ *
+ * WHY THIS EXISTS. Resuming asks "what happens next", and the tool that answers it —
+ * `state transition --to <phase> --dry-run` — takes a TARGET phase the reader has to guess
+ * before it will say anything. Both halves of the answer are already declared in this
+ * framework: `TRANSITIONS` for the gated story loop, and `UNGATED_FORWARD_EDGES` for the
+ * planning progression and the next-story loop. The gate list comes from `requiredGates`,
+ * the same function the transition itself calls, so an opt-in gate (reachability, the
+ * playthrough, human acceptance, architecture fitness) is reported exactly when the resolved
+ * policy would require it — and a repository that enables none of them sees the frozen lists
+ * the contract declares, unchanged.
+ *
+ * Pure: a function of (phase, policy). It runs no transition and reads no file, so a brief
+ * cannot claim an edge the machinery would refuse.
+ */
+export function legalEdgesFrom(phase, policy = null) {
+  if (!phase) return [];
+  const edges = [];
+  const spec = TRANSITIONS[phase];
+  if (spec) {
+    // `requiredGates` returns `{ from, gates, revalidate }` — an OBJECT, not a bare list. Read `.gates`;
+    // a caller that treats the return value as an array gets an empty list and reports a gated edge as
+    // ungated. The `revalidate` half is deliberately not carried: on this edge it repeats these gates,
+    // and the transition dry run is what reports revalidation.
+    const required = requiredGates(spec.to, {
+      reachability: policy?.reachability?.enabled === true,
+      humanAcceptance: policy?.humanAcceptance?.enabled === true,
+      architectureFitness: architectureFitnessActive(policy),
+      userPlay: policy?.userPlay?.enabled === true,
+    });
+    edges.push({ to: spec.to, gates: required?.gates || [] });
+  }
+  for (const [from, to] of UNGATED_FORWARD_EDGES) {
+    if (from !== phase) continue;
+    const gates = conditionalEdgeGates(from, to, policy);
+    edges.push({ to, gates, ungated: gates.length === 0 });
+  }
+  return edges;
+}
+
+/**
  * The state brief: a derived summary of the state document, small enough to load
  * every turn.
  *
@@ -2091,7 +2141,8 @@ export function writeJsonAtomic(path, value) {
  * project's whole history to answer "what phase am I in".
  *
  * WHAT IT CARRIES. Only what the phase reads: the phase and the session settings,
- * the active work item and its story and epic status, every gate in the policy with the
+ * the active work item and its story and epic status, what is left in that epic, the legal
+ * edge out of the current phase with the gates it carries, every gate in the policy with the
  * newest evidence record for each, the last transition, and how much of the document
  * compaction would archive. Nothing here is decided twice: every field is read
  * from the document, and `latestEvidenceForGate` is the same reader a gate check
@@ -2104,7 +2155,7 @@ export function writeJsonAtomic(path, value) {
  * Pure: no I/O, so a test drives it from a document and a caller decides where it
  * is written.
  */
-export function buildStateBrief(state) {
+export function buildStateBrief(state, policy = null) {
   const s = isPlainObject(state) ? state : {};
   const session = isPlainObject(s.session) ? s.session : {};
   const work = isPlainObject(s.activeWorkItem) ? s.activeWorkItem : null;
@@ -2125,6 +2176,16 @@ export function buildStateBrief(state) {
   const epic = work?.epicId && isPlainObject(epics[work.epicId]) ? epics[work.epicId] : null;
   const stories = isPlainObject(epic?.stories) ? epic.stories : {};
   const storyStatuses = Object.values(stories);
+
+  // WHAT IS LEFT IN THE ACTIVE EPIC, named rather than counted. `Resume` compares state against the
+  // epic markdown story by story, and a count cannot be compared with anything, so the brief names
+  // each story still not `done` with its status. Derived from the same map the counts come from.
+  const remaining = Object.entries(stories)
+    .filter(([, status]) => status !== 'done')
+    .map(([id, status]) => ({ id, status }));
+
+  // The legal edge out of the current phase, and the gates it carries. See `legalEdgesFrom`.
+  const next = legalEdgesFrom(session.currentPhase, policy);
 
   // What `state compact --keep active` would move, counted by the same two pure
   // functions compaction itself uses. Reported rather than implied, because the
@@ -2150,8 +2211,10 @@ export function buildStateBrief(state) {
         status: epic.status || null,
         storiesDone: storyStatuses.filter((v) => v === 'done').length,
         storiesTotal: storyStatuses.length,
+        remaining,
       }
       : null,
+    next,
     gates,
     evidence: { inline, archivable: archivableEvidence.length, superseded: (Array.isArray(s.gateEvidence) ? s.gateEvidence : []).filter((r) => r?.status === 'superseded').length },
     history: { inline: historyInline, archivable: archivableHistory.length, entryLimit: HISTORY_ENTRIES_KEPT, charLimit: MAX_HISTORY_ENTRY_CHARS },
@@ -2173,7 +2236,19 @@ export function renderStateBrief(brief) {
   lines.push('');
   lines.push(`phase: ${b.phase || '(unset)'} · workflow: ${b.workflowPath || '(unset)'} · tracking: ${b.trackingMode || '(unset)'}`);
   if (b.story) lines.push(`story: ${b.story.status || '(unset)'}`);
-  if (b.epic) lines.push(`epic: ${b.epic.status || '(unset)'} — ${b.epic.storiesDone} of ${b.epic.storiesTotal} stories done`);
+  if (b.epic) {
+    lines.push(`epic: ${b.epic.status || '(unset)'} — ${b.epic.storiesDone} of ${b.epic.storiesTotal} stories done`);
+    const remaining = Array.isArray(b.epic.remaining) ? b.epic.remaining : [];
+    if (remaining.length) {
+      lines.push(`  remaining: ${remaining.map((r) => `${r.id} (${r.status || 'unset'})`).join(', ')}`);
+    }
+  }
+  // The edge out of this phase, so the transition dry run confirms a known edge instead of being the
+  // thing that discovers one. A phase with no legal edge (`closed`) prints nothing, which is the fact.
+  for (const edge of (Array.isArray(b.next) ? b.next : [])) {
+    const needs = Array.isArray(edge.gates) && edge.gates.length ? `needs ${edge.gates.join(', ')}` : 'ungated';
+    lines.push(`next: ${b.phase} -> ${edge.to} (${needs})`);
+  }
   lines.push('');
   lines.push('gates (the newest evidence record for each)');
   for (const row of Array.isArray(b.gates) ? b.gates : []) {

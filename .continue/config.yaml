@@ -65,7 +65,7 @@ customCommands:
       Follow every step in that skill file. Run the Gate Check first by reading `.cadet/state.json`.
 
   - name: cadet-resume
-    description: Inspect .cadet/state.json and resume the workflow from the last recorded phase
+    description: Run `cadet-agent state brief` and resume the workflow from the last recorded phase
     prompt: |
       Read `.cadet/agent/core/cadet-agent.md` for the global directive.
       Read `.cadet/agent/core/skills/Resume.md` as the primary instruction context.

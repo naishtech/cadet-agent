@@ -49,11 +49,18 @@ export const CONTEXT_RECORD_FILE = 'record.json';
 export const CONTEXT_BRIEF_FILE = 'state-brief.md';
 const STATE_BRIEF = `${CONTEXT_DIR}/${CONTEXT_BRIEF_FILE}`;
 
-/** Write the tier-0 brief, before a plan names and hashes it. */
-export function writeStateBrief(targetDir, state) {
+/**
+ * Write the tier-0 brief, before a plan names and hashes it.
+ *
+ * `policy` is passed through so the written brief and the printed one are the SAME rendering. The
+ * brief's legal-edge line reports an opt-in gate (reachability, the playthrough, human acceptance,
+ * architecture fitness) only when the resolved policy requires it, so a caller that omits the policy
+ * writes a brief that under-reports the edge the transition itself would enforce.
+ */
+export function writeStateBrief(targetDir, state, policy = null) {
   const path = join(targetDir, CONTEXT_DIR, CONTEXT_BRIEF_FILE);
   mkdirSync(join(targetDir, CONTEXT_DIR), { recursive: true });
-  writeFileSync(path, renderStateBrief(buildStateBrief(state)), 'utf-8');
+  writeFileSync(path, renderStateBrief(buildStateBrief(state, policy)), 'utf-8');
   return path;
 }
 

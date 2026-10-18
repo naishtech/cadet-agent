@@ -1,5 +1,5 @@
 ---
-description: "Cadet Resume: inspect .cadet/state.json and resume the workflow from the last recorded phase."
+description: "Cadet Resume: run `cadet-agent state brief` and resume the workflow from the last recorded phase."
 ---
 
 ## Primary Context

@@ -1,6 +1,6 @@
 ---
 name: cadet-resume
-description: Inspect .cadet/state.json and resume the workflow from the last recorded phase. Use when starting a new session or after a break.
+description: Run `cadet-agent state brief` and resume the workflow from the last recorded phase. Use when starting a new session or after a break.
 ---
 
 ## Primary Context

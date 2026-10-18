@@ -569,3 +569,46 @@ describe('Reconciliation', () => {
     }
   });
 });
+
+describe('Resume reads the brief, not the record', () => {
+  // WHY THIS EXISTS. `state brief` replaced `.cadet/state.json` at tier 0 of the context plan in 0.63.0,
+  // while the documents that START a session still told a host to open the record. Measured on a consumer
+  // whose record is 78,193 B, that read cost 26,064 tokens against the brief's 484. The rule had been
+  // decided in the machinery and never carried into the prose, which is how a decided thing reverts.
+  //
+  // These assertions are narrow on purpose. The directive names the record legitimately in its hard-gate
+  // and transition sections, so a check that forbade the string outright would fire on correct text —
+  // and a guard that fires on correct text teaches its reader to ignore it.
+
+  it('reads the brief in Phase 1, and validates with the command rather than by reading', () => {
+    const resume = readFileSync(join(skillsDir, 'Resume.md'), 'utf-8');
+    assert.match(resume, /cadet-agent state brief/, 'Phase 1 must run the brief');
+    assert.match(resume, /cadet-agent state validate/, 'the schema check is the command, not a read');
+    assert.ok(
+      !resume.includes('Read and validate it against'),
+      'the instruction that cost 26,064 tokens must be gone',
+    );
+  });
+
+  it('says it in the directive too, because that is where a session lookup starts', () => {
+    const directive = readFileSync(directivePath, 'utf-8');
+    assert.match(directive, /Read it with `cadet-agent state brief`/);
+    assert.match(directive, /run `cadet-agent state brief` and report any gate/, 'the dispatch rule names it');
+  });
+
+  it('names the command in every adapter that seeds a host skill index', () => {
+    const adapters = [
+      join(repoRoot, '.agents', 'skills', 'cadet-resume', 'SKILL.md'),
+      join(repoRoot, '.claude', 'skills', 'cadet-resume', 'SKILL.md'),
+      join(repoRoot, '.github', 'prompts', 'cadet-resume.prompt.md'),
+    ];
+    for (const path of adapters) {
+      assert.ok(existsSync(path), `${path} must exist`);
+      const content = readFileSync(path, 'utf-8');
+      assert.match(content, /state brief/, `${path} seeds the host skill index and must name the command`);
+      assert.ok(!content.includes('Inspect .cadet/state.json'), `${path} must not advertise the record`);
+    }
+    const continueConfig = readFileSync(join(repoRoot, '.continue', 'config.yaml'), 'utf-8');
+    assert.match(continueConfig, /Run `cadet-agent state brief` and resume/);
+  });
+});
