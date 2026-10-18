@@ -9,7 +9,10 @@ You are executing the Cadet **Resume** skill. Your sole purpose is to inspect th
 
 ## Gate Check
 
-Before proceeding, read `.cadet/state.json`. Apply `.cadet/agent/core/RepositoryRoleBoundary.md` before story or gate work. No specific phase gate — this skill can be invoked at any time to inspect and resume the current workflow.
+Before proceeding, run `cadet-agent state brief` and read it — it is the tier-0 summary of the workflow
+record, and it is what this skill inspects. Apply `.cadet/agent/core/RepositoryRoleBoundary.md` before story
+or gate work. No specific phase gate — this skill can be invoked at any time to inspect and resume the
+current workflow.
 
 Read `.cadet/agent/core/HarnessRuntime.md`. Resume must load and validate the active run, stale evidence, remaining budgets, pending escalations, and the next legal transition before recommending an action.
 </instructions>
@@ -48,7 +51,13 @@ Inspect the current project state and resume the Cadet workflow from the last re
      validates before writing.
    - Prompt the user: "What would you like to work on?" and stop.
 3. **If `state.json` exists:**
-   - Read and validate it against `.cadet/state.schema.json`.
+   - Run `cadet-agent state brief` and read it. It carries the phase, the session settings, the active work
+     item, every gate with its newest evidence record, the legal edge out of the current phase, and what
+     compaction would archive.
+   - **Open `.cadet/state.json` only to read a record the brief names.** The document also carries every
+     work item ever closed and every change checkpoint ever recorded, and it grows without bound. Reading it
+     to answer "what phase am I in" pays for the project's whole history, in the context of this turn.
+   - Run `cadet-agent state validate` for the schema check. Reading the document does not validate it.
    - **Do not print a report of it.** Note the phase, the tracking mode and the active work item, and
      keep them for yourself. The phase appears in the reply only as one line of orientation, and only
      when it is not obvious from the active work item.
@@ -124,10 +133,14 @@ Before recommending the next action, validate the harness state:
    budgets, the run status, and any unresolved escalation. Report one only when it changes the next
    action — a hard stop, or a run that stopped rather than reporting an outcome.
 4. Check gate evidence freshness for the current work item:
+   - The brief's gate rows come from `latestEvidenceForGate` — the same reader a gate check uses — so the
+     row IS the check for which record is live. `state validate` names a record that has gone stale.
    - For each claimed `true` gate, confirm a matching, non-expired, non-superseded evidence record.
    - A gate whose evidence has a stale input tree hash, a different work item, or changed acceptance
      criteria is a finding that blocks the transition: name it with the command that re-records it.
-5. Determine the **next legal transition** and whether its required gates are evidence-backed. Use `cadet-agent state transition --to <phase> --dry-run`, which reports the same verdict as a real transition without writing anything — a rejection lists the exact missing or stale gates. **Always pass `--dry-run` here:** without it the command applies the transition and writes `state.json`, which mutates finalised state during what is only meant to be an inspection.
+5. Determine the **next legal transition** and whether its required gates are evidence-backed. The brief
+   prints the legal edge out of the current phase and the gates it needs, so the dry run CONFIRMS a known
+   edge rather than discovering one. Use `cadet-agent state transition --to <phase> --dry-run`, which reports the same verdict as a real transition without writing anything — a rejection lists the exact missing or stale gates. **Always pass `--dry-run` here:** without it the command applies the transition and writes `state.json`, which mutates finalised state during what is only meant to be an inspection.
 6. A gate that is unmet because the work is unfinished is not a finding, and is not reported. Report only
    what the next action needs: a genuine blocker, a transition the framework refused, or a decision that
    belongs to the user.

@@ -95,7 +95,7 @@ The agent maintains a session state file at `.cadet/state.json` conforming to `.
 - Ask the user once during initialization which tracking mode they prefer. Persist the choice in `state.json → session.trackingMode`.
 - **Update state** at every checkpoint: when a phase transitions, when a story is completed, when an epic is done. In `"markdown"` mode, also update the corresponding markdown files. In `"github"` mode, update the corresponding GitHub issue.
 - **Seal a story's evidence when it closes, before the boundary.** `cadet-agent state seal` writes the active work item's records into `.cadet/seal.commit-msg` as `Cadet-*` trailers; the commit that carries that message is the seal, and `state validate --verify-sealed` reads it back. Do this **before** `cadet-agent state begin` moves to the next story — the boundary archives the records, and an archived record can no longer be sealed. Cadet never commits: hand the message to the user, or commit it when the user has asked for one. Rationale and the three homes of evidence: `.cadet/agent/core/Harness.md` §2c.
-- **Read state** on session start: if `state.json` exists, resume from the last recorded phase, active story, and tracking mode.
+- **Read state** on session start: if `state.json` exists, resume from the last recorded phase, active story, and tracking mode. **Read it with `cadet-agent state brief`, not by opening the document.** The brief is the tier-0 summary — the phase, the work item, every gate's newest record, the legal edge out — while the document also carries every closed work item's evidence and the whole change log, and grows without bound.
 - **Never lose state**: if a state update fails, retry or ask the user for help before continuing work. The state file is the single source of truth for what has been completed.
 
 ## Skill Dispatch
@@ -129,7 +129,7 @@ by the phase — an implementation turn can also report a plan change, a measure
 ### Dispatch Rules
 
 1. After classifying the workflow path, announce which skill you are invoking and why.
-2. Before invoking a skill, read `.cadet/state.json` and report any gate that blocks the target phase.
+2. Before invoking a skill, run `cadet-agent state brief` and report any gate that blocks the target phase.
 3. Invoke the skill by loading its file as the primary instruction context:
    - Read `.cadet/agent/core/skills/<SkillName>.md` for the canonical process.
    - For GitHub Copilot, use the `/cadet-<skill>` slash-command prompt when available.

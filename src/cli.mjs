@@ -585,7 +585,7 @@ async function cmdState(opts) {
     const { exists, state } = readState(opts.targetDir);
     if (!exists) fail(opts, 'No .cadet/state.json found.', () => 2);
 
-    const brief = buildStateBrief(state);
+    const brief = buildStateBrief(state, loadPolicy(opts.targetDir));
     if (opts.format === 'json') {
       emit(opts, '', { ok: true, brief });
     } else {
@@ -1812,7 +1812,7 @@ async function cmdHarness(opts) {
       // THE BRIEF IS WRITTEN BEFORE THE PLAN IS BUILT, so the plan can name it and hash it. A plan
       // that named a file nobody had written would report its own tier-0 reference as MISSING, and
       // the caller would have to run two commands to get one answer.
-      writeStateBrief(opts.targetDir, state);
+      writeStateBrief(opts.targetDir, state, policy);
       const plan = buildContextPlan({ targetDir: opts.targetDir, policy, state });
       const planPath = writeContextPlan(opts.targetDir, plan);
       const shown = relative(opts.targetDir, planPath).replace(/\\/g, '/');

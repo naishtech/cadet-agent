@@ -13,6 +13,26 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Changed
+- **The Resume skill reads the brief, not the record.** `state brief` shipped in 0.63.0 and replaced
+  `.cadet/state.json` at tier 0 of the context plan, but the two documents that start a session still told a
+  host to read the document: `Resume.md` Phase 1 ("Read and validate it against `.cadet/state.schema.json`")
+  and the directive's *"Read state on session start"*. Measured on a real consumer whose record is 78,193 B:
+  opening it cost 26,064 tokens, of which 18,085 were appended history a resume never reads, while the live
+  keys it needed were 1,049 and the brief answers the same question in 484.
+  `Resume.md` now runs `state brief`, uses `state validate` for the schema check, and opens the document only
+  to read a record the brief names. The four adapter surfaces that seeded a host's skill index with
+  *"Inspect `.cadet/state.json`"* (`.agents`, `.claude`, `.continue`, `.github/prompts`) now name the command.
+- **The brief reports the legal edge out of the current phase, and what is left in the epic.**
+  `state transition --to <phase> --dry-run` takes a target phase a reader otherwise guesses. The brief prints
+  `next: implementation -> review (needs testsPassed, compileCheckConfirmed, unityAnalyzerClean,
+  storyTrackingUpdated)`, read from the same `TRANSITIONS` table and `requiredGates` function the transition
+  itself calls, so an opt-in gate (reachability, the playthrough, human acceptance, architecture fitness) is
+  reported exactly when the resolved policy requires it, and a repository that enables none sees the frozen
+  lists unchanged. The epic line gains `remaining:`, naming each story still not `done` with its status —
+  the field `Resume.md` Phase 2b compares against the epic markdown, which a count cannot support. Both are
+  derived, and `buildStateBrief` stays pure.
+
 ## [0.63.0] — 2026-10-04
 
 ### Added

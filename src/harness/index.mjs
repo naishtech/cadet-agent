@@ -47,7 +47,7 @@ export {
   HISTORY_ENTRIES_KEPT, MAX_HISTORY_ENTRY_CHARS, historyEntryLength, compactHistory, DEFAULT_MAX_LIVE_EVIDENCE, retainLiveRecords,
   createEvidence, computeInputTreeHash, workItemIdOf, evidenceFreshness,
   latestEvidenceForGate, activeExceptions, requiredGates, conditionalEdgeGates, isUngatedForwardEdge,
-  buildStateBrief, renderStateBrief,
+  buildStateBrief, renderStateBrief, legalEdgesFrom,
   evaluateTransition, resolveStrict,
   applyTransition, resetGatesForNewWorkItem, statePathFor, readState, writeState, writeJsonAtomic, StateError,
 } from './state.mjs';

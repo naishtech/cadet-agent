@@ -180,4 +180,52 @@ describe('state brief — the tier-0 summary', () => {
       assert.match(written, /Open that document for evidence records/, 'the brief says what it omits');
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
+
+  it('names the legal edge out of the current phase, with the gates it carries', () => {
+    const brief = buildStateBrief(stateWithHistory({ records: 4, historyEntries: 2 }), null);
+    const edge = brief.next.find((e) => e.to === 'review');
+
+    assert.ok(edge, 'implementation -> review is the gated edge out of implementation');
+    assert.deepEqual(
+      edge.gates,
+      ['testsPassed', 'compileCheckConfirmed', 'unityAnalyzerClean', 'storyTrackingUpdated'],
+      'the same four gates the transition itself requires',
+    );
+  });
+
+  it('reports an opt-in gate only when the resolved policy requires it', () => {
+    const base = stateWithHistory({ records: 4, historyEntries: 1 });
+    // `review -> validation` is the edge that carries every opt-in gate, so it is where a brief that
+    // ignored the policy would differ from the transition that enforces it.
+    const state = { ...base, session: { ...base.session, currentPhase: 'review' } };
+
+    const off = buildStateBrief(state, null);
+    const on = buildStateBrief(state, {
+      reachability: { enabled: true }, userPlay: { enabled: true }, humanAcceptance: { enabled: true },
+    });
+    const edgeOff = off.next.find((e) => e.to === 'validation');
+    const edgeOn = on.next.find((e) => e.to === 'validation');
+
+    assert.ok(!edgeOff.gates.includes('reachabilityAddressed'), 'absent when the repository has not opted in');
+    assert.ok(edgeOn.gates.includes('reachabilityAddressed'), 'and appended when it has');
+    assert.ok(edgeOn.gates.includes('userPlaythroughConfirmed'));
+  });
+
+  it('names the stories still not done, and the ungated next-story loop', () => {
+    const base = stateWithHistory({ records: 4, historyEntries: 1 });
+    const brief = buildStateBrief(base, null);
+    assert.deepEqual(brief.epic.remaining.map((r) => r.id), ['story-5b.md', 'story-5c.md'], 'done stories are not listed');
+
+    // `closed` is terminal and `validation -> implementation` is the next-story loop, which carries no
+    // gate by design. A brief that hid that edge would leave the loop undiscoverable.
+    const state = { ...base, session: { ...base.session, currentPhase: 'validation' } };
+    const loop = buildStateBrief(state, null).next.find((e) => e.to === 'implementation');
+    assert.ok(loop, 'the next-story loop is a legal edge');
+    assert.equal(loop.ungated, true);
+
+    const rendered = renderStateBrief(buildStateBrief(state, null));
+    assert.match(rendered, /next: validation -> closed \(needs designArtifactSyncConfirmed\)/);
+    assert.match(rendered, /next: validation -> implementation \(ungated\)/);
+    assert.match(rendered, /remaining: story-5b\.md \(in-progress\)/);
+  });
 });
