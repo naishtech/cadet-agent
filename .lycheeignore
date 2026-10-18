@@ -1,0 +1,6 @@
+# Paths lychee must not scan. `npm run lint` walks `**/*.md`, which now reaches
+# the installed dependency's own README (it ships one with a relative link to a
+# file npm does not publish). CI's link job checks out without dependencies, so
+# it never sees these; this keeps the local check — and `bump-version.ps1`, which
+# runs it — from failing on files we do not own.
+node_modules/

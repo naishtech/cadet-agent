@@ -13,7 +13,7 @@ Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished g
   - `templates/` contains runtime templates for planning artifacts.
 - `.cadet/harness.json` holds repository-local budget/policy overrides (preserved by sync).
 - `.cadet/runs/` holds sanitized run ledgers (preserved by sync; no secrets or raw prompts by default).
-- `src/harness/` contains the dependency-free harness implementation (policy, budget, state, verification, context, routing, redaction, ledger, archive, hook).
+- `src/harness/` contains the harness implementation (policy, budget, state, verification, context, routing, redaction, ledger, archive, hook, C# scan and diagram generation). Its one runtime dependency is `nomnoml`, the UML renderer used by `harness diagram` — see [Component diagrams](#component-diagrams).
 - `.cadet/agent/docs/` contains setup guides for each supported IDE.
 - `.github/agents/` contains the Copilot custom agent definitions (Cadet Agent + Cadet Agent Reviewer).
 - `.github/prompts/` contains Copilot slash-command skill prompts (`/cadet-review`, `/cadet-tdd`, etc.).
@@ -163,7 +163,7 @@ flowchart TD
 
 ### Resuming a Session
 
-Use the `/cadet-resume` slash command to pick up where you left off. It reads `.cadet/state.json` and reports the current phase, epic/story progress, and outstanding gates — then dispatches the right skill for the next step. It also checks the current branch and working tree, so leftover changes from a previous task are resolved (commit, stash, push, or move to a new branch) before a new task begins. If no state file exists, it initializes a fresh session from `context-resolution`.
+Use the `/cadet-resume` slash command to pick up where you left off. It runs `cadet-agent state brief`, the tier-0 summary of `.cadet/state.json`, and it checks the document with `cadet-agent state validate`. The brief prints the phase, the active work item, every gate with its newest evidence record, and the legal edge out of the current phase. A session therefore opens a bounded summary, not a record that grows with the project — the document also holds every work item ever closed and every change checkpoint ever recorded. It also checks the current branch and working tree, so leftover changes from a previous task are resolved (commit, stash, push, or move to a new branch) before a new task begins. If no state file exists, it initializes a fresh session from `context-resolution`.
 
 ### Phase Gating
 
@@ -248,6 +248,8 @@ cadet-agent harness context plan|record|validate # plan what a phase loads, reco
 cadet-agent harness cleanup --older-than-ms <n>  # apply the retention policy (bound required)
 cadet-agent harness capabilities                 # available CLI/Unity/MCP/hook/token/cost telemetry
 cadet-agent harness capabilities --verify-host   # probe the configured interception, per action
+cadet-agent harness diagram                      # render UML component diagrams per package, coloured by progress
+cadet-agent harness verify-diagrams              # check the committed diagram tree is current (read-only)
 ```
 
 Every command supports `--format human|json` and exits nonzero for invalid state, failed verification, budget exhaustion, stale evidence, or safety rejection.
@@ -267,6 +269,30 @@ cadet-agent harness record --dry-run             # reports what it would write, 
 ```
 
 See `docs/guidance/HarnessTroubleshooting.md` for stale evidence, budget exhaustion, unavailable Unity CLI, and live MCP connection failures.
+
+## Component diagrams
+
+`cadet-agent harness diagram` renders the C# structure as UML component diagrams — one per (package × epic) — and colours every component by how far its work has progressed: **red** not started, **amber** in progress, **green** done.
+
+The picture is the record, not a separate map to maintain. Progress is read from `.cadet/state.json` and the evidence archive, joined to the files each story's evidence bound (`relevantFiles`).
+
+- **Packages** come from Unity `.asmdef` assembly definitions and their `references`, falling back to top-level folders when a tree has none. Unity test assemblies are left out by default; pass `--include-tests` to keep them.
+- **Components** are the namespaces inside a package.
+- **Scope** is the components the epic touched, plus their one-hop dependencies; anything else is reported as an elided count, so a package stays readable however large it grows.
+- **Colour is cumulative.** A component shows its progress across *all* epics, so a component finished by one epic is green in every diagram, not only the one that finished it.
+- **Drill down.** Click any component box to open that component's page: the files it owns (linked to source), the types it declares, what it depends on and is used by, and the stories that touched it.
+
+The generator writes a self-contained tree under `.cadet/diagrams/`: an `index.html` at the root, an `index.html` per package, a page per component, and a `.noml` (the UML source — the portable, testable artifact) plus a `.svg` per (package × epic). Open `.cadet/diagrams/index.html` to navigate. Rendering is done by [nomnoml](https://github.com/skanaar/nomnoml) (MIT), the CLI's only runtime dependency; no browser, Java, or CDN is involved.
+
+```bash
+cadet-agent harness diagram                       # default output: .cadet/diagrams
+cadet-agent harness diagram --package Cadet.Core  # one package only
+cadet-agent harness diagram --include-tests       # keep Unity test assemblies
+cadet-agent harness diagram --out ./docs/diagrams # somewhere else
+cadet-agent harness verify-diagrams               # is the committed tree still current?
+```
+
+The tree is **committed** and is part of closure: the CodeReview skill regenerates it once the story and epic records are updated, and `harness reconcile` reports a blocking `diagram-drift` finding when it no longer matches — which is what `designArtifactSyncConfirmed` refuses closure on. `harness verify-diagrams` is the read-only check for CI.
 
 ## Examples
 

@@ -46,6 +46,7 @@ Cadet skills are phase-scoped instruction files. When invoked (via `/cadet-<skil
 - [Harness Contract v5](core/HarnessContract-v5.md) — git-backed gate evidence: `state.json` v4 keeps only the active work item, history moves to commit trailers and `.cadet/archive/`
 - [Harness Contract v6](core/HarnessContract-v6.md) — reachability: a story declares how its deliverable becomes reachable, and `reachabilityAddressed` (opt-in) refuses an unowned or expired deferral
 - [Unity CLI](core/UnityCli.md) — CLI commands vs MCP mode, and the gate→command contract
+- [Component Diagrams](core/ComponentDiagrams.md) — UML per C# package, coloured by workflow progress
 
 ## Guidance
 

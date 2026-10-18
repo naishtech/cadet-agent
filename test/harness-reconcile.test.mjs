@@ -849,3 +849,54 @@ describe('harness reconcile CLI', () => {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });
+
+describe('harness reconcile — the generated diagram tree', () => {
+  // A minimal C# package, so the generator has something to render.
+  const csharp = {
+    'Assets/Game/Game.asmdef': '{ "name": "Game", "references": [] }\n',
+    'Assets/Game/Core/Thing.cs': 'namespace Game.Core { public class Thing { } }\n',
+  };
+  const plans = () => ({
+    [`${PLANS}/requirements.md`]: '# Requirements\n',
+    [`${PLANS}/technical-design.md`]: '# Technical design\n',
+    [`${PLANS}/epic-1/epic.md`]: epicMd(),
+    [`${PLANS}/epic-1/story-1.md`]: storyMd(),
+  });
+  const state = {
+    version: 4,
+    stateVersion: 4,
+    session: { workflowPath: 'large', currentPhase: 'validation', trackingMode: 'markdown' },
+    activeWorkItem: { epicId: 'epic-1', storyId: 'story-1.md' },
+    epics: { 'epic-1': { status: 'in-progress', stories: { 'story-1.md': 'in-progress' } } },
+    gates: {},
+    gateEvidence: [],
+    gateExceptions: [],
+  };
+
+  it('reports a blocking diagram-drift when the committed tree is stale', () => {
+    const dir = fixture({ ...plans(), ...csharp, '.cadet/state.json': JSON.stringify(state, null, 2) });
+    try {
+      const generated = spawnSync('node', [cli, 'harness', 'diagram', '--target', dir], { encoding: 'utf-8', windowsHide: true });
+      assert.equal(generated.status, 0, generated.stderr);
+      assert.equal(
+        reconcileArtifacts(dir, { state }).findings.filter((f) => f.code === 'diagram-drift').length,
+        0,
+        'a current tree is not reported',
+      );
+
+      // A new namespace moves the model, so the committed tree stops matching it.
+      writeFileSync(join(dir, 'Assets/Game/Core/Extra.cs'), 'namespace Game.Core.Extra { public class Extra { } }\n');
+      const drifted = reconcileArtifacts(dir, { state }).findings.filter((f) => f.code === 'diagram-drift');
+      assert.equal(drifted.length, 1);
+      assert.equal(drifted[0].severity, 'blocking', 'a warning would report the drift and gate nothing');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('does not check diagrams when none were ever generated', () => {
+    const dir = fixture({ ...plans(), ...csharp, '.cadet/state.json': JSON.stringify(state, null, 2) });
+    try {
+      const findings = reconcileArtifacts(dir, { state }).findings;
+      assert.equal(findings.filter((f) => f.code === 'diagram-drift').length, 0);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});

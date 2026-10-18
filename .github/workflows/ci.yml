@@ -15,6 +15,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '18'
+      # The CLI now has one runtime dependency (nomnoml, the UML renderer), so the
+      # diagram tests need it installed. Until then the suite was dependency-free
+      # and ran straight from a clean checkout.
+      - run: npm ci
       - run: npm test
 
   package:

@@ -1,0 +1,184 @@
+# Component Diagrams
+
+`cadet-agent harness diagram` renders the C# structure as UML component diagrams and colours every
+component by how far the work on it has progressed. It exists to answer one question at a glance:
+*what is built, what is half-built, and what has not been started* — for each package, without
+reading `state.json` by hand.
+
+## What it reads
+
+- **C# sources** and Unity **`.asmdef`** assembly definitions under the scanned root.
+- **`.cadet/state.json`** — the epics, their stories, and each story's status.
+- **`.cadet/archive/evidence/*.jsonl`** — the same records after a closed work item's evidence has
+  left `state.json`. Without this the archive would be invisible and finished stories would read red.
+
+## Packages and components
+
+| Level | Source | Fallback |
+|---|---|---|
+| Package | a Unity `.asmdef` (its `name`), with `references` resolved through the assembly name or the `.asmdef.meta` GUID | each top-level folder that holds C# |
+| Component | a `namespace` inside a package | the containing folder for files that declare none |
+
+Edges between components are derived, best-effort, from `using` directives: a `using` is matched to
+the longest component namespace that prefixes it. This reads declarations, not the compiled type
+graph, and the diagrams should be read the same way.
+
+## Progress and colour
+
+A component is coloured by **every** story that touched it, in **any** epic — not only the stories
+of the diagram's own epic. A component finished in an earlier epic is therefore green in a later
+epic's diagram too. The epic decides what a diagram *shows*; it does not decide the colour.
+
+| Colour | Status | Meaning |
+|---|---|---|
+| 🔴 `#E05555` | `not-started` | no story anywhere touched it |
+| 🟠 `#E8A840` | `in-progress` | some touching stories are `done`, but not all |
+| 🟢 `#4A9A5A` | `done` | every touching story is `done` |
+
+An epic that touches nothing in a package produces no diagram for that package.
+
+## Test assemblies
+
+Unity test assemblies are **excluded by default**. They are numerous, each usually holds a single
+namespace, and their one-component diagrams crowd the index. An assembly is recognised as a test
+assembly by what it references — `UnityEngine.TestRunner`, `UnityEditor.TestRunner`, or
+`nunit.framework.dll` in `precompiledReferences` — not by its name, because projects name test
+assemblies inconsistently. Pass `--include-tests` to keep them.
+
+## Scope
+
+One diagram is produced per **(package × epic)**. Each diagram shows:
+
+- the components the epic **touched**, plus
+- their **one-hop** dependencies, and
+- an **elision marker** naming how many components were left out.
+
+The one hop is computed before anything is added to the set, so a chain of three does not drag the
+whole package in. This is what keeps a package with many namespaces to a small, relevant picture.
+
+## Command
+
+```bash
+cadet-agent harness diagram                        # write the default tree
+cadet-agent harness diagram --package Cadet.Core   # restrict to one package id
+cadet-agent harness diagram --include-tests        # keep Unity test assemblies
+cadet-agent harness diagram --cs-root src/Game     # scan a subtree instead of the target root
+cadet-agent harness diagram --out ./docs/diagrams  # write somewhere else
+cadet-agent harness diagram --format json          # the model, for CI and tests
+cadet-agent harness verify-diagrams                # check the committed tree is current (read-only)
+```
+
+The command is **mutating** and honours `--dry-run`. Its declared writes are `.cadet/diagrams/**`.
+
+## Output
+
+```
+.cadet/diagrams/
+  index.html                 # one link per package, with a status rollup
+  .diagrams-manifest.json    # the files this command wrote, so a re-run can prune
+  <package-id>/
+    index.html               # the component index, then one clickable diagram per epic
+    components/<slug>.html   # the drill-down page for one component
+    <epic-id>.noml           # the UML source — portable, and what the tests assert
+    <epic-id>.svg            # the rendered diagram
+```
+
+The HTML is self-contained (inline SVG and CSS), so a double-click renders it with no sibling assets
+and no network. A re-run **prunes** the files a previous run wrote and this one did not — for example
+after `--include-tests` is dropped — using the manifest, so it deletes its own output and nothing else,
+even when `--out` points into a shared directory.
+
+**Commit the tree.** It is generated, but it is reviewed: it belongs in version control next to the
+change that moved it, which is what makes "stale" a question with an answer. Do not add
+`.cadet/diagrams/` to `.gitignore`.
+
+## Keeping it current
+
+The tree is derived from the code and from `state.json`, so it moves when either does: a new
+namespace, a changed `using`, a package split, a story turning `done`. It is part of closure, not a
+side tool.
+
+- **Regenerate at story closure.** The CodeReview skill runs `cadet-agent harness diagram` after the
+  story and epic records are updated — their statuses colour the diagrams — and commits the tree with
+  the change.
+- **Check it with `cadet-agent harness verify-diagrams`.** Read-only: it recomputes the model in
+  memory and compares it with the committed files, reporting `missing`, `changed` and `extra`, and
+  exits 1 on any drift. It deliberately does not regenerate, because a check that repaired the thing
+  it checks would always pass. This is the command to put in CI.
+- **Closure refuses a stale tree.** `cadet-agent harness reconcile` reports a **blocking**
+  `diagram-drift` finding when the tree no longer matches, and `designArtifactSyncConfirmed` — the
+  `validation → closed` gate — is supported only when the run reports no blocking finding.
+- **Opt-in by presence.** A repository that has never generated the tree has no manifest and is not
+  checked, so adopting the framework changes nothing until diagrams exist.
+
+The comparison is by bytes, which holds only because the output is deterministic: our `.noml` and
+pages, nomnoml pinned by `package-lock.json`, posix paths, and relative links, so no absolute path or
+timestamp reaches the tree. Run `npm ci` rather than `npm install`, or a different nomnoml patch
+release would legitimately report as drift.
+
+## What moves the tree
+
+The model reads three things and nothing else, so most of what changes in a repository leaves the tree
+alone:
+
+| Input | Where it comes from |
+|---|---|
+| The packages, namespaces and `using` edges | the C# sources and their `.asmdef` files |
+| Each component's colour | `state.json → epics[*].stories[*]` — `planned`, `in-progress`, `done` |
+| Which stories touched which component | the evidence `relevantFiles`, inline in `state.json` and in `.cadet/archive/evidence/` |
+
+Everything else in `state.json` is never read: the phase, the gates, `activeWorkItem`, `activeRunId`,
+`lastTransition`, `changeHistory`, and further evidence records that name files already attributed. A
+write to any of them regenerates **byte-identical** output, so `git` shows no diff and
+`harness verify-diagrams` stays clean. Measured against the reference project: a state write that
+changed the phase, set three gates, changed the run id, appended a duplicate evidence record and added
+a change-history entry left all 106 files identical.
+
+So the tree churns once per story that has a footprint — when a story's status changes, and when its
+first evidence names a file in a component it had not touched. Two consequences worth knowing:
+
+- **"Started" on its own does not move it.** A story that is `in-progress` but has had nothing verified
+  yet owns no files, touches no component, and changes no colour. The first `harness verify` for that
+  story is what puts it on the diagram. The colour is derived from evidence, and that is deliberate:
+  it is what keeps the diagram a record rather than a claim.
+- **A story with no evidence appears on no component page**, for the same reason.
+
+## Drill-down
+
+Every component box in a package diagram is clickable and opens that component's page. The package
+page also lists every component, so a component is reachable even when no diagram happens to show it.
+
+A component page carries:
+
+- **Files** — the `.cs` files the component owns, linked to the source.
+- **Types** — the `class` / `struct` / `interface` / `enum` / `record` declarations in those files.
+  This is a text scan, not a parse: a declaration must start a line and name a PascalCase identifier,
+  so an unusual naming style is missed rather than guessed at.
+- **Depends on** / **Used by** — its component neighbours in the package, each a link to their page.
+- **Work** — the epics and stories that touched it, with their status.
+
+The click works offline. nomnoml renders SVG and nothing else — it has no notion of pages — so it
+supplies only the node identity: a node written `[<done id=c3> …]` carries `data-name="c3"` in the
+SVG. The page embeds a `c3 → page` map per diagram and applies it to the inline SVG with a few lines
+of inline script. The map and the SVG are generated from one model, and a test pins the two together,
+because a mismatch would make a box silently unclickable.
+
+## The renderer, and its licence
+
+The SVG is produced by [nomnoml](https://github.com/skanaar/nomnoml) (MIT), called from Node with no
+browser or DOM. It is the CLI's **only runtime dependency** — `src/harness/` was dependency-free before
+this feature, and the `.noml` source it emits is genuine UML (package frame, `«…»` classifiers,
+`-->` dependency arrows), not a flowchart. `graphre` (MIT) comes in transitively. npm carries both
+licences with the published package.
+
+## Tests
+
+`test/harness-diagram.test.mjs`, over `test/fixtures/csharp-packages/`:
+
+- the scan discovers packages, resolves references, groups namespaces, and derives `using` edges;
+- attribution paints a done story's component green, an in-progress story's amber, and an untouched
+  component out of scope;
+- the `.noml` source is exact and deterministic;
+- the rendered SVG names every component and paints each status, and is deterministic;
+- the CLI writes the tree, links the packages from the root index, warns with no work record, and
+  writes nothing under `--dry-run`.

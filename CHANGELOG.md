@@ -13,7 +13,40 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Added
+- **`cadet-agent harness verify-diagrams` — is the committed diagram tree still current?** Read-only:
+  it recomputes the model in memory and compares it with the files on disk, reporting what is missing,
+  changed or left over, and exits 1 on any drift. It deliberately does not regenerate, because a check
+  that repaired the thing it checks would always pass. This is the command to put in CI.
+- **`cadet-agent harness diagram` — UML component diagrams coloured by workflow progress.** It
+  renders the C# structure as one component diagram per (package × epic), and colours every
+  component by how far its work has gone: red not started, amber in progress, green done. The colour
+  is cumulative across all epics, so a component finished by one epic is green in every diagram, not
+  only the one that finished it. Packages
+  come from Unity `.asmdef` assemblies (and their `references`), or top-level folders when a tree has
+  none; components are the namespaces inside a package. Progress is read from `state.json` and the
+  evidence archive, joined to the files each story's evidence bound — so the diagram is the record,
+  and there is no separate map to maintain. Each diagram is scoped to the components the epic
+  touched plus their one-hop dependencies, with the remainder reported as an elided count, so a
+  package stays readable however large it grows. Unity test assemblies are excluded by default —
+  recognised by their TestRunner/nunit references, not their names — and `--include-tests` keeps
+  them. Every component box is **clickable** and opens that component's page — its files (linked to
+  source), the types it declares, what it depends on and is used by, and the stories that touched it —
+  and the package page lists every component, so none is unreachable. Output is a self-contained tree
+  under `.cadet/diagrams/`: a root `index.html`, an `index.html` and a component page per package, and
+  a `.noml` (the UML source, the portable and tested artifact) plus a `.svg` per diagram.
+
 ### Changed
+- **The diagrams are part of story closure, and a stale tree blocks it.** `harness reconcile` reports
+  a blocking `diagram-drift` finding when the committed tree no longer matches the code and the work
+  record — which is exactly what `designArtifactSyncConfirmed` refuses closure on — and the CodeReview
+  skill regenerates the tree at the story boundary, after the statuses that colour it are written. The
+  tree is committed, not git-ignored. Opt-in by presence: a repository that has never generated one has
+  no manifest and is not checked.
+- **`src/harness/` gains its first runtime dependency.** `nomnoml` (MIT, one transitive dependency,
+  `graphre`) renders the diagrams to SVG with no browser or DOM. The harness was dependency-free
+  before this change; the `.noml` artifact it emits is genuine UML rather than a flowchart, which is
+  what the dependency buys. CI now runs `npm ci` before `npm test`.
 - **An evidence record now says what the run cost.** The verification loop measured every attempt's
   duration and output size and wrote both to the attempt SPAN, and to nothing else — so `state.json →
   gateEvidence`, the record an operator reads and a later session summarises, carried the command, the

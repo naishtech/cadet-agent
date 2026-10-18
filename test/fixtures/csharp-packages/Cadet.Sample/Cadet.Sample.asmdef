@@ -1,0 +1,4 @@
+{
+  "name": "Cadet.Sample",
+  "references": ["Cadet.Core"]
+}

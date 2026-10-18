@@ -22,6 +22,8 @@ After review, set `codeReviewCompleted`, `securityReviewPassed`, and `acceptance
 
 An epic whose work only becomes reachable at its last story is a review finding in its own right: name it, and say whether the owner has accepted that ordering.
 
+**The diagrams are part of the change, not a side artifact.** They are derived from the code *and* from `state.json` — a new namespace, a changed `using`, a story turning `done` — so they move when either moves, and a design change that reaches the code moves them too. Regenerate them at closure with `cadet-agent harness diagram` and commit the tree with the change; confirm it is current with `cadet-agent harness verify-diagrams`. A tree left stale is a **blocking** finding when the chain is reconciled (`diagram-drift`), and `designArtifactSyncConfirmed` refuses closure on it. The verify command deliberately does not regenerate: a check that repaired the thing it checks would always pass.
+
 **This review does not accept the work.** A review finds; acceptance is a person's record (`humanAcceptanceConfirmed`, required at epic closure when `humanAcceptance.enabled` is set). A review that reports "no findings" has not satisfied that gate and must not claim to — the two answer different questions, and a review that reached for the acceptance gate is the failure mode the separate gate exists to prevent.
 
 Read `.cadet/agent/core/HarnessRuntime.md`. Review the run ledger, gate evidence freshness, and budget status as first-class inputs.
@@ -80,6 +82,7 @@ Identify defects, regressions, security concerns, and process drift before chang
     - Derive the `why` column from the story's intent and acceptance criteria, not from the diff. That column, and the `intent` and `Guided review` prose, is the only part of the report that is authored rather than measured.
     - **When the inventory is unavailable** (`available: false`), record the reason under `Limits` and do not list files from memory. **When it lists no files**, the report says so plainly rather than padding the table.
     - Name the file date-first so a plain `ls` is chronological, never use a colon, and never overwrite an existing report — append `-2`, as the handoff record does.
+24. **Refresh the component diagrams and confirm they are current.** Run `cadet-agent harness diagram`, commit the tree it writes under `.cadet/diagrams/`, and run `cadet-agent harness verify-diagrams`. Do this **after** the story and epic records are updated (see Completion), because their statuses colour the diagrams — regenerating first leaves the tree describing the state you are about to replace.
 </process>
 
 <documents>
@@ -97,6 +100,7 @@ Identify defects, regressions, security concerns, and process drift before chang
 - Clear pass/fail or ready/not-ready recommendation.
 - Required remediation actions and follow-up validation needs.
 - Traceability notes covering requirements, design, planning artifact alignment, and guidance/standards/policy mismatches.
+- The diagram verdict: the tree is current (`harness verify-diagrams` is clean) and committed with the change, or the drift is named as a blocking finding.
 - The Change Report at `.cadet/reports/`, with the file and acceptance-criterion counts it recorded, and any inventory limitation stated under `Limits`.
 </output>
 
@@ -107,5 +111,6 @@ After review:
 - Set `gates.codeReviewCompleted`, `gates.securityReviewPassed`, and `gates.acceptanceCriteriaValidated` to `true` in `.cadet/state.json` only with supporting evidence (agent-owned review decisions recorded as evidence or `changeHistory` entries). A review entry in the log is a pointer — the review file's path and the commit that carries the verdict — never a retelling of the review: the review file is the record, and it is in git (`.cadet/agent/core/Harness.md` §2c). When `reachability.enabled` is set, also satisfy `gates.reachabilityAddressed` by running `cadet-agent harness verify-reachability --story <path>` **in this phase** — the record is bound to the phase it is created in, so one made during implementation is rejected as stale here. When `userPlay.enabled` is set, satisfy `gates.userPlaythroughConfirmed` **in this phase** too: for a story whose `Play:` declaration is `deferred`, `cadet-agent harness verify-play --story <path>` records it; for one declared `required`, only the person can, and your part is to ask them — whether they played it and whether anything was unexpected — and then record their own answer with `harness confirm --gate userPlaythroughConfirmed --reason "<what they said>" --files <story>`. Never record a `required` story's playthrough yourself, never write the answer for them, and never treat a missing `Play:` line as a deferral.
 - Set `currentPhase` to `validation` only when all review → validation gates are satisfied.
 - In markdown tracking mode, update the story and epic files to reflect completion.
+- **Then regenerate the diagrams** — `cadet-agent harness diagram` — and commit the tree with the change, once the statuses above are written. The colours come from those statuses, so a tree generated before this point is already stale. `cadet-agent harness verify-diagrams` is the check that says the tree now matches the code and the record.
 - The Change Report is written **in this phase**, before the transition: it is the reader-facing summary of what review just verified, and a report emitted later would describe a phase that has already moved on.
 </completion>

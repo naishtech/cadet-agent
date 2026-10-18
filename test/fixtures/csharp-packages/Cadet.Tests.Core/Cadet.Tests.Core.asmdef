@@ -1,0 +1,5 @@
+{
+  "name": "Cadet.Tests.Core",
+  "references": ["Cadet.Core", "UnityEngine.TestRunner", "UnityEditor.TestRunner"],
+  "precompiledReferences": ["nunit.framework.dll"]
+}
