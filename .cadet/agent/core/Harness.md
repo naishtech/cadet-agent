@@ -91,7 +91,7 @@ record would substitute for something available.
 The gates deliberately outside that list, and why:
 
 - `compileCheckConfirmed`, `unityAnalyzerClean`, `storyTrackingUpdated` — their automated path can be
-  absent (no Unity CLI, no project script), so forbidding manual confirmation would leave the gate
+  absent (no editor CLI, no project script), so forbidding manual confirmation would leave the gate
   unsatisfiable rather than stricter.
 - `designReviewCompleted` — a review is a judgement, so the reviewer, agent or person, may record it with
   `harness confirm --gate designReviewCompleted` and the strict-closure metadata.
@@ -291,9 +291,9 @@ attempt. See §5.
 
 | Gate | Command | Success | Failure |
 |---|---|---|---|
-| `testsPassed` | `npm test` (this repo) / `unity test <project> --format json` | exit 0 + report | nonzero; parse the report (path + hash are evidence). A command that never **launched** is `blocked`, not a red — see below |
-| `compileCheckConfirmed` | `unity build <project> --target StandaloneWindows64 -o <tmp> --format json` or a configured compile command | exit 0 | nonzero |
-| `unityAnalyzerClean` | `unity run <project> --command <analyzer-cmd> --format json` | exit 0 + zero `UNT*` | nonzero or any `UNT*` |
+| `testsPassed` | the project's test command — `testCommand` in `.cadet/harness.json`, `npm test` by default, and the engine pack names an engine project's runner | exit 0 + report | nonzero; parse the report (path + hash are evidence). A command that never **launched** is `blocked`, not a red — see below |
+| `compileCheckConfirmed` | the project's compile command — `compileCommand` in `.cadet/harness.json`, and the engine pack names the engine's own build | exit 0 | nonzero |
+| `unityAnalyzerClean` | the project's analyzer command — `analyzerCommand` in `.cadet/harness.json`, and the engine pack names the engine's own analyzer | exit 0 + no diagnostic | nonzero or any diagnostic |
 | `acceptanceCriteriaValidated` | `cadet-agent harness verify-acs --story <path>` | every declared AC test appears in the run's inventory | a declared test is absent, an AC declares none, or the inventory is unknown |
 | `reachabilityAddressed` | `cadet-agent harness verify-reachability --story <path>` | the story's reachability is witnessed, or deferred to a work item that exists and is not done | the declaration is missing or malformed, a deferral names a phantom or already-done work item, deferrals form a cycle, or the configured `reachability.command` exits nonzero |
 | `userPlaythroughConfirmed` | ask the person who played it, then `cadet-agent harness confirm --gate userPlaythroughConfirmed --reason "<their answer>" --files <story>` — or, for a `Play: deferred` story, `cadet-agent harness verify-play --story <path>` | a person played the delivered work and said what they did and what they saw, or the story's play deferral names a live work item | a `required` declaration with no person's record (no command produces one); a declaration that is missing, malformed, self-deferring, deferring to a work item that does not exist or is already done, or part of a deferral cycle |
@@ -301,7 +301,7 @@ attempt. See §5.
 | `designReviewCompleted` | `cadet-agent harness verify-design-review --artifact <path> --files <design,requirements,ADRs>` | the review artifact names its reviewer and inputs, every finding has a known disposition, and every contested finding names its resolver | the artifact has no Findings section, no reviewer or no inputs; a finding id or disposition is not recognised; an `accepted`/`deferred` finding names nowhere; a contested finding has no resolution naming who decided it; or nothing was bound with `--files` |
 | `humanAcceptanceConfirmed` | ask the person who accepted it, then `cadet-agent harness confirm --gate humanAcceptanceConfirmed --reason "<their answer>" --expires-at <ISO-8601>` | a person recorded what they accepted and what they saw | a command is offered for it (nothing automated can answer the question); or a record exists with no answer in it |
 
-- If Unity CLI is unavailable, `compileCheckConfirmed` may be satisfied by a user
+- If the editor's CLI is unavailable, `compileCheckConfirmed` may be satisfied by a user
   `manual-confirmation` record (project path, editor version, timestamp, scope).
 - The analyzer command must be declared in `.cadet/harness.json` before the gate can be automated.
 - **Evidence is bound to relevant files.** `cadet-agent harness verify` hashes the files given by
@@ -345,16 +345,16 @@ attempt. See §5.
   manual confirmation (it is in the default `disallowManualFor`), because the declaration check runs even
   with no probe configured. A `witnessed` declaration is a claim, not a proof: the proof is the
   repository's own `reachability.command`, whose exit code is the verdict. With no command configured the
-  check says so rather than implying a guarantee it did not establish. **A new Unity project has this gate
+  check says so rather than implying a guarantee it did not establish. **A new game project has this gate
   on from installation**: the shipped policy file declares it off, and initialization turns it on after
-  detecting `ProjectSettings/ProjectVersion.txt` (or, failing that, `Assets/` with `Packages/manifest.json`).
-  A project that already owns `.cadet/harness.json` keeps it unchanged, and a non-Unity repository keeps
-  the gate off.
+  detecting the project's engine markers (`ProjectSettings/ProjectVersion.txt`, or `Assets/` with
+  `Packages/manifest.json`). A project that already owns `.cadet/harness.json` keeps it unchanged, and a
+  non-game repository keeps the gate off.
 - **Hard budgets block.** Exceeding a hard limit (context tokens, output tokens, tool calls, wall-clock,
   cost) stops the operation and can never produce a passing gate. Command output is counted against the
   output-token budget, estimated from its byte length. When a configured cost budget exists but provider
   rates are unavailable, the cost is unmeasurable: the run is blocked rather than treated as within budget.
-- See `.cadet/agent/core/UnityCli.md` for the full command contract.
+- See the engine pack (`.cadet/agent/core/engines/<engine>/`) for the full command contract.
 
 ## 6. Loop contract
 
@@ -384,7 +384,7 @@ attempt. See §5.
 ## 8. Tool routing
 
 Order: **deterministic CLI** for verification → **repository read/search** for static context →
-**MCP** only for live Unity inspection or mutation. If MCP is unavailable, fall back to static
+**MCP** only for live editor inspection or mutation. If MCP is unavailable, fall back to static
 context plus CLI verification; **never pretend live inspection occurred**. Live-editor mutation
 requires explicit user confirmation.
 
@@ -429,7 +429,7 @@ budget state is missing.
 | VisualEvidence | rendered frame (static claim) or clip/timed frame sequence (temporal claim) + source under test | inspected-artifact finding (`passed`/`failed`/`blocked`/`visionUnavailable`/`inconclusive`) bound to the source, not the artifact; a temporal claim passes only on a motion artifact, never a still | per run | artifact missing or unreadable. **An image-incapable model does not block**: record `visionUnavailable` and continue |
 | CodeReview | run ledger, gate evidence, the story's reachability declaration | review decision + findings, including the reachability finding — an UNOWNED gap is blocking, an owned deferral is filed | per run | gate evidence stale/missing |
 | Resume | active run, ledger | validated next legal transition | per run | illegal/stale transition requested |
-| MCPSetup | Unity CLI/MCP availability | round-trip + mutation-approval evidence | per run | mutation without confirmation |
+| MCPSetup | editor CLI/MCP availability | round-trip + mutation-approval evidence | per run | mutation without confirmation |
 | AgentReviewer | full ledger + state | audit decision | per run | evidence-backed gates missing |
 
 ## 12. CLI surface

@@ -8,6 +8,7 @@ import {
   DEFAULT_ARCHIVE_LIMITS, ArchiveError,
 } from './harness/archive.mjs';
 import { REPO_ROLES, REPO_ROLE_MARKER } from './harness/repo-role.mjs';
+import { ENGINE_FILE_REL, INIT_COMMAND, resolveEngines, writeEngine } from './harness/engine.mjs';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -294,6 +295,21 @@ export function writeRepoRoleMarker(targetDir, role = REPO_ROLES.CONSUMER) {
 
 // ── Public install entry ────────────────────────────────────────────────────
 
+/**
+ * Say which engine this run recorded, or say that nothing was recorded.
+ *
+ * Silence here is the failure this seam exists to prevent: a project that cannot
+ * name its engine must hear so from the installer, not from a phase skill three
+ * days later.
+ */
+function reportEngine(engineFile, engines) {
+  if (!engineFile.written) {
+    console.log(`   Engine:   none configured (${ENGINE_FILE_REL} not written)`);
+    return;
+  }
+  console.log(`   Engine:   ${engines.join(' + ')} (${ENGINE_FILE_REL})`);
+}
+
 export async function install(targetDir, opts = {}) {
   console.log(`📦 Cadet-Agent — installing to ${targetDir}\n`);
 
@@ -346,13 +362,25 @@ export async function install(targetDir, opts = {}) {
   // edit made to a policy file the framework itself has just created.
   if (seededPolicy) reportSeedReachability(targetDir);
 
+  // 4d. Record the engine seam. `.cadet/engine.json` is what every phase skill
+  // reads to learn which engine it is working in; the pack names the commands.
+  // The answer outranks detection, because a project can hold both marker sets
+  // while the user has still named one primary.
+  const engines = resolveEngines({
+    answered: choice.engines || [],
+    detected: choice.detected?.engines || [],
+    components: selectedComponents || [],
+  });
+  const engineFile = writeEngine(targetDir, { engines, components: selectedComponents || [] });
+  reportEngine(engineFile, engines);
+
   // 5. Report
   const record = buildInstallRecord({
     targetDir,
     version: releaseVersion,
     components: selectedComponents || [],
-    engine: choice.detected,
-    written: extracted,
+    engine: { engines },
+    written: engineFile.written ? [...extracted, engineFile.path] : extracted,
     manifest: componentsManifest,
   });
   writeInstallRecord(targetDir, record);
@@ -988,7 +1016,7 @@ export async function configureInstall(manifest, targetDir, opts = {}) {
     const engines = normalizeEngines(opts.engine || (detected.engine === 'both' ? 'both' : detected.engine));
     const components = componentsForChoice({ hosts, engines, plugins: opts.plugins !== false })
       .filter((id) => available.has(id));
-    return { components: selectComponents(manifest, { components }).map((c) => c.id), source: 'flags', detected };
+    return { components: selectComponents(manifest, { components }).map((c) => c.id), source: 'flags', detected, engines };
   }
 
   const defaults = selectComponents(manifest, {
@@ -1346,9 +1374,22 @@ export async function sync(targetDir, opts = {}) {
 
   // 2b. Ensure the repo-role marker exists even when no files change, so an
   // existing install synced by an older CLI still gets the boundary recorded.
+  const record = readInstallRecord(targetDir);
   if (!readRepoRoleMarker(targetDir)) {
     writeRepoRoleMarker(targetDir, REPO_ROLES.CONSUMER);
   }
+
+  // 2c. Refresh the engine seam, for the same reason: an install that predates
+  // `.cadet/engine.json` gets it on its next sync, even when no other file moves.
+  // The record's primary engine outranks a fresh detection, so a project whose
+  // markers were edited by hand keeps the engine its owner chose.
+  const engines = resolveEngines({
+    answered: [record?.engine?.primary, record?.engine?.secondary].filter(Boolean),
+    detected: detectProject(targetDir).engines,
+    components: record?.components?.length ? record.components : inferComponentsFromDisk(targetDir),
+  });
+  const engineFile = writeEngine(targetDir, { engines, components: record?.components || [] });
+  reportEngine(engineFile, engines);
 
   if (oldVersionNorm === newVersion) {
     console.log(`✅ Already up to date (v${oldVersionNorm}). Nothing to sync.\n`);
@@ -1364,7 +1405,6 @@ export async function sync(targetDir, opts = {}) {
   // installed before records existed is inferred from disk, once, and the
   // inference is written at the end of this run.
   const zipComponents = readComponentsFromZip(zipBuf);
-  const record = readInstallRecord(targetDir);
   const components = record?.components?.length
     ? record.components
     : inferComponentsFromDisk(targetDir);
@@ -1375,7 +1415,7 @@ export async function sync(targetDir, opts = {}) {
     const added = zipComponents.components.map((c) => c.id).filter((id) => !components.includes(id));
     if (added.length) {
       console.log(`   Not installed (new in this release): ${added.join(', ')}`);
-      console.log('   Add them with: npx cadet-agent@latest init --components <ids>');
+      console.log(`   Add them with: ${INIT_COMMAND} --components <ids>`);
     }
   }
   console.log('');
@@ -1426,8 +1466,8 @@ export async function sync(targetDir, opts = {}) {
     targetDir,
     version: newVersion,
     components,
-    engine: detectProject(targetDir),
-    written: [...result.updated, ...result.added],
+    engine: { engines },
+    written: [...result.updated, ...result.added, ...(engineFile.written ? [engineFile.path] : [])],
     manifest: zipComponents,
     previous: record,
   });

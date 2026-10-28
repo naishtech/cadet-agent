@@ -1,7 +1,7 @@
 # Skill: TDD
 
 <role>
-You are a senior Unity/C# engineer who practices test-first development.
+You are a senior engineer who practices test-first development in a game project.
 </role>
 
 <instructions>
@@ -40,13 +40,13 @@ Apply mandatory test-driven development so behavior is validated before and afte
 1. Define expected behavior in test form at confirmed seams.
 2. Write a failing test first (**red**). Record a red evidence record before any green claim.
 3. Implement minimal code to pass the test (**green**).
-4. **Verify through the harness, not by assertion:** run `cadet-agent harness verify --gate testsPassed` (or `npm test` / `unity test <project> --format json` for Unity). The result creates fresh evidence bound to the work item, input tree hash, and acceptance criterion.
+4. **Verify through the harness, not by assertion:** run `cadet-agent harness verify --gate testsPassed`. It runs the project's declared test command (`testCommand` in `.cadet/harness.json`, `npm test` by default) and creates fresh evidence bound to the work item, input tree hash, and acceptance criterion. When the project has its own engine test command, the engine pack names it.
 5. Refactor safely while keeping tests green; re-run verification after every refactor.
 6. Add or adjust coverage for edge cases and regression protection.
 7. Map tests to acceptance criteria and planned tasks. Record the **exact test identifiers** against the AC they prove, in the story — this is the declared-test mapping, and it is what makes coverage checkable.
 8. **Verify declared tests actually ran:** run `cadet-agent harness verify-acs --story <path>`. A declared test that does not appear in the test report is a renamed or unwritten test; fix the story or write the test. Do not mark coverage complete on the strength of the declaration alone.
 9. Report test outcomes clearly, including the evidence IDs that back each criterion.
-10. If Unity code changed, ask the user to focus the Unity window and trigger recompilation; record a `manual-confirmation` for `compileCheckConfirmed` unless Unity CLI is available.
+10. If engine code changed, run the project's compile check; the engine pack names the command. When the pack cannot automate it, ask the user to run the engine's own recompile step and record a `manual-confirmation` for `compileCheckConfirmed`.
 11. **Declare reachability AND play here; verify both in the review phase.** Write the story's `Reachability:` line now — `witnessed — <how a user or operator reaches and sees it>`, or `deferred to <work item> — <why>` — and its `Play:` line — `required — <what the user does in the running game and what they should see>`, or `deferred to <work item> — <why it cannot be played yet>`. The two answer different questions: reachability says a person CAN reach the deliverable, and play says whether a person should PLAY it. When `userPlay.enabled` is set and the story says `required`, the person's playthrough is what satisfies `userPlaythroughConfirmed` before `validation`, and an agent cannot record it: ask that person whether they played the work and what was unexpected, then record their answer with `cadet-agent harness confirm --gate userPlaythroughConfirmed --reason "<what they said>"`. Do **not** run `cadet-agent harness verify-reachability` or `harness verify-play` while `currentPhase` is `implementation`: both gates are REVIEW-phase gates, and a record is bound to the phase it was created in, so one created here is rejected as stale when the review→validation transition is checked. The `CodeReview` skill runs them in the review phase, where they belong. A deliverable nothing can reach is not a delivered increment, however green the suite is; a deliverable nobody has played is not a tested one, however green the suite is; and a deferral whose target has already finished has expired.
 
 ## Retry and stop rules

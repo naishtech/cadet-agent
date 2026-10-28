@@ -612,3 +612,60 @@ describe('Resume reads the brief, not the record', () => {
     assert.match(continueConfig, /Run `cadet-agent state brief` and resume/);
   });
 });
+
+// ── The engine seam in the phase skills ─────────────────────────────────────
+//
+// A phase skill names a capability; the engine pack names the command. A skill
+// that states "unity test <project>" has taken the pack's job back, and the two
+// copies drift — which is the failure this migration exists to remove.
+//
+// The gate id `unityAnalyzerClean` survives this guard on purpose. It is a state
+// key the harness schema defines, an identifier rather than a reference to an
+// engine, and a word-boundary match leaves it alone. Renaming the gate is a
+// harness change and out of scope here, so a guard that forbade the string
+// outright would fire on correct text and teach its reader to ignore it.
+
+describe('Phase skills are engine-neutral', () => {
+  const engineWord = /\b(?:unity|unreal)\b/i;
+  const skillFiles = readdirSync(skillsDir).filter((f) => f.endsWith('.md'));
+
+  it('reads every skill file', () => {
+    assert.ok(skillFiles.length >= 15, `expected at least 15 skills, found ${skillFiles.length}`);
+  });
+
+  for (const file of skillFiles) {
+    it(`${file} names no engine`, () => {
+      const hits = readFileSync(join(skillsDir, file), 'utf-8')
+        .split(/\r?\n/)
+        .map((line, i) => ({ text: line.trim(), n: i + 1 }))
+        .filter((entry) => engineWord.test(entry.text))
+        .map((entry) => `${file}:${entry.n}: ${entry.text}`);
+      assert.deepEqual(hits, [], `a phase skill must not name an engine:\n  ${hits.join('\n  ')}`);
+    });
+  }
+
+  it('sends the reader to the pack for every command it no longer states', () => {
+    // The anti-hollowing pin. The de-Unity pass must leave a pointer where a
+    // command used to be; a skill that lost the command and gained nothing says
+    // nothing, which is worse than the engine-specific text it replaced.
+    const pointers = {
+      'TDD.md': /engine pack/,
+      'Debugging.md': /engine pack/,
+      'Architecture.md': /engine pack/,
+      'MCPSetup.md': /engine pack/,
+      'StoryBreakdown.md': /engine gate the pack defines/,
+    };
+    for (const [file, pointer] of Object.entries(pointers)) {
+      const content = readFileSync(join(skillsDir, file), 'utf-8');
+      assert.match(content, pointer, `${file} must name the engine pack as the owner of its command`);
+    }
+  });
+
+  it('the directive carries the engine row and the stop sentence', () => {
+    const directive = readFileSync(directivePath, 'utf-8');
+    assert.match(directive, /### The Engine Seam/, 'the directive must define the seam once');
+    assert.ok(directive.includes('.cadet/engine.json'), 'the seam must name the engine file');
+    assert.ok(directive.includes('.cadet/agent/core/engines/<engine>/README.md'), 'the row must name the pack');
+    assert.ok(directive.includes('npx cadet-agent@latest init'), 'the stop must name the fix, not only the problem');
+  });
+});

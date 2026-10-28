@@ -38,7 +38,7 @@ Clarify a fuzzy, ambiguous, or contested plan — a feature, a refactor, or a ma
 
 ## Rule: resolve discovery-answerable questions yourself
 
-Before asking anything, mark every question whose answer is discoverable and resolve it yourself using the available tools — inspect the repository and Unity project assets and state instead of spending one of the user's questions on it. Only ask the user what genuinely lives in their head.
+Before asking anything, mark every question whose answer is discoverable and resolve it yourself using the available tools — inspect the repository and the engine project's assets and state instead of spending one of the user's questions on it. Only ask the user what genuinely lives in their head.
 </input>
 
 <process>
@@ -49,7 +49,7 @@ Before asking anything, mark every question whose answer is discoverable and res
    - **question** — one, single, specific question.
    - **domain** — the expected answer space (free text, one-of options, yes/no, number/range).
    - **depends-on** — the earlier questions whose answers determine whether this one matters.
-   - **resolvable-via** — *optional*; if the answer is discoverable (repository / Unity project / editor), mark it so and resolve it yourself instead of asking.
+   - **resolvable-via** — *optional*; if the answer is discoverable (repository / engine project / editor), mark it so and resolve it yourself instead of asking.
    - **risk** — how much the plan depends on this answer × how likely it is wrong.
    - **impact** — how much the answer changes the resulting design.
 
