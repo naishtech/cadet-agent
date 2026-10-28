@@ -58,6 +58,7 @@ function showHelp() {
     npx cadet-agent@latest init     Install Cadet-Agent into the current directory
     npx cadet-agent@latest init --target <dir>   Install into a specific directory
     npx cadet-agent@latest init --components core,host.claude   Install only these components
+    npx cadet-agent@latest init --hosts claude,hermes --engine unity   Configure without questions
     npx cadet-agent@latest sync     Update framework, preserving local policies/plans
     npx cadet-agent@latest sync --target <dir>   Sync a specific directory
 
@@ -187,6 +188,10 @@ function parseArgs(argv) {
       case '--target': case '-t': opts.targetDir = value(a); break;
       case '--source': opts.sourceUrl = value(a); break;
       case '--components': opts.components = value(a).split(',').map((s) => s.trim()).filter(Boolean); break;
+      case '--hosts': opts.hosts = value(a).split(',').map((s) => s.trim()).filter(Boolean); break;
+      case '--engine': opts.engine = value(a); break;
+      case '--plugins': opts.plugins = true; break;
+      case '--no-plugins': opts.plugins = false; break;
       case '--format': opts.format = value(a); break;
       case '--to': opts.to = value(a); break;
       case '--gate': opts.gate = value(a); break;
@@ -2640,6 +2645,9 @@ export async function run(argv) {
     sourceUrl: opts.sourceUrl,
     yes: opts.yes === true,
     components: opts.components,
+    hosts: opts.hosts,
+    engine: opts.engine,
+    plugins: opts.plugins,
     createOnlyPolicy: opts.agentsMd ? { 'AGENTS.md': opts.agentsMd } : undefined,
   };
 

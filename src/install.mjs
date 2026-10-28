@@ -1,5 +1,6 @@
 import { readFileSync, unlinkSync, existsSync, readdirSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, relative, dirname } from 'node:path';
+import { createHash } from 'node:crypto';
 import { createInterface } from 'node:readline';
 import { runUpgrades } from './upgrades.mjs';
 import {
@@ -125,10 +126,15 @@ function promptLine(question) {
   });
 }
 
-/** True when we may prompt: an interactive TTY and not disabled by --yes. */
+/**
+ * True when we may prompt: an interactive TTY, not disabled by --yes.
+ * `interactive: true` states the answer explicitly, which is how the tests drive
+ * the wizard without a terminal.
+ */
 export function canPrompt(opts = {}) {
   if (opts.yes === true) return false;
   if (opts.interactive === false) return false;
+  if (opts.interactive === true) return true;
   return Boolean(process.stdin.isTTY && process.stdout.isTTY);
 }
 
@@ -308,8 +314,21 @@ export async function install(targetDir, opts = {}) {
   console.log('📂 Extracting...');
   const seededPolicy = willCreatePolicyFile(targetDir);
   const createOnly = readCreateOnlyPathsFromZip(zipBuf);
+  const componentsManifest = readComponentsFromZip(zipBuf);
+  const choice = await configureInstall(componentsManifest, targetDir, {
+    ...opts,
+    interactive: canPrompt(opts),
+  });
+  if (choice.cancelled) {
+    console.log('   Cancelled. Nothing was written.');
+    return;
+  }
+  const selectedComponents = choice.components
+    || (componentsManifest ? componentsManifest.components.map((c) => c.id) : null);
+
   const extracted = await extractZip(zipBuf, targetDir, {
     ...opts,
+    components: selectedComponents || undefined,
     createOnlyPaths: createOnly,
     interactive: canPrompt(opts),
   });
@@ -326,6 +345,17 @@ export async function install(targetDir, opts = {}) {
   if (seededPolicy) reportSeedReachability(targetDir);
 
   // 5. Report
+  const record = buildInstallRecord({
+    targetDir,
+    version: releaseVersion,
+    components: selectedComponents || [],
+    engine: choice.detected,
+    written: extracted,
+    manifest: componentsManifest,
+  });
+  writeInstallRecord(targetDir, record);
+  console.log(`   Record:   ${record.files.length} files, ${record.components.length} components (${INSTALL_RECORD_PATH.replace(/\\/g, '/')})`);
+
   console.log(`\n✅ Cadet-Agent v${releaseVersion} installed! Extracted ${extracted.length} files.\n`);
 
   // Print per-IDE next steps
@@ -768,7 +798,9 @@ export function selectComponents(manifest, opts = {}) {
     }
   }
 
-  return ids.map((id) => byId.get(id));
+  return ids
+    .map((id) => byId.get(id))
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
 /**
@@ -849,6 +881,323 @@ function extractionRulesFor(buf, opts) {
   if (!manifest) return null;
   return buildExtractionRules(selectComponents(manifest, opts));
 }
+
+// ── Interactive configuration ───────────────────────────────────────────────
+
+/**
+ * The hosts the installer can configure, with the folder that proves one is in
+ * use here. `id` is the component id; `aliases` are what a user may type.
+ */
+export const HOSTS = Object.freeze([
+  { id: 'host.copilot', aliases: ['copilot', 'github', 'github-copilot'], label: 'GitHub Copilot', marker: '.github' },
+  { id: 'host.claude', aliases: ['claude', 'claude-code'], label: 'Claude Code', marker: '.claude' },
+  { id: 'host.agents', aliases: ['agents', 'deepcode', 'deep-code', 'hermes'], label: 'Deep Code / Hermes', marker: '.agents' },
+  { id: 'host.cursor', aliases: ['cursor'], label: 'Cursor', marker: '.cursor' },
+  { id: 'host.continue', aliases: ['continue'], label: 'Continue', marker: '.continue' },
+]);
+
+const ENGINE_COMPONENTS = Object.freeze({
+  unity: ['engine.unity.plugin', 'engine.unity.cli'],
+  unreal: ['engine.unreal.plugin', 'engine.unreal.cli'],
+});
+
+/** Which hosts already have a folder in this project. */
+export function detectHosts(targetDir) {
+  return HOSTS.filter((h) => existsSync(join(targetDir, h.marker))).map((h) => h.id);
+}
+
+/** Accept `claude,hermes` or `host.claude,host.agents` and return component ids. */
+export function normalizeHostIds(list = []) {
+  const ids = [];
+  for (const raw of list) {
+    const key = String(raw || '').trim().toLowerCase();
+    if (!key) continue;
+    const host = HOSTS.find((h) => h.id === key || h.aliases.includes(key));
+    if (host && !ids.includes(host.id)) ids.push(host.id);
+  }
+  return ids;
+}
+
+/** Map one engine name to its engine list. */
+export function normalizeEngines(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (v === 'unity') return ['unity'];
+  if (v === 'unreal') return ['unreal'];
+  if (v === 'both') return ['unity', 'unreal'];
+  return [];
+}
+
+/**
+ * The component ids an answer set implies. Pure, so the wizard, the flags and
+ * the tests all use the same mapping.
+ */
+export function componentsForChoice({ hosts = [], engines = [], plugins = true } = {}) {
+  const ids = ['core', ...hosts];
+  if (plugins) {
+    for (const engine of engines) ids.push(...(ENGINE_COMPONENTS[engine] || []));
+  }
+  return [...new Set(ids)];
+}
+
+const YES = new Set(['', 'y', 'yes', 'true', '1']);
+const NO = new Set(['n', 'no', 'false', '0']);
+
+/** Parse a comma-separated numbered answer against a list; empty keeps the default. */
+export function parseNumberList(answer, length, fallback = []) {
+  const text = String(answer || '').trim();
+  if (text === '') return fallback;
+  if (/^(none|no)$/i.test(text)) return [];
+  const picked = [];
+  for (const part of text.split(',')) {
+    const n = Number(part.trim());
+    if (!Number.isInteger(n) || n < 1 || n > length) continue;
+    if (!picked.includes(n - 1)) picked.push(n - 1);
+  }
+  return picked;
+}
+
+/**
+ * Walk the four questions and return the component list.
+ *
+ * Precedence, highest first: `--components` (no questions at all),
+ * `--hosts/--engine/--plugins`, the detected defaults (no TTY or `--yes`), then
+ * the wizard. The wizard never invents an engine: if nothing is detected it
+ * offers the choice and takes the answer.
+ */
+export async function configureInstall(manifest, targetDir, opts = {}) {
+  if (!manifest) {
+    return { components: null, source: 'archive-defaults', detected: detectProject(targetDir) };
+  }
+
+  const available = new Set(manifest.components.map((c) => c.id));
+  const detected = detectProject(targetDir);
+  const detectedHosts = detectHosts(targetDir);
+
+  if (opts.components) {
+    return {
+      components: selectComponents(manifest, { components: opts.components }).map((c) => c.id),
+      source: 'components-flag',
+      detected,
+    };
+  }
+
+  if (opts.hosts || opts.engine || opts.plugins !== undefined) {
+    const hosts = normalizeHostIds(opts.hosts || detectedHosts).filter((id) => available.has(id));
+    const engines = normalizeEngines(opts.engine || (detected.engine === 'both' ? 'both' : detected.engine));
+    const components = componentsForChoice({ hosts, engines, plugins: opts.plugins !== false })
+      .filter((id) => available.has(id));
+    return { components: selectComponents(manifest, { components }).map((c) => c.id), source: 'flags', detected };
+  }
+
+  const defaults = selectComponents(manifest, {
+    components: componentsForChoice({
+      hosts: detectedHosts,
+      engines: detected.engines,
+      plugins: true,
+    }).filter((id) => available.has(id)),
+  }).map((c) => c.id);
+
+  if (!canPrompt(opts)) {
+    return { components: defaults, source: 'detected', detected, hosts: detectedHosts, engines: detected.engines, plugins: true };
+  }
+
+  const ask = opts.ask || promptLine;
+  const hosts = await askHosts(ask, detectedHosts);
+  const engines = await askEngines(ask, detected);
+  const plugins = engines.length > 0 ? await askPlugins(ask, engines) : false;
+
+  const chosen = selectComponents(manifest, {
+    components: componentsForChoice({ hosts, engines, plugins }).filter((id) => available.has(id)),
+  }).map((c) => c.id);
+  console.log('');
+  console.log('   Summary');
+  for (const id of chosen) {
+    const c = manifest.components.find((x) => x.id === id);
+    const where = c?.installTo && c.installTo !== '.' ? `  ->  ${c.installTo.replace(/\/$/, '')}` : '';
+    console.log(`     ${id.padEnd(22)} ${c?.label || ''}${where}`);
+  }
+  const confirmed = await ask(`   Write these files? (Y/n): `);
+  if (NO.has(String(confirmed || '').trim().toLowerCase())) {
+    return { components: chosen, source: 'wizard', cancelled: true, detected, hosts, engines, plugins };
+  }
+  return { components: chosen, source: 'wizard', detected, hosts, engines, plugins };
+}
+
+async function askHosts(ask, detectedHosts) {
+  console.log('');
+  console.log('   1/4  Which coding tools do you use?');
+  HOSTS.forEach((h, i) => {
+    const mark = detectedHosts.includes(h.id) ? ' *' : '';
+    console.log(`        ${i + 1}. ${h.label}${mark}`);
+  });
+  const detectedLabels = HOSTS.filter((h) => detectedHosts.includes(h.id)).map((h) => h.label);
+  const hint = detectedLabels.length ? detectedLabels.join(', ') : 'none';
+  const answer = await ask(`        Numbers, comma separated (Enter = ${hint}): `);
+  const picked = parseNumberList(answer, HOSTS.length, detectedHosts.map((id) => HOSTS.findIndex((h) => h.id === id)));
+  return picked.map((i) => HOSTS[i].id);
+}
+
+async function askEngines(ask, detected) {
+  console.log('');
+  const label = detected.engine === 'both' ? 'Unity and Unreal' : (detected.engine || 'none detected');
+  console.log(`   2/4  Which engine?  unity / unreal / both   (detected: ${label})`);
+  const answer = await ask(`        Engine (Enter = ${detected.engine || 'skip'}): `);
+  const engines = normalizeEngines(answer);
+  if (engines.length) return engines;
+  return detected.engines;
+}
+
+async function askPlugins(ask, engines) {
+  console.log('');
+  const answer = await ask(`   3/4  Install the ${engines.join(' + ')} tooling and CLI? (Y/n): `);
+  const text = String(answer || '').trim().toLowerCase();
+  if (NO.has(text)) return false;
+  return YES.has(text) ? true : true;
+}
+
+// ── Install record ──────────────────────────────────────────────────────────
+
+export const INSTALL_RECORD_PATH = join('.cadet', 'agent', 'install.json');
+
+export function installRecordPath(targetDir) {
+  return join(targetDir, INSTALL_RECORD_PATH);
+}
+
+/** The record of what this install wrote, or null when there is none. */
+export function readInstallRecord(targetDir) {
+  try {
+    return JSON.parse(readFileSync(installRecordPath(targetDir), 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+export function writeInstallRecord(targetDir, record) {
+  const path = installRecordPath(targetDir);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`, 'utf-8');
+  return path;
+}
+
+function sha256File(path) {
+  return createHash('sha256').update(readFileSync(path)).digest('hex');
+}
+
+/**
+ * Which component owns a file at its installed path.
+ *
+ * Attribution follows the install roots, not the archive prefixes: the record
+ * names `Assets/Covyne/Cadet/Editor/Window.cs`, while the rule that placed it
+ * says `packages/unity`. The longest install root wins, and anything outside
+ * every engine root belongs to core.
+ */
+function componentForInstalledPath(rel, components, manifest) {
+  const byRoot = [];
+  const byArchivePath = [];
+  for (const c of manifest?.components || []) {
+    if (!components.includes(c.id)) continue;
+    const root = normalizeInstallTo(c.installTo);
+    if (root) byRoot.push({ component: c.id, prefix: root });
+    for (const raw of c.zipPaths || []) {
+      const prefix = normalizePrefix(raw);
+      if (prefix) byArchivePath.push({ component: c.id, prefix });
+    }
+  }
+
+  const longest = (entries) => {
+    for (const entry of entries.sort((a, b) => b.prefix.length - a.prefix.length)) {
+      if (rel === entry.prefix || rel.startsWith(entry.prefix + '/')) return entry.component;
+    }
+    return null;
+  };
+
+  // An install root answers first: `Assets/Covyne/Cadet/...` belongs to the
+  // component that put it there, whatever its archive path was.
+  const byRootHit = longest(byRoot);
+  if (byRootHit) return byRootHit;
+  // A component installed in place keeps its archive path, so the archive prefix
+  // identifies it: `.claude/...` is Claude Code's, not core's.
+  return longest(byArchivePath) || 'core';
+}
+
+/**
+ * Describe what this run wrote: every file with its hash, the components, the
+ * engine, and the roots the components installed into.
+ *
+ * The hashes are what make uninstall possible without guessing, and what lets a
+ * later sync say "12 files changed since install" instead of overwriting in silence.
+ */
+export function buildInstallRecord({ targetDir, version, components, engine, written, manifest, previous = null }) {
+  const byPath = new Map();
+  for (const entry of previous?.files || []) {
+    if (entry?.path) byPath.set(entry.path, entry);
+  }
+
+  for (const absolute of written) {
+    const rel = relative(targetDir, absolute).replace(/\\/g, '/');
+    byPath.set(rel, {
+      path: rel,
+      sha256: sha256File(join(targetDir, rel)),
+      component: componentForInstalledPath(rel, components, manifest),
+    });
+  }
+
+  // A file the record names but the disk no longer has was removed by an
+  // upgrade or by the consumer. Drop it: a record that lists absent files makes
+  // uninstall report failures that are not failures.
+  const files = [...byPath.values()]
+    .filter((entry) => existsSync(join(targetDir, entry.path)))
+    .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+
+  const dirs = [...new Set(
+    (manifest?.components || [])
+      .filter((c) => components.includes(c.id))
+      .map((c) => normalizeInstallTo(c.installTo))
+      .filter(Boolean),
+  )].sort();
+
+  const targets = {};
+  for (const [name, ids] of Object.entries(ENGINE_COMPONENTS)) {
+    const selected = ids.filter((id) => components.includes(id));
+    if (!selected.length) continue;
+    const comp = (manifest?.components || []).find((c) => c.id === selected[0]);
+    targets[name] = { pluginRoot: normalizeInstallTo(comp?.installTo) || null };
+  }
+
+  const engines = engine?.engines || [];
+  return {
+    schemaVersion: 1,
+    suiteVersion: version || null,
+    installedAt: new Date().toISOString(),
+    components: [...components].sort(),
+    engine: { primary: engines[0] || null, secondary: engines[1] || null },
+    targets,
+    dirs,
+    files,
+  };
+}
+
+/**
+ * Infer the component set from what is on disk, for a project installed before
+ * records existed (0.63.x). Probes only paths the framework itself created.
+ */
+export function inferComponentsFromDisk(targetDir) {
+  const ids = ['core'];
+  for (const host of HOSTS) {
+    if (existsSync(join(targetDir, host.marker))) ids.push(host.id);
+  }
+  if (isDirectory(join(targetDir, 'Assets', 'Covyne', 'Cadet'))) {
+    ids.push('engine.unity.plugin');
+    if (existsSync(join(targetDir, 'Assets', 'Covyne', 'Cadet', 'CLI', 'dist.sh'))) ids.push('engine.unity.cli');
+  }
+  if (existsSync(join(targetDir, 'Plugins', 'CadetBuild', 'CadetBuild.uplugin'))) {
+    ids.push('engine.unreal.plugin');
+    if (existsSync(join(targetDir, 'Plugins', 'CadetBuild', 'CLI', 'dist.sh'))) ids.push('engine.unreal.cli');
+  }
+  return ids;
+}
+
+
 
 // ── Project detection ───────────────────────────────────────────────────────
 
@@ -971,6 +1320,26 @@ export async function sync(targetDir, opts = {}) {
   const zipBuf = await downloadZip(asset.browser_download_url);
   console.log(`   Downloaded ${(zipBuf.length / 1024).toFixed(0)} KB\n`);
 
+  // 3b. Which components does this project own? The record answers. A project
+  // installed before records existed is inferred from disk, once, and the
+  // inference is written at the end of this run.
+  const zipComponents = readComponentsFromZip(zipBuf);
+  const record = readInstallRecord(targetDir);
+  const components = record?.components?.length
+    ? record.components
+    : inferComponentsFromDisk(targetDir);
+  if (!record?.components?.length) {
+    console.log(`   No install record: inferred ${components.length} components from disk`);
+  }
+  if (zipComponents) {
+    const added = zipComponents.components.map((c) => c.id).filter((id) => !components.includes(id));
+    if (added.length) {
+      console.log(`   Not installed (new in this release): ${added.join(', ')}`);
+      console.log('   Add them with: npx cadet-agent@latest init --components <ids>');
+    }
+  }
+  console.log('');
+
   // 4. Extract with manifest awareness. Create-only paths (e.g. AGENTS.md) are
   // never overwritten when the consumer already has them.
   console.log('📂 Extracting (preserving local policies and plans)...');
@@ -980,6 +1349,7 @@ export async function sync(targetDir, opts = {}) {
     preserved: existingManifest.preservedPaths || [],
     managed: existingManifest.managedPaths || [],
     createOnly,
+    components,
     ...opts,
     interactive: canPrompt(opts),
   });
@@ -1005,6 +1375,20 @@ export async function sync(targetDir, opts = {}) {
   // Unity project gets the reachability gate on. A consumer that already owned the
   // file is not touched, which is why this runs only when the seed was written.
   if (seededPolicy) reportSeedReachability(targetDir);
+
+  // 4e. Refresh the record: same components, the new version, and hashes for
+  // every file this run wrote. Files the record still names but the disk no
+  // longer has are dropped by the builder.
+  const refreshed = buildInstallRecord({
+    targetDir,
+    version: newVersion,
+    components,
+    engine: detectProject(targetDir),
+    written: [...result.updated, ...result.added],
+    manifest: zipComponents,
+    previous: record,
+  });
+  writeInstallRecord(targetDir, refreshed);
 
   // 5. Report
   console.log('');
