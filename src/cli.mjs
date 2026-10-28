@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, copyFi
 import { fileURLToPath } from 'node:url';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { install, sync } from './install.mjs';
+import { uninstall } from './uninstall.mjs';
 import {
   validateState, migrateStateFile, readState, writeState, evaluateTransition, applyTransition,
   workItemIdOf, loadPolicy, RunLedger, loadRun, listRuns, cleanupRuns, buildReport, formatReport,
@@ -61,6 +62,8 @@ function showHelp() {
     npx cadet-agent@latest init --hosts claude,hermes --engine unity   Configure without questions
     npx cadet-agent@latest sync     Update framework, preserving local policies/plans
     npx cadet-agent@latest sync --target <dir>   Sync a specific directory
+    npx cadet-agent@latest uninstall   Remove what the install record proves, and nothing else
+    npx cadet-agent@latest uninstall --dry-run   Show the four lists; delete nothing
 
     cadet-agent state init          Create the first .cadet/state.json (never overwrites one)
     cadet-agent state brief         Print the tier-0 summary: phase, work item, gates, archivable records
@@ -192,6 +195,7 @@ function parseArgs(argv) {
       case '--engine': opts.engine = value(a); break;
       case '--plugins': opts.plugins = true; break;
       case '--no-plugins': opts.plugins = false; break;
+      case '--force': opts.force = true; break;
       case '--format': opts.format = value(a); break;
       case '--to': opts.to = value(a); break;
       case '--gate': opts.gate = value(a); break;
@@ -2658,6 +2662,9 @@ export async function run(argv) {
         break;
       case 'sync':
         await sync(opts.targetDir, installOpts);
+        break;
+      case 'uninstall':
+        await uninstall(opts.targetDir, { dryRun: opts.dryRun === true, force: opts.force === true });
         break;
       case 'state':
         await cmdState(opts);
