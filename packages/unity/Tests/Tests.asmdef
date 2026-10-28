@@ -1,0 +1,13 @@
+{
+    "name": "Tests",
+    "references": [
+        "Covyne.CADET.Editor",
+        "Covyne.CADET.Editor.Lite"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ]
+}

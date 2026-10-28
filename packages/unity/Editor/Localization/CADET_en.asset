@@ -1,0 +1,617 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e9620f8c34305754d8cc9a7e49e852d9, type: 3}
+  m_Name: CADET_en
+  m_EditorClassIdentifier: 
+  m_LocaleId:
+    m_Code: en
+  m_SharedData: {fileID: 11400000, guid: 466cb8ae31477084da6e574329c1db9d, type: 2}
+  m_Metadata:
+    m_Items: []
+  m_TableData:
+  - m_Id: 144891314176
+    m_Localized: Profile Editor
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451520
+    m_Localized: Create New Profile
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451521
+    m_Localized: Edit Profile
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451522
+    m_Localized: Basic Settings
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451523
+    m_Localized: Unity Settings
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451524
+    m_Localized: Steam Settings
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451525
+    m_Localized: Epic Settings
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451526
+    m_Localized: macOS Settings
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451527
+    m_Localized: Depots
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451528
+    m_Localized: 'Depot {0}: {1} ({2})'
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451529
+    m_Localized: Profile Name
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451530
+    m_Localized: A unique name to identify this build profile
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451531
+    m_Localized: Platform
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451532
+    m_Localized: 'Target platform: Steam, Epic Games Store, or both'
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451533
+    m_Localized: Operating System
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451534
+    m_Localized: 'Target operating system: Windows, macOS, or both'
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451535
+    m_Localized: Build Only
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451536
+    m_Localized: If enabled, only builds the project without publishing to any platform
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451537
+    m_Localized: macOS Signing
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451538
+    m_Localized: Enable code signing for macOS builds
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451539
+    m_Localized: Git Branch
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451540
+    m_Localized: The Git branch to use for the build
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451541
+    m_Localized: Editor Path
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451542
+    m_Localized: Path to the Unity Editor executable
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451543
+    m_Localized: Project Path
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451544
+    m_Localized: Path to the Unity project directory
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451545
+    m_Localized: Build Output Path
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451546
+    m_Localized: Directory where Unity build output will be saved
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451547
+    m_Localized: Project Name
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451548
+    m_Localized: Name of the Unity project
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840128
+    m_Localized: App ID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840129
+    m_Localized: Steam App ID for your game
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840130
+    m_Localized: SteamCMD (Windows)
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840131
+    m_Localized: Path to SteamCMD executable for Windows
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840132
+    m_Localized: SteamCMD (macOS/Linux)
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840133
+    m_Localized: Path to SteamCMD script for macOS/Linux
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840134
+    m_Localized: Use Sentry File
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840135
+    m_Localized: Whether to use a sentry file for Steam authentication
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840136
+    m_Localized: Description
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840137
+    m_Localized: Description for the Steam build
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840138
+    m_Localized: Set Live Branch
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840139
+    m_Localized: Steam branch name to set as live
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840140
+    m_Localized: Content Root
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840141
+    m_Localized: Root directory for Steam content
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840142
+    m_Localized: Build Output
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840143
+    m_Localized: Output directory for Steam build files
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840144
+    m_Localized: Depot ID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840145
+    m_Localized: Steam depot ID for this depot
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840146
+    m_Localized: OS
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840147
+    m_Localized: Operating system for this depot
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840148
+    m_Localized: Local Path
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840149
+    m_Localized: Local file system path for depot content
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840150
+    m_Localized: Depot Path
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840151
+    m_Localized: Path within the Steam depot
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840152
+    m_Localized: Recursive
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840153
+    m_Localized: Whether to include subdirectories recursively
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840154
+    m_Localized: Product ID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840155
+    m_Localized: Epic Games Store product ID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840156
+    m_Localized: Organization ID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840157
+    m_Localized: Epic Games organization ID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840158
+    m_Localized: Artifact ID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840159
+    m_Localized: Epic Games artifact ID for the build
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840160
+    m_Localized: Sandbox ID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840161
+    m_Localized: Epic Games sandbox ID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840162
+    m_Localized: BuildPatchTool Path
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840163
+    m_Localized: Path to Epic Games BuildPatchTool directory
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840164
+    m_Localized: Enable Signing
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840165
+    m_Localized: Enable code signing for macOS builds
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840166
+    m_Localized: Entitlements Path
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840167
+    m_Localized: Path to the macOS entitlements file
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840168
+    m_Localized: Cancel
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840169
+    m_Localized: Save
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840170
+    m_Localized: Browse
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840171
+    m_Localized: Edit
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840172
+    m_Localized: Done
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840173
+    m_Localized: Remove
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840174
+    m_Localized: Add Depot
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840175
+    m_Localized: OK
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840176
+    m_Localized: Validation Error
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840177
+    m_Localized: Profile Saved
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840178
+    m_Localized: Profile editor failed to initialize.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840179
+    m_Localized: Select Unity Editor
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840180
+    m_Localized: Select Unity Project
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840181
+    m_Localized: Select Build Output Directory
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840182
+    m_Localized: Select BuildPatchTool Directory
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840183
+    m_Localized: Select Entitlements File
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840184
+    m_Localized: steam
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840185
+    m_Localized: epic
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840186
+    m_Localized: both
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840187
+    m_Localized: windows
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840188
+    m_Localized: mac
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840189
+    m_Localized: Yes (1)
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840190
+    m_Localized: No (0)
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840191
+    m_Localized: C.A.D.E.T
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840192
+    m_Localized: CADET - Cross-platform Automated Deployment Engine & Tooling
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840193
+    m_Localized: 'Profile:'
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840194
+    m_Localized: New
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840195
+    m_Localized: Edit
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840196
+    m_Localized: Delete
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840197
+    m_Localized: Duplicate
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840198
+    m_Localized: Cancel
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840199
+    m_Localized: OK
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840200
+    m_Localized: Test CADET Binary (Show Usage)
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840201
+    m_Localized: Configure Dependencies
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840202
+    m_Localized: Build Only
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840203
+    m_Localized: Publish Only
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840204
+    m_Localized: Build & Publish
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840205
+    m_Localized: Clear Output
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840206
+    m_Localized: Save Log
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840207
+    m_Localized: Testing CADET binary...
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840208
+    m_Localized: === Running dist.sh ===
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840209
+    m_Localized: No profiles available. Click 'New' to create one.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840210
+    m_Localized: 'Platform:'
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840211
+    m_Localized: 'Unity Project:'
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840212
+    m_Localized: 'Build Output:'
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840213
+    m_Localized: Delete Profile
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840214
+    m_Localized: Are you sure you want to delete the profile '{0}'?\n\nThis action
+      cannot be undone.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840215
+    m_Localized: Duplicate Profile
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840216
+    m_Localized: Profile duplication for '{0}' will be implemented here.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840217
+    m_Localized: Save Log
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840218
+    m_Localized: 'Console Output:'
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840219
+    m_Localized: Output will appear here...
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840220
+    m_Localized: C.A.D.E.T Setup
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840221
+    m_Localized: Welcome to CADET
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840222
+    m_Localized: Cross-platform Automated Deployment Engine & Tooling
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840223
+    m_Localized: Before you can deploy builds, CADET requires third-party tools from
+      platform vendors. These tools are not included due to license restrictions.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840224
+    m_Localized: Required Dependencies
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840225
+    m_Localized: Console Output
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840226
+    m_Localized: Output will appear here during installation...
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840227
+    m_Localized: Clear Output
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840228
+    m_Localized: Skip for Now
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840229
+    m_Localized: Continue to CADET
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840230
+    m_Localized: Skip & Continue
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840231
+    m_Localized: 'Description:'
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840232
+    m_Localized: 'Install Location:'
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840233
+    m_Localized: "\u2696\uFE0F License Agreement Required"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840234
+    m_Localized: I have reviewed and accept the license terms
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840235
+    m_Localized: 'Or specify custom installation path:'
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840236
+    m_Localized: Download & Extract
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840237
+    m_Localized: Uninstall
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840238
+    m_Localized: Verify Installation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840239
+    m_Localized: Retry
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840240
+    m_Localized: Manual Download
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840241
+    m_Localized: View License
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840242
+    m_Localized: Browse...
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840243
+    m_Localized: Verify Custom Path
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840244
+    m_Localized: Select {0} Directory
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840245
+    m_Localized: Select {0}
+    m_Metadata:
+      m_Items: []
+  references:
+    version: 2
+    RefIds: []

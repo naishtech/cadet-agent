@@ -1,0 +1,5 @@
+# Shell scripts must keep LF line endings.
+# core.autocrlf is true on Windows checkouts. Without this rule a copied CLI
+# script is written back as CRLF, and bash cannot run it. Seen once, in a
+# consumer project, which needed the same rule before its copy would start.
+*.sh text eol=lf

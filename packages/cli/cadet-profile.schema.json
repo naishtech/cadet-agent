@@ -1,0 +1,497 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cadet-cli.local/schemas/profile.json",
+  "title": "CADET CLI Build Profile",
+  "description": "Configuration schema for CADET CLI build and publish operations",
+  "type": "object",
+  "required": [
+    "profileName",
+    "platform",
+    "os",
+    "bundleId"
+  ],
+  "anyOf": [
+    {
+      "required": [
+        "unity"
+      ]
+    },
+    {
+      "required": [
+        "unreal"
+      ]
+    }
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "os": {
+            "enum": [
+              "windows"
+            ]
+          },
+          "platform": {
+            "enum": [
+              "steam",
+              "both"
+            ]
+          }
+        },
+        "required": [
+          "os",
+          "platform"
+        ]
+      },
+      "then": {
+        "properties": {
+          "steam": {
+            "required": [
+              "appId",
+              "steamcmdExe"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "os": {
+            "enum": [
+              "mac"
+            ]
+          },
+          "platform": {
+            "enum": [
+              "steam",
+              "both"
+            ]
+          }
+        },
+        "required": [
+          "os",
+          "platform"
+        ]
+      },
+      "then": {
+        "properties": {
+          "steam": {
+            "required": [
+              "appId",
+              "steamcmdSh"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "os": {
+            "enum": [
+              "both"
+            ]
+          },
+          "platform": {
+            "enum": [
+              "steam",
+              "both"
+            ]
+          }
+        },
+        "required": [
+          "os",
+          "platform"
+        ]
+      },
+      "then": {
+        "properties": {
+          "steam": {
+            "required": [
+              "appId",
+              "steamcmdExe",
+              "steamcmdSh"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "profileName": {
+      "type": "string",
+      "description": "Human-readable name for this build profile",
+      "examples": [
+        "Steam-Public",
+        "Epic-Beta",
+        "Dolven-Steam-Windows"
+      ]
+    },
+    "platform": {
+      "type": "string",
+      "description": "Target platform(s) for publishing",
+      "enum": [
+        "none",
+        "steam",
+        "epic",
+        "both"
+      ]
+    },
+    "os": {
+      "type": "string",
+      "description": "Target operating system(s) for the build",
+      "enum": [
+        "windows",
+        "mac",
+        "both"
+      ]
+    },
+    "bundleId": {
+      "type": "string",
+      "description": "Bundle identifier for macOS code signing (required when os includes 'mac'). Format: com.company.appname",
+      "examples": [
+        "com.example.myapp",
+        "com.covyne.dolven"
+      ]
+    },
+    "useGit": {
+      "type": "boolean",
+      "description": "If true, enables git operations when --git-sync flag is used. Requires gitRepository and gitBranch to be set.",
+      "default": false
+    },
+    "installGitLfsIfMissing": {
+      "type": "boolean",
+      "description": "If true, CADET runs a Git LFS preflight before git sync. It requires git-lfs to be available and runs 'git lfs install' before clone/fetch.",
+      "default": false
+    },
+    "gitRepository": {
+      "type": "string",
+      "description": "Git repository URL for cloning. Required when useGit is true and --git-sync flag is used.",
+      "examples": [
+        "https://github.com/org/repo.git",
+        "git@github.com:org/repo.git"
+      ]
+    },
+    "gitBranch": {
+      "type": "string",
+      "description": "Git branch to checkout and reset to when --git-sync flag is used. Operations: fetch, checkout, hard reset to origin/<branch>, clean untracked files. Runs in unity.projectPath directory. WARNING: Discards all local changes. Requires gitRepository to be set.",
+      "examples": [
+        "main",
+        "release/v1.0",
+        "develop"
+      ]
+    },
+    "unity": {
+      "type": "object",
+      "description": "Unity Editor configuration",
+      "required": [
+        "editorPath",
+        "projectPath",
+        "buildOutputPath",
+        "projectName"
+      ],
+      "properties": {
+        "editorPath": {
+          "type": "string",
+          "description": "Absolute path to Unity Editor executable",
+          "examples": [
+            "/Applications/Unity/Hub/Editor/2022.3.0f1/Unity.app",
+            "/e/unity/installs/versions/6000.2.10f1/Editor/Unity.exe"
+          ]
+        },
+        "projectPath": {
+          "type": "string",
+          "description": "Absolute path to Unity project directory",
+          "examples": [
+            "/path/to/project",
+            "/f/unity/projects/Amethyst"
+          ]
+        },
+        "buildOutputPath": {
+          "type": "string",
+          "description": "Absolute path to build output directory. Windows builds go to <buildOutputPath>/windows/, macOS builds to <buildOutputPath>/macos/",
+          "examples": [
+            "/path/to/builds",
+            "/f/unity/projects/Amethyst/Bin"
+          ]
+        },
+        "projectName": {
+          "type": "string",
+          "description": "Unity project name (used as executable name, e.g., <projectName>.exe or <projectName>.app)",
+          "examples": [
+            "MyGame",
+            "Dolven"
+          ]
+        }
+      }
+    },
+    "unreal": {
+      "type": "object",
+      "description": "Unreal build configuration",
+      "required": [
+        "engineRoot",
+        "projectPath",
+        "buildOutputPath",
+        "projectName",
+        "buildConfiguration"
+      ],
+      "properties": {
+        "engineRoot": {
+          "type": "string",
+          "description": "Absolute path to Unreal Engine root directory"
+        },
+        "projectPath": {
+          "type": "string",
+          "description": "Absolute path to Unreal .uproject file"
+        },
+        "buildOutputPath": {
+          "type": "string",
+          "description": "Absolute path to Unreal build output directory"
+        },
+        "projectName": {
+          "type": "string",
+          "description": "Unreal project name"
+        },
+        "buildConfiguration": {
+          "type": "string",
+          "description": "Unreal build configuration",
+          "enum": [
+            "Development",
+            "Shipping",
+            "DebugGame"
+          ]
+        },
+        "targetPlatforms": {
+          "type": "array",
+          "description": "Target Unreal platforms",
+          "items": {
+            "type": "string"
+          }
+        },
+        "archiveDirectory": {
+          "type": "string",
+          "description": "Optional Unreal archive directory"
+        },
+        "cookerSettingsOverride": {
+          "type": "string",
+          "description": "Optional path to an .ini file that overrides DefaultEditorPerProjectUserSettings.ini in the synced cooker workspace. Use this to disable auto-start servers (e.g. MCP) that would conflict with the dev editor."
+        },
+        "packagingIniOverride": {
+          "type": "string",
+          "description": "Optional path to an .ini file containing +MapsToCook / +DirectoriesToNeverCook entries appended to DefaultGame.ini before cooking. Use for demo/subset builds. Leave empty for full builds."
+        }
+      }
+    },
+    "steam": {
+      "type": "object",
+      "description": "Steam publishing configuration (required if platform is 'steam' or 'both'). Requirements: steamcmdExe required when os is 'windows' or 'both'; steamcmdSh required when os is 'mac' or 'both'",
+      "required": [
+        "appId"
+      ],
+      "properties": {
+        "appId": {
+          "type": "string",
+          "description": "Steam App ID",
+          "pattern": "^[0-9]+$",
+          "examples": [
+            "1234567",
+            "3155820"
+          ]
+        },
+        "steamcmdExe": {
+          "type": "string",
+          "description": "Path to steamcmd.exe (Windows) - relative to project root or absolute. Typically installed to user directory (e.g., %APPDATA%/CADET/Tools/steamcmd/steamcmd.exe on Windows).",
+          "examples": [
+            "steamcmd/steamcmd.exe"
+          ]
+        },
+        "steamcmdSh": {
+          "type": "string",
+          "description": "Path to steamcmd.sh (macOS/Linux) - relative to project root or absolute. Typically installed to user directory (e.g., ~/Library/Application Support/CADET/Tools/steamcmd/steamcmd.sh on macOS).",
+          "examples": [
+            "steamcmd/steamcmd.sh"
+          ]
+        },
+        "useSentryFile": {
+          "type": "boolean",
+          "description": "If true, use sentry file authentication with credentials from ~/.env_dolven_build_steam (automated). If false or omitted, use interactive mode (prompts for password/Steam Guard code). After first successful login with Steam Guard, SteamCMD creates a sentry file for subsequent logins.",
+          "default": false,
+          "examples": [
+            true,
+            false
+          ]
+        },
+        "description": {
+          "type": "string",
+          "description": "Internal description for this build (shown in SteamCMD output and Steam Partner site). Maps to 'Desc' field in app_build.vdf.",
+          "examples": [
+            "Dolven Demo 1.1.0",
+            "Build 2025-12-18",
+            "Release v2.3.0"
+          ]
+        },
+        "setLive": {
+          "type": "string",
+          "description": "Steam branch to set live after upload. Common values: 'default' (public), 'beta', or custom branch names. Maps to 'SetLive' field in app_build.vdf.",
+          "examples": [
+            "default",
+            "beta",
+            "closed_beta"
+          ]
+        },
+        "contentRoot": {
+          "type": "string",
+          "description": "Path to content root directory for Steam depot upload. Usually points to the build output directory. Maps to 'ContentRoot' in app_build.vdf.",
+          "examples": [
+            "../../Bin",
+            "Bin"
+          ]
+        },
+        "buildOutput": {
+          "type": "string",
+          "description": "Path to build output directory for SteamCMD logs. Maps to 'BuildOutput' in app_build.vdf.",
+          "examples": [
+            "../../Bin/build",
+            "Bin/build"
+          ]
+        },
+        "depots": {
+          "type": "array",
+          "description": "List of Steam depots to upload. Each depot represents a set of files for a specific OS.",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "depotId",
+              "os",
+              "localPath",
+              "depotPath",
+              "recursive"
+            ],
+            "properties": {
+              "depotId": {
+                "type": "string",
+                "description": "Steam Depot ID (from Steamworks partner site)",
+                "pattern": "^[0-9]+$",
+                "examples": [
+                  "1234568",
+                  "3155821"
+                ]
+              },
+              "os": {
+                "type": "string",
+                "description": "Operating system for this depot. Used to filter which depots are included when publishing for a specific OS.",
+                "enum": [
+                  "windows",
+                  "mac"
+                ]
+              },
+              "localPath": {
+                "type": "string",
+                "description": "Local path pattern to files relative to contentRoot. Supports wildcards. Use double backslashes for Windows paths in JSON.",
+                "examples": [
+                  "windows\\\\*",
+                  "macos\\\\*",
+                  "*"
+                ]
+              },
+              "depotPath": {
+                "type": "string",
+                "description": "Depot path where files will be placed (root of the depot)",
+                "examples": [
+                  ".",
+                  "game/",
+                  "data/"
+                ]
+              },
+              "recursive": {
+                "type": "string",
+                "description": "Whether to include subdirectories recursively ('1' = yes, '0' = no)",
+                "enum": [
+                  "0",
+                  "1"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "epic": {
+      "type": "object",
+      "description": "Epic Games Store publishing configuration (required if platform is 'epic' or 'both'). Credentials (CLIENT_ID, CLIENT_SECRET) are loaded from ~/.env_cadet_epic_credentials",
+      "required": [
+        "productId",
+        "organizationId",
+        "artifactId",
+        "sandboxId",
+        "buildPatchToolPath"
+      ],
+      "properties": {
+        "productId": {
+          "type": "string",
+          "description": "Epic Product ID (from Epic Developer Portal)",
+          "examples": [
+            "abc123def456"
+          ]
+        },
+        "organizationId": {
+          "type": "string",
+          "description": "Epic Organization ID (from Epic Developer Portal)",
+          "examples": [
+            "org123"
+          ]
+        },
+        "artifactId": {
+          "type": "string",
+          "description": "Epic Artifact ID (from Epic Developer Portal)",
+          "examples": [
+            "artifact123"
+          ]
+        },
+        "sandboxId": {
+          "type": "string",
+          "description": "Epic Sandbox ID (from Epic Developer Portal)",
+          "examples": [
+            "sandbox123"
+          ]
+        },
+        "buildPatchToolPath": {
+          "type": "string",
+          "description": "Path to Epic BuildPatchTool directory - relative to project root or absolute. Typically installed to user directory (e.g., %APPDATA%/CADET/Tools/BuildPatchTool on Windows).",
+          "examples": [
+            "BuildPatchTool",
+            "BuildPatchTool/Engine/Binaries/Mac/BuildPatchTool.sh"
+          ]
+        }
+      }
+    },
+    "macos": {
+      "type": "object",
+      "description": "macOS-specific configuration. Credentials for signing are loaded from ~/.env_cadet_mac_creds",
+      "properties": {
+        "enableSigning": {
+          "type": "boolean",
+          "description": "If true and os includes 'mac', run macOS code signing and notarization before publishing. Requires credentials in ~/.env_cadet_mac_creds",
+          "default": false
+        },
+        "entitlementsPath": {
+          "type": "string",
+          "description": "Path to .entitlements file for code signing - relative to project root. Required for proper macOS app signing.",
+          "examples": [
+            "Tools/MacOS/Dolven.entitlements"
+          ]
+        }
+      }
+    },
+    "gitBashPath": {
+      "type": "string",
+      "description": "Path to git.exe from Git for Windows installation (Windows only). If not specified, defaults to C:/Program Files/Git/bin/git.exe. Git for Windows provides proper credential manager integration.",
+      "examples": [
+        "C:/Program Files/Git/bin/git.exe",
+        "C:/Program Files (x86)/Git/bin/git.exe"
+      ]
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Cadet Build",
+  "Description": "Editor tooling for CADET build/publish workflows.",
+  "Category": "Editor Utilities",
+  "CreatedBy": "Covyne",
+  "CreatedByURL": "",
+  "DocsURL": "",
+  "MarketplaceURL": "",
+  "SupportURL": "",
+  "EngineVersion": "5.8.0",
+  "CanContainContent": false,
+  "Installed": false,
+  "Modules": [
+    {
+      "Name": "CadetBuild",
+      "Type": "Editor",
+      "LoadingPhase": "Default"
+    }
+  ]
+}

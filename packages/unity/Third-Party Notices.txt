@@ -1,0 +1,34 @@
+Third-Party Notices
+
+This package includes or references the following third-party components:
+
+1. Cosmopolitan (Cosmos) Binaries
+   - Provider: Justine Tunney (https://github.com/jart)
+   - License: ISC License
+   - Website: https://github.com/jart/cosmopolitan
+   - Included Files: bash, jq, grep, sed, cut, sort, and other Unix utilities (.ape executables)
+   - Usage: Cross-platform shell environment and command-line utilities for Windows builds
+   - License Text: https://opensource.org/licenses/ISC
+   - Security Note: Open source tools with no known security vulnerabilities
+
+2. SteamCMD
+   - Provider: Valve Corporation
+   - License: Freeware (Valve Steam License)
+   - Website: https://developer.valvesoftware.com/wiki/SteamCMD
+   - Included Files: steamcmd.exe and supporting DLLs (.dll, .exe files)
+   - Usage: Command-line utility for uploading builds to Steam (pre-configured in package)
+   - Terms: https://store.steampowered.com/subscriber_agreement/
+   - Security Note: Official Valve software, widely used by game developers
+
+3. Epic Games BuildPatchTool
+   - Provider: Epic Games, Inc.
+   - License: Epic Games Developer License Agreement
+   - Website: https://dev.epicgames.com/
+   - Included Files: BuildPatchTool.exe and supporting binaries
+   - Usage: Tool for packaging and uploading builds to Epic Games Store (pre-configured in package)
+   - Terms: https://www.epicgames.com/site/en-US/tos
+   - Security Note: Official Epic Games software for developers
+
+All third-party components are used in accordance with their respective license terms and are compatible with the Unity Asset Store EULA. These tools are downloaded and configured automatically by CADET when needed, and are not included in the initial package download to comply with licensing restrictions and reduce package size.
+
+For full license texts and additional terms, please refer to the respective provider websites listed above.

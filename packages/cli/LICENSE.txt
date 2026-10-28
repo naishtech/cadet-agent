@@ -1,0 +1,98 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    CADET CLI LICENSE (STANDARD)
+═══════════════════════════════════════════════════════════════════════════════
+
+Copyright © 2026 Covyne Entertainment
+All rights reserved.
+
+───────────────────────────────────────────────────────────────────────────────
+
+1. GRANT OF LICENSE
+
+   This license grants you a non-exclusive, non-transferable right to install
+   and use the CADET Command Line Interface ("CLI") for local, manual, or
+   desktop-based build and publishing workflows.
+
+   This license is intended for use by individual developers or teams running
+   builds on local machines.
+
+───────────────────────────────────────────────────────────────────────────────
+
+2. PERMITTED USE
+
+   You may:
+
+   • Install and run the CLI on personal or company-owned computers
+   • Execute the CLI manually from a terminal
+   • Script the CLI for local automation
+   • Use the CLI in conjunction with local Unity builds
+   • Use the CLI for commercial or non-commercial projects
+
+───────────────────────────────────────────────────────────────────────────────
+
+3. PROHIBITED USE
+
+   You may not, under this license:
+
+   • Use the CLI in:
+     - Continuous Integration (CI) or Continuous Deployment (CD) systems
+     - Cloud-based or hosted build environments
+     - Headless or unattended build agents
+     - Distributed or parallelized build systems
+   • Use the CLI as part of a shared service or build farm
+   • Redistribute or sublicense the CLI
+   • Circumvent license checks or usage restrictions
+
+   Use of the CLI in any of the above environments requires a separate
+   Enterprise License.
+
+───────────────────────────────────────────────────────────────────────────────
+
+4. ENTERPRISE LICENSING
+
+   An Enterprise License is required for:
+
+   • CI/CD pipelines
+   • Cloud or containerized builds
+   • Automated or scheduled build execution
+   • Multiple concurrent or distributed executions
+
+   For Enterprise licensing, contact:
+   contact@covyne.com
+
+───────────────────────────────────────────────────────────────────────────────
+
+5. OWNERSHIP
+
+   The CLI and all associated intellectual property remain the property of
+   Covyne Entertainment. This license grants usage rights only and does not
+   convey ownership.
+
+───────────────────────────────────────────────────────────────────────────────
+
+6. TERMINATION
+
+   This license is automatically terminated if its terms are violated. Upon
+   termination, all use of the CLI must cease.
+
+───────────────────────────────────────────────────────────────────────────────
+
+7. DISCLAIMER
+
+   The CLI is provided "as is", without warranty of any kind. Covyne
+   Entertainment shall not be liable for any damages arising from its use.
+
+───────────────────────────────────────────────────────────────────────────────
+
+8. GOVERNING LAW
+
+   This license shall be governed by the laws of Australia.
+
+───────────────────────────────────────────────────────────────────────────────
+
+9. CONTACT
+
+   Questions or licensing inquiries:
+   contact@covyne.com
+
+═══════════════════════════════════════════════════════════════════════════════
