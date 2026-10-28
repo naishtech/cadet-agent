@@ -291,7 +291,7 @@ namespace Covyne.CADET.Editor.Tests.Services
         public void IsInCooldown_True_AfterThreeSessionBuilds_WithinCooldownWindow()
         {
             DateTime now = DateTime.UtcNow;
-            // Third build completed 10 seconds ago — still within 30s cooldown
+            // Third build completed inside the cooldown window the service ships
             var jobs = new List<BuildJobDefinition>
             {
                 MakeFinishedJob(BuildJobStatus.Completed, now - TimeSpan.FromMinutes(20), TimeSpan.FromMinutes(1)),
@@ -309,12 +309,15 @@ namespace Covyne.CADET.Editor.Tests.Services
         public void IsInCooldown_False_AfterCooldownWindowExpires()
         {
             DateTime now = DateTime.UtcNow;
-            // Third build completed 40 seconds ago — beyond the 30s cooldown
+            // Third build completed past the cooldown the service ships. Derived from the
+            // service's own constant: the literal 30 s this test used had gone stale when
+            // BaseCooldownSeconds moved to 300, and the test then asserted the opposite of
+            // the behaviour it was written to protect.
             var jobs = new List<BuildJobDefinition>
             {
                 MakeFinishedJob(BuildJobStatus.Completed, now - TimeSpan.FromMinutes(20), TimeSpan.FromMinutes(1)),
                 MakeFinishedJob(BuildJobStatus.Completed, now - TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(1)),
-                MakeFinishedJob(BuildJobStatus.Completed, now - TimeSpan.FromSeconds(40), TimeSpan.FromMinutes(1)),
+                MakeFinishedJob(BuildJobStatus.Completed, now - TimeSpan.FromSeconds(IterationAnalyticsService.BaseCooldownSeconds + 20), TimeSpan.FromMinutes(1)),
             };
 
             IterationInsights result = _service.ComputeInsights(jobs);
