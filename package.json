@@ -9,7 +9,7 @@
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "test:cli": "bash packages/cli/test/run.sh",
-    "lint": "lychee --offline --include-fragments \"**/*.md\"",
+    "lint": "lychee --offline --include-fragments \"**/*.md\" \".cadet/**/*.md\"",
     "verify": "npm test && npm run test:cli && npm run lint"
   },
   "files": [

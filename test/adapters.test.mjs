@@ -1228,4 +1228,84 @@ describe('Adapter inventory', () => {
       checkNoDuplication('.agents/skills/cadet-agent/SKILL.md', 'Deep Code base skill');
     });
   });
+
+  // ── Engine packs and adapters stay separate ────────────────────────────
+  //
+  // An engine pack is core content: it holds the commands a phase skill defers to.
+  // An adapter is a pointer. Neither may borrow the other's sentences, and the
+  // temptation runs one way — paste "install the Unreal plugin" into a Copilot
+  // prompt file and the engine doctrine this epic cleared returns to the adapters.
+  //
+  // Known limit, the same one the core discovery guard states: verbatim lines only.
+
+  describe('Engine packs and adapters stay separate', () => {
+    const packFiles = ['.cadet/agent/core/engines/unity', '.cadet/agent/core/engines/unreal']
+      .flatMap((dir) => {
+        const abs = join(repoRoot, dir.replace(/\//g, '/'));
+        return existsSync(abs)
+          ? readdirSync(abs).filter((f) => f.endsWith('.md')).map((f) => `${dir}/${f}`)
+          : [];
+      });
+
+    const adapterList = [
+      '.github/agents/cadet.agent.md',
+      '.github/agents/cadet-agent-reviewer.agent.md',
+      ...Object.values(ideAdapters['github-copilot'].skillToPrompt).map((p) => `.github/prompts/${p}`),
+      ...ideAdapters['github-copilot'].extraPrompts.map((p) => `.github/prompts/${p}`),
+      '.claude/skills/cadet-agent/SKILL.md',
+      '.claude/skills/cadet-agent-reviewer/SKILL.md',
+      ...Object.values(ideAdapters['claude-code'].skillToFile).map((f) => `.claude/skills/${f}`),
+      ...ideAdapters['claude-code'].extraSkills.map((f) => `.claude/skills/${f}`),
+      '.agents/skills/cadet-agent/SKILL.md',
+      '.agents/skills/cadet-agent-reviewer/SKILL.md',
+      ...Object.values(ideAdapters['deepcode'].skillToFile).map((f) => `.agents/skills/${f}`),
+      ...ideAdapters['deepcode'].extraSkills.map((f) => `.agents/skills/${f}`),
+      '.cursor/rules/cadet-agent.md',
+      '.cursor/rules/cadet-agent-reviewer.md',
+      ...(ideAdapters['cursor'].extraRules || []),
+      '.continue/rules/cadet-agent.md',
+      '.continue/rules/cadet-agent-reviewer.md',
+      ...(ideAdapters['continue'].extraRules || []),
+      '.continue/config.yaml',
+    ];
+
+    function normalizedLines(text) {
+      return text
+        .replace(/`[^`]*`/g, ' ')
+        .split('\n')
+        .map((line) => line.replace(/[*_>#|]/g, ' ').replace(/\s+/g, ' ').trim())
+        .filter((line) => line.length >= 40);
+    }
+
+    it('shares no line between a pack and an adapter', () => {
+      const adapterLines = new Set();
+      for (const rel of adapterList) {
+        if (!existsSync(join(repoRoot, rel.replace(/\//g, '/')))) continue;
+        for (const line of normalizedLines(readFile(rel))) adapterLines.add(line);
+      }
+      const hits = [];
+      for (const rel of packFiles) {
+        for (const line of normalizedLines(readFile(rel))) {
+          if (adapterLines.has(line)) hits.push(`${rel}: "${line.slice(0, 90)}"`);
+        }
+      }
+      assert.deepEqual(hits, [], `An engine pack and an adapter share a line:\n  ${hits.join('\n  ')}`);
+    });
+
+    it('no adapter names an engine', () => {
+      for (const rel of adapterList) {
+        if (!existsSync(join(repoRoot, rel.replace(/\//g, '/')))) continue;
+        const body = bodyOf(rel, readFile(rel));
+        assert.ok(
+          !/\b(?:unity|unreal)\b/i.test(body),
+          `${rel} names an engine; the engine belongs to the pack, not to an adapter`,
+        );
+      }
+    });
+
+    it('the inventory states the engine rule', () => {
+      const inventory = readFile('ADAPTERS.md');
+      assert.match(inventory, /engine pack/i, 'ADAPTERS.md must say how engine packs relate to adapters');
+    });
+  });
 });
