@@ -44,6 +44,7 @@ import { readState, validateState, workItemIdOf } from './state.mjs';
 import { REPO_ROLES, detectRepoRole } from './repo-role.mjs';
 import { loadPolicy } from './policy.mjs';
 import { listRuns, loadRun } from './ledger.mjs';
+import { installDrift } from './install-drift.mjs';
 
 /** The prefix every health line carries, so the reader knows which system spoke. */
 export const STATUS_PREFIX = 'cadet-agent:';
@@ -105,6 +106,20 @@ export function computeStatus(targetDir, { now = new Date() } = {}) {
     });
   }
 
+  // The installer's own record. A missing CLI file is the one install fact that
+  // stops work: every build and publish the project asks for needs those scripts.
+  // A patch to a script is not a problem — it is reported in `install.cli.modified`
+  // and left to the user.
+  const drift = installDrift(targetDir);
+  if (drift.cli.recorded && drift.cli.missing > 0) {
+    problems.push({
+      code: 'cli-missing',
+      message: `the Cadet CLI is missing ${drift.cli.missing} of ${drift.cli.total} files`,
+      blocks: 'every build and publish the project asks for',
+      remedy: 'npx cadet-agent@latest sync',
+    });
+  }
+
   return {
     ok: problems.length === 0,
     line: buildLine({ problems, exists, role }),
@@ -112,6 +127,7 @@ export function computeStatus(targetDir, { now = new Date() } = {}) {
     role: role.role,
     workItemId,
     stateExists: exists,
+    install: drift,
     checkedAt: now.toISOString(),
   };
 }

@@ -1,0 +1,21 @@
+{
+  "profileName": "unreal-macos",
+  "platform": "macos",
+  "os": "macos",
+  "bundleId": "com.example.unreal.mac",
+  "unreal": {
+    "engineRoot": "/Users/Shared/Epic Games/UE_5.8",
+    "projectPath": "/Users/me/projects/game/Game.uproject",
+    "buildOutputPath": "/Users/me/builds/game",
+    "projectName": "Game",
+    "buildConfiguration": "Shipping"
+  },
+  "steam": {
+    "appId": 2369851
+  },
+  "macos": {
+    "signingIdentity": "Developer ID Application: Example (TEAM123)",
+    "teamId": "TEAM123",
+    "notarizationAppleId": "developer@example.com"
+  }
+}

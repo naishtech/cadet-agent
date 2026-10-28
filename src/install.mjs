@@ -333,6 +333,8 @@ export async function install(targetDir, opts = {}) {
     interactive: canPrompt(opts),
   });
   reportCreateOnlySkips(createOnly, targetDir, releaseVersion, opts);
+  const lf = ensureShellScriptsLf(targetDir, extracted);
+  if (lf.added) console.log('   Added *.sh text eol=lf to .gitattributes');
 
   // 4b. Record the repository role. This install targets a consumer project, and
   // the marker lets later CLI/skill invocations say so instead of guessing.
@@ -1199,8 +1201,46 @@ export function inferComponentsFromDisk(targetDir) {
 
 
 
-// ── Project detection ───────────────────────────────────────────────────────
+/**
+ * Every installed shell script must be LF, and the consumer's checkout must keep
+ * it that way.
+ *
+ * A CRLF copy of `dist.sh` does not run: bash reads the trailing CR as part of
+ * the command. This happened once in a consumer project, which needed a
+ * `.gitattributes` rule before its copy would start, so the installer checks the
+ * bytes it wrote and pins the rule that keeps them.
+ *
+ * Returns `{ added, gitattributes }` for the caller to report.
+ */
+export function ensureShellScriptsLf(targetDir, written) {
+  const scripts = (written || []).filter((p) => p.toLowerCase().endsWith('.sh'));
+  const crlf = scripts.filter((p) => {
+    try { return readFileSync(p).includes(0x0d); } catch { return false; }
+  });
+  if (crlf.length > 0) {
+    const names = crlf.map((p) => relative(targetDir, p).replace(/\\/g, '/')).join(', ');
+    throw new Error(`installed script(s) carry CRLF and will not run: ${names}`);
+  }
+  return ensureShellLfAttribute(targetDir);
+}
 
+/** Add `*.sh text eol=lf` to the consumer's .gitattributes, once. */
+export function ensureShellLfAttribute(targetDir) {
+  const path = join(targetDir, '.gitattributes');
+  const rule = '*.sh text eol=lf';
+  let text = '';
+  try { text = readFileSync(path, 'utf-8'); } catch { text = ''; }
+
+  const present = text.split(/\r?\n/).some((line) => line.trim() === rule);
+  if (present) return { added: false, gitattributes: path };
+
+  const block = '# Shell scripts must keep LF: bash cannot run a CRLF copy.\n*.sh text eol=lf\n';
+  const next = text === '' ? block : `${text}${text.endsWith('\n') ? '' : '\n'}\n${block}`;
+  writeFileSync(path, next, 'utf-8');
+  return { added: true, gitattributes: path };
+}
+
+// ── Project detection ───────────────────────────────────────────────────────
 /**
  * Is this an Unreal project?
  *
@@ -1375,6 +1415,9 @@ export async function sync(targetDir, opts = {}) {
   // Unity project gets the reachability gate on. A consumer that already owned the
   // file is not touched, which is why this runs only when the seed was written.
   if (seededPolicy) reportSeedReachability(targetDir);
+
+  const lf = ensureShellScriptsLf(targetDir, [...result.updated, ...result.added]);
+  if (lf.added) console.log('   Added *.sh text eol=lf to .gitattributes');
 
   // 4e. Refresh the record: same components, the new version, and hashes for
   // every file this run wrote. Files the record still names but the disk no

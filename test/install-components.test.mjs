@@ -10,6 +10,7 @@ import { crc32 } from '../src/harness/archive.mjs';
 import {
   readComponentsFromZip, selectComponents, buildExtractionRules, findRule, mapComponentPath,
   extractZip, detectProject, detectUnrealProject, COMPONENTS_FILE,
+  ensureShellScriptsLf, ensureShellLfAttribute,
 } from '../src/install.mjs';
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
@@ -171,6 +172,31 @@ describe('component extraction', () => {
 
   it('fails rather than half-installing an unknown component', async () => {
     await assert.rejects(() => extractZip(makePackageZip(), work, { components: ['engine.mobile'] }), /unknown component/);
+  });
+
+  it('refuses a script that would arrive with CRLF', async () => {
+    const zip = buildZip([
+      { name: COMPONENTS_FILE, content: JSON.stringify(COMPONENTS) },
+      { name: 'packages/cli/dist.sh', content: '#!/bin/bash\r\necho hi\r\n' },
+    ]);
+    const written = await extractZip(zip, work, { components: ['engine.unity.plugin', 'engine.unity.cli'] });
+    assert.throws(() => ensureShellScriptsLf(work, written), /carry CRLF/);
+  });
+
+  it('pins *.sh to LF in the consumer .gitattributes, once', async () => {
+    const zip = buildZip([
+      { name: COMPONENTS_FILE, content: JSON.stringify(COMPONENTS) },
+      { name: 'packages/cli/dist.sh', content: '#!/bin/bash\n' },
+    ]);
+    const written = await extractZip(zip, work, { components: ['engine.unity.plugin', 'engine.unity.cli'] });
+    const first = ensureShellScriptsLf(work, written);
+    assert.equal(first.added, true);
+
+    const text = readFileSync(join(work, '.gitattributes'), 'utf-8');
+    assert.equal(text.split('\n').filter((l) => l.trim() === '*.sh text eol=lf').length, 1);
+
+    const second = ensureShellLfAttribute(work);
+    assert.equal(second.added, false);
   });
 });
 

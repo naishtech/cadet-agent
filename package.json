@@ -8,8 +8,9 @@
   },
   "scripts": {
     "test": "node --test test/*.test.mjs",
+    "test:cli": "bash packages/cli/test/run.sh",
     "lint": "lychee --offline --include-fragments \"**/*.md\"",
-    "verify": "npm test && npm run lint"
+    "verify": "npm test && npm run test:cli && npm run lint"
   },
   "files": [
     "bin/",
@@ -25,7 +26,7 @@
     "cursor",
     "claude-code"
   ],
-  "license": "CC-BY-4.0",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/naishtech/cadet-agent.git"

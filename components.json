@@ -62,7 +62,7 @@
       "zipPaths": ["packages/cli/"],
       "installTo": "Assets/Covyne/Cadet/CLI/",
       "requires": ["engine.unity.plugin"],
-      "exclude": ["PROVENANCE.md"]
+      "exclude": ["PROVENANCE.md", "test/"]
     },
     {
       "id": "engine.unreal.plugin",
@@ -81,7 +81,7 @@
       "zipPaths": ["packages/cli/"],
       "installTo": "Plugins/CadetBuild/CLI/",
       "requires": ["engine.unreal.plugin"],
-      "exclude": ["PROVENANCE.md"]
+      "exclude": ["PROVENANCE.md", "test/"]
     }
   ]
 }

@@ -1,0 +1,29 @@
+{
+  "profileName": "unity-full",
+  "platform": "windows",
+  "os": "windows",
+  "bundleId": "com.example.full",
+  "useGit": true,
+  "gitRepository": "https://example.com/game.git",
+  "gitBranch": "main",
+  "unity": {
+    "editorPath": "C:/Program Files/Unity/Hub/Editor/2022.3.62f3/Editor/Unity.exe",
+    "projectPath": "C:/projects/full",
+    "buildOutputPath": "C:/builds/full",
+    "projectName": "Full"
+  },
+  "steam": {
+    "appId": 2369850
+  },
+  "epic": {
+    "productId": "prod-1",
+    "organizationId": "org-1",
+    "artifactId": "art-1",
+    "sandboxId": "sandbox-1",
+    "buildPatchToolPath": "C:/tools/BuildPatchTool"
+  },
+  "macos": {
+    "signingIdentity": "Developer ID Application: Example (TEAM123)",
+    "teamId": "TEAM123"
+  }
+}
