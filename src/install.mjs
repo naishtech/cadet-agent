@@ -486,13 +486,16 @@ async function planCreateOnly(createOnlyPaths, targetDir, opts = {}) {
 export async function extractZip(buf, targetDir, opts = {}) {
   const createOnlyPaths = opts.createOnlyPaths || [];
   const plan = await planCreateOnly(createOnlyPaths, targetDir, opts);
+  const rules = extractionRulesFor(buf, opts);
 
   const { extracted } = extractArchive(buf, targetDir, {
     limits: ARCHIVE_LIMITS,
     filter: (entry) => {
       if (plan.skip.has(normalizeRel(entry.filename))) return { skip: true };
+      if (rules && !findRule(entry.filename, rules)) return { skip: true };
       return true;
     },
+    mapPath: rules ? (entry) => mapComponentPath(entry.filename, rules) : null,
   });
 
   applyMerges(plan, targetDir, buf);
@@ -526,6 +529,7 @@ export async function extractZipWithManifest(buf, targetDir, { preserved, manage
 
   const plan = await planCreateOnly(createOnly, targetDir, opts);
   kept.push(...plan.kept);
+  const rules = extractionRulesFor(buf, opts);
 
   const { extracted } = extractArchive(buf, targetDir, {
     limits,
@@ -538,8 +542,12 @@ export async function extractZipWithManifest(buf, targetDir, { preserved, manage
       if (plan.skip.has(normalizeRel(entry.filename))) {
         return { skip: true };
       }
+      if (rules && !findRule(entry.filename, rules)) {
+        return { skip: true };
+      }
       return true;
     },
+    mapPath: rules ? (entry) => mapComponentPath(entry.filename, rules) : null,
   });
 
   applyMerges(plan, targetDir, buf);
@@ -701,6 +709,183 @@ export function readCreateOnlyPathsFromZip(buf) {
   } catch {
     return [];
   }
+}
+
+// ── Component manifest (components.json) ────────────────────────────────────
+//
+// One manifest decides what an install writes and where. `components.json` is
+// authored at the repository root and shipped in the zip, with the suite
+// version stamped in by the packager. An archive without the file installs
+// everything, which is the behaviour every earlier release had.
+
+export const COMPONENTS_FILE = 'components.json';
+
+function normalizePrefix(p) {
+  return String(p || '').replace(/^\.?\/+/, '').replace(/\\/g, '/').replace(/\/+$/, '');
+}
+
+function normalizeInstallTo(p) {
+  const n = String(p || '').replace(/\\/g, '/').trim();
+  if (n === '' || n === '.' || n === './') return '';
+  return n.replace(/^\.?\/+/, '').replace(/\/+$/, '');
+}
+
+/** Read `components.json` from the archive. Returns null when the zip has none. */
+export function readComponentsFromZip(buf) {
+  try {
+    const data = readArchiveEntry(buf, COMPONENTS_FILE, ARCHIVE_LIMITS);
+    if (!data) return null;
+    const manifest = JSON.parse(data.toString('utf-8'));
+    return Array.isArray(manifest?.components) ? manifest : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve which components this install writes.
+ *
+ * `opts.components` is a list of ids; absent means every component. A
+ * `required` component is always added, and an unsatisfied `requires` is an
+ * error rather than a silently partial install.
+ */
+export function selectComponents(manifest, opts = {}) {
+  const all = manifest.components;
+  const byId = new Map(all.map((c) => [c.id, c]));
+  const ids = opts.components ? [...opts.components] : all.map((c) => c.id);
+
+  for (const c of all) {
+    if (c.required && !ids.includes(c.id)) ids.push(c.id);
+  }
+
+  const unknown = ids.filter((id) => !byId.has(id));
+  if (unknown.length) throw new Error(`unknown component(s): ${unknown.join(', ')}`);
+
+  for (const id of ids) {
+    for (const required of byId.get(id).requires || []) {
+      if (!byId.has(required)) throw new Error(`component ${id} requires ${required}, which this package does not define`);
+      if (!ids.includes(required)) throw new Error(`component ${id} requires ${required}; select both`);
+    }
+  }
+
+  return ids.map((id) => byId.get(id));
+}
+
+/**
+ * Turn selected components into extraction rules, one per archive path prefix.
+ * The longest prefix wins, so a nested component can place its files more
+ * precisely than the component that contains it.
+ *
+ * `exclude` entries accept two forms: a bare name (`PROVENANCE.md`) excludes that
+ * name anywhere below the prefix, and a trailing slash (`Tests/`) excludes a
+ * folder and everything under it.
+ */
+export function buildExtractionRules(selected) {
+  const rules = [];
+  for (const c of selected) {
+    for (const raw of c.zipPaths || []) {
+      const prefix = normalizePrefix(raw);
+      if (!prefix) continue;
+      rules.push({
+        component: c.id,
+        prefix,
+        installTo: normalizeInstallTo(c.installTo),
+        exclude: (c.exclude || []).map(normalizeExclude),
+      });
+    }
+  }
+  return rules.sort((a, b) => b.prefix.length - a.prefix.length);
+}
+
+/** Keep a trailing slash: it is what marks an exclude as a folder. */
+function normalizeExclude(p) {
+  return String(p || '').replace(/^\.?\/+/, '').replace(/\\/g, '/');
+}
+
+function normalizeEntryName(filename) {
+  return String(filename || '').replace(/^\.?\/+/, '').replace(/\\/g, '/');
+}
+
+/** The rule that owns an archive entry, or null when no component claims it. */
+export function findRule(filename, rules) {
+  const name = normalizeEntryName(filename);
+  for (const rule of rules) {
+    // An exact match means the component names this file, not a folder above it
+    // (`.cadet/harness.json`), so the entry keeps its own name.
+    if (name === rule.prefix) return { rule, rest: name };
+    if (name.startsWith(rule.prefix + '/')) return { rule, rest: name.slice(rule.prefix.length + 1) };
+  }
+  return null;
+}
+
+/** Destination path for an archive entry, or null when it is not installed. */
+export function mapComponentPath(filename, rules) {
+  const found = findRule(filename, rules);
+  if (!found) return null;
+  const { rule, rest } = found;
+  if (isExcluded(rest, rule.exclude)) return null;
+  // No installTo means the component keeps the archive layout, so the entry
+  // keeps its own path rather than the part below the prefix.
+  return rule.installTo ? `${rule.installTo}/${rest}` : normalizeEntryName(filename);
+}
+
+/** Is this path below the component root excluded from the install? */
+function isExcluded(rest, excludes) {
+  for (const pattern of excludes) {
+    if (!pattern) continue;
+    if (pattern.endsWith('/')) {
+      const folder = pattern.replace(/\/+$/, '');
+      if (rest === folder || rest.startsWith(folder + '/')) return true;
+    } else if (rest === pattern || rest.endsWith('/' + pattern)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Extraction rules for this archive, or null when the archive carries no manifest. */
+function extractionRulesFor(buf, opts) {
+  const manifest = readComponentsFromZip(buf);
+  if (!manifest) return null;
+  return buildExtractionRules(selectComponents(manifest, opts));
+}
+
+// ── Project detection ───────────────────────────────────────────────────────
+
+/**
+ * Is this an Unreal project?
+ *
+ * A `.uproject` at the root is the strong marker. `Source/` plus a
+ * `Config/DefaultEngine.ini` is the medium one, and it covers a project whose
+ * descriptor is not committed yet.
+ */
+export function detectUnrealProject(targetDir) {
+  const uproject = (() => {
+    try {
+      return readdirSync(targetDir).find((f) => f.toLowerCase().endsWith('.uproject')) || null;
+    } catch {
+      return null;
+    }
+  })();
+  if (uproject) return { unreal: true, confidence: 'high', marker: uproject };
+  if (isDirectory(join(targetDir, 'Source')) && existsSync(join(targetDir, 'Config', 'DefaultEngine.ini'))) {
+    return { unreal: true, confidence: 'medium', marker: 'Source/ + Config/DefaultEngine.ini' };
+  }
+  return { unreal: false, confidence: 'none', marker: null };
+}
+
+/**
+ * One answer for "what engine is this project", so the installer asks once.
+ * `engine` is 'unity', 'unreal', 'both' or null.
+ */
+export function detectProject(targetDir) {
+  const unity = detectUnityProject(targetDir);
+  const unreal = detectUnrealProject(targetDir);
+  const engines = [];
+  if (unity.unity) engines.push('unity');
+  if (unreal.unreal) engines.push('unreal');
+  const engine = engines.length === 0 ? null : engines.length === 2 ? 'both' : engines[0];
+  return { engine, engines, unity, unreal };
 }
 
 /**

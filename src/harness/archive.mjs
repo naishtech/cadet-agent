@@ -208,7 +208,7 @@ export function readEntryData(buf, entry) {
  * Extract a ZIP into targetDir with full containment and limit enforcement.
  * `filter` may return `{ skip: true }` to omit an entry. Returns extracted paths.
  */
-export function extractArchive(buf, targetDir, { limits = DEFAULT_ARCHIVE_LIMITS, filter = null } = {}) {
+export function extractArchive(buf, targetDir, { limits = DEFAULT_ARCHIVE_LIMITS, filter = null, mapPath = null } = {}) {
   if (buf.length > limits.maxCompressedBytes) {
     throw new ArchiveError(`archive is ${buf.length} bytes, over the compressed limit of ${limits.maxCompressedBytes}`, 'compressed-too-large');
   }
@@ -220,7 +220,12 @@ export function extractArchive(buf, targetDir, { limits = DEFAULT_ARCHIVE_LIMITS
       const decision = filter(entry);
       if (decision === false || decision?.skip) { skipped.push(entry.filename); continue; }
     }
-    const outPath = assertContained(targetDir, entry.filename);
+    // `mapPath` lets a caller install an entry somewhere other than its archive
+    // name (a component manifest maps `packages/unity/...` to `Assets/...`).
+    // A falsy result means the caller chose not to write this entry.
+    const targetName = mapPath ? mapPath(entry) : entry.filename;
+    if (!targetName) { skipped.push(entry.filename); continue; }
+    const outPath = assertContained(targetDir, targetName);
     const data = readEntryData(buf, entry);
     mkdirSync(join(outPath, '..'), { recursive: true });
     writeFileSync(outPath, data);

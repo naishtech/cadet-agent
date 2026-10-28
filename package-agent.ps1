@@ -235,6 +235,46 @@ foreach ($managedPath in $manifest.managedPaths) {
     Copy-Item -Path $src -Destination $dest -Force
 }
 
+# ---------------------------------------------------------------- engine products
+# The CLI, the Unity tooling and the Unreal plugin ship at `packages/...` inside
+# the zip. components.json maps each one to the path it is installed at
+# (`Assets/Covyne/Cadet/`, `Plugins/CadetBuild/`), so the zip layout and the
+# install layout stay independent.
+foreach ($rel in @("packages\cli", "packages\unity", "packages\unreal")) {
+    $src = Join-Path $scriptDir $rel
+    if (-not (Test-Path $src)) {
+        Write-Error "Package source not found: $src"
+        exit 1
+    }
+    Copy-TreeIntoStaging -SourceRoot $src -StagingRoot $staging -TargetRoot ($rel -replace '\\', '/')
+}
+
+# Stage components.json with the suite version stamped in. Written without a BOM
+# because the installer parses it with JSON.parse.
+$componentsSource = Join-Path $scriptDir "components.json"
+if (-not (Test-Path $componentsSource)) {
+    Write-Error "components.json not found at: $componentsSource"
+    exit 1
+}
+$packageJson = Get-Content (Join-Path $scriptDir "package.json") -Raw | ConvertFrom-Json
+$components = Get-Content $componentsSource -Raw | ConvertFrom-Json
+$components | Add-Member -NotePropertyName suiteVersion -NotePropertyValue $packageJson.version -Force
+$componentsTarget = Join-Path $staging "components.json"
+$componentsText = $components | ConvertTo-Json -Depth 10
+[System.IO.File]::WriteAllText($componentsTarget, $componentsText, (New-Object System.Text.UTF8Encoding($false)))
+
+# Every zip path the manifest names must exist in the package. A component that
+# points at nothing is a packaging error, not a consumer surprise.
+foreach ($component in $components.components) {
+    foreach ($zipPath in @($component.zipPaths)) {
+        $probe = Join-Path $staging (($zipPath.TrimEnd('/')) -replace '/', '\')
+        if (-not (Test-Path $probe)) {
+            Write-Error "components.json names a path the package does not contain: $zipPath (component $($component.id))"
+            exit 1
+        }
+    }
+}
+
 $fileCount = (Get-ChildItem -Path $staging -Recurse -File).Count
 
 Compress-Archive -Path (Join-Path $staging "*") -DestinationPath $outputZip

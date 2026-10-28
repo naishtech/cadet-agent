@@ -57,6 +57,7 @@ function showHelp() {
   Usage:
     npx cadet-agent@latest init     Install Cadet-Agent into the current directory
     npx cadet-agent@latest init --target <dir>   Install into a specific directory
+    npx cadet-agent@latest init --components core,host.claude   Install only these components
     npx cadet-agent@latest sync     Update framework, preserving local policies/plans
     npx cadet-agent@latest sync --target <dir>   Sync a specific directory
 
@@ -185,6 +186,7 @@ function parseArgs(argv) {
     switch (a) {
       case '--target': case '-t': opts.targetDir = value(a); break;
       case '--source': opts.sourceUrl = value(a); break;
+      case '--components': opts.components = value(a).split(',').map((s) => s.trim()).filter(Boolean); break;
       case '--format': opts.format = value(a); break;
       case '--to': opts.to = value(a); break;
       case '--gate': opts.gate = value(a); break;
@@ -2637,6 +2639,7 @@ export async function run(argv) {
   const installOpts = {
     sourceUrl: opts.sourceUrl,
     yes: opts.yes === true,
+    components: opts.components,
     createOnlyPolicy: opts.agentsMd ? { 'AGENTS.md': opts.agentsMd } : undefined,
   };
 
