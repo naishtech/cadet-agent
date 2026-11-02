@@ -21,10 +21,8 @@ namespace Covyne.CADET.Editor.Lite.Services
                 BuildJobStatus.Queued => "Queued",
                 BuildJobStatus.Syncing => "Syncing",
                 BuildJobStatus.Building => "Building",
-#if !CADET_LITE
                 BuildJobStatus.Publishing => "Publishing",
                 BuildJobStatus.Notarizing => "Notarizing",
-#endif
                 BuildJobStatus.Completed => "Completed",
                 BuildJobStatus.Failed => "Failed",
                 BuildJobStatus.Cancelled => "Cancelled",
@@ -165,7 +163,6 @@ namespace Covyne.CADET.Editor.Lite.Services
                 return BuildJobStatus.Completed;
             }
 
-#if !CADET_LITE
             if ((status == BuildJobStatus.Publishing || status == BuildJobStatus.Notarizing) && !workspace.IsOperationActive)
             {
                 string evidence = $"{workspace.LastOperationSummary} {workspace.LastTerminalMessage} {workspace.ActiveStatusDetail}";
@@ -184,7 +181,6 @@ namespace Covyne.CADET.Editor.Lite.Services
                     return BuildJobStatus.Failed;
                 }
             }
-#endif
 
             return status;
         }
@@ -356,7 +352,6 @@ namespace Covyne.CADET.Editor.Lite.Services
                 operations.Add("Unity Build");
             }
 
-#if !CADET_LITE
             if (lower.Contains("notarize") || lower.Contains("macos sign") || lower.Contains("macos build"))
             {
                 operations.Add("Notarize macOS");
@@ -371,7 +366,6 @@ namespace Covyne.CADET.Editor.Lite.Services
             {
                 operations.Add("Publish Epic");
             }
-#endif
 
             return operations.Count == 0 ? string.Empty : string.Join(", ", operations);
         }

@@ -1,4 +1,3 @@
-#if !CADET_LITE
 using System.IO;
 using Covyne.CADET.Editor.Lite.Models;
 using Covyne.CADET.Editor.Models;
@@ -80,4 +79,3 @@ namespace Covyne.CADET.Editor.Tests.Services
         }
     }
 }
-#endif

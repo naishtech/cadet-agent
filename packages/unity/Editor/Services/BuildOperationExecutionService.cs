@@ -260,9 +260,7 @@ namespace Covyne.CADET.Editor.Services
             if (request.ActionButtons == null) throw new ArgumentNullException(nameof(request.ActionButtons));
             if (request.ConsoleOutput == null) throw new ArgumentNullException(nameof(request.ConsoleOutput));
             if (request.ProgressBar == null) throw new ArgumentNullException(nameof(request.ProgressBar));
-#if !CADET_LITE
             if (request.ExecuteDistScript == null) throw new ArgumentNullException(nameof(request.ExecuteDistScript));
-#endif
         }
 
         private static void InvokeRepaint(Request request, string reason)

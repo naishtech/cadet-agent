@@ -47,10 +47,6 @@ namespace Covyne.CADET.Editor.Services
                 return;
             }
 
-#if CADET_LITE
-            statusText = NormalizeLiteQueueStatus(statusText);
-#endif
-
             if (string.Equals(LastPublishedStatus, statusText, StringComparison.Ordinal))
             {
                 return;
@@ -69,39 +65,5 @@ namespace Covyne.CADET.Editor.Services
             WorkspaceOperationStateService.UpdateStatusDetail(ActiveJob.JobGuid, statusText);
         }
 
-#if CADET_LITE
-        private static string NormalizeLiteQueueStatus(string statusText)
-        {
-            if (string.IsNullOrWhiteSpace(statusText))
-            {
-                return statusText;
-            }
-
-            string lower = statusText.ToLowerInvariant();
-
-            if (lower.Contains("checking workspace sync status") ||
-                lower.Contains("preparing workspace synchronization"))
-            {
-                return "Pre-sync";
-            }
-
-            if (lower.Contains("synchronizing workspace files") ||
-                lower.Contains("workspace out of sync") ||
-                lower.Contains("target workspace missing") ||
-                lower.Contains("workspace already synchronized") ||
-                lower.Contains("workspace sync complete"))
-            {
-                return "Sync";
-            }
-
-            if (lower.Contains("executing unity build process") ||
-                lower.Contains("unity batch mode build"))
-            {
-                return "Unity Build";
-            }
-
-            return statusText;
-        }
-#endif
     }
 }

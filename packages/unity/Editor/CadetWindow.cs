@@ -18,14 +18,7 @@ namespace Covyne.CADET.Editor
 {
     public class CadetWindow : EditorWindow
     {
-    #if !CADET_LITE
         private const string DiagnosticsPrefix = "[C.A.D.E.T][CadetWindow]";
-    #endif
-#if CADET_LITE
-        private const string ProUpgradeUrl = "https://www.covyne.com/store/p/-cadet-desktop-license";
-        private static Func<string, string, string, string, bool> directorySyncConfirmationDialog =
-            (title, message, ok, cancel) => EditorUtility.DisplayDialog(title, message, ok, cancel);
-#endif
 
         // MVVM components
         private CadetWindowViewModel viewModel;
@@ -43,9 +36,7 @@ namespace Covyne.CADET.Editor
         // Cached profile for consistent control count between Layout and Repaint passes
         private BuildProfile cachedCurrentProfile;
         private CadetUnityLogLevel selectedUnityLogLevel = CadetUnityLogLevel.Error;
-    #if !CADET_LITE
         private bool showDetachedBashWindow;
-    #endif
         
         /// <summary>
         /// Checks if Unity is currently building or compiling
@@ -107,9 +98,7 @@ namespace Covyne.CADET.Editor
         private void Initialize()
         {
             selectedUnityLogLevel = CadetFilteredLogger.GetMinimumLevel();
-#if !CADET_LITE
             showDetachedBashWindow = CadetDebugPreferences.GetShowDetachedBashWindow();
-#endif
 
             // Initialize ViewModel
             viewModel = new CadetWindowViewModel();
@@ -198,10 +187,8 @@ namespace Covyne.CADET.Editor
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField("Log Level", GUILayout.Width(80));
             selectedUnityLogLevel = (CadetUnityLogLevel)EditorGUILayout.EnumPopup(selectedUnityLogLevel, GUILayout.Width(120));
-#if !CADET_LITE
             GUILayout.Space(12);
             showDetachedBashWindow = EditorGUILayout.ToggleLeft("Show Bash Window", showDetachedBashWindow, GUILayout.Width(140));
-#endif
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.EndVertical();
@@ -212,9 +199,7 @@ namespace Covyne.CADET.Editor
             }
 
             CadetFilteredLogger.SetMinimumLevel(selectedUnityLogLevel);
-#if !CADET_LITE
             CadetDebugPreferences.SetShowDetachedBashWindow(showDetachedBashWindow);
-#endif
         }
         
         /// <summary>
@@ -255,11 +240,6 @@ namespace Covyne.CADET.Editor
 
         private void OpenPublishingToolsIfAvailable()
         {
-#if CADET_LITE
-            // In Lite: do nothing - button is already disabled with Pro indicator
-            // No URL launch to maintain in-place Pro feature visibility
-            return;
-#else
             // Use reflection so Lite can compile without the pro PublishingTools namespace.
             Type windowType = Type.GetType("Covyne.CADET.Editor.PublishingTools.PublishingToolsWindow, Covyne.CADET.Editor");
             if (windowType == null)
@@ -270,7 +250,6 @@ namespace Covyne.CADET.Editor
 
             var showMethod = windowType.GetMethod("ShowDependencyConfiguration", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
             showMethod?.Invoke(null, null);
-#endif
         }
         
         /// <summary>
@@ -304,12 +283,6 @@ namespace Covyne.CADET.Editor
             EditorGUILayout.BeginHorizontal();
             GUILayout.Label(CadetLocalization.GetString("Window.Cadet.Header"), EditorStyles.boldLabel);
             GUILayout.FlexibleSpace();
-#if CADET_LITE
-            if (GUILayout.Button("Upgrade to CADET Pro", EditorStyles.linkLabel, GUILayout.ExpandWidth(false)))
-            {
-                Application.OpenURL(ProUpgradeUrl);
-            }
-#endif
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.Space(10);
 
@@ -722,46 +695,20 @@ namespace Covyne.CADET.Editor
         /// </summary>
         private async void OnExecute()
         {
-#if !CADET_LITE
             Stopwatch executeStopwatch = Stopwatch.StartNew();
             CadetFilteredLogger.Debug(
                 $"{DiagnosticsPrefix} OnExecute start unityBuild={viewModel.ActionButtons.UnityBuildChecked} " +
                 $"notarize={viewModel.ActionButtons.NotarizeMacChecked} steam={viewModel.ActionButtons.PublishSteamChecked} epic={viewModel.ActionButtons.PublishEpicChecked}.");
-#endif
-#if CADET_LITE
-            if (buildQueuePanel != null && buildQueuePanel.IsInCooldown)
-            {
-                string remaining = buildQueuePanel.CooldownRemainingText;
-                string msg = string.IsNullOrEmpty(remaining)
-                    ? "A cooldown is active between builds.\n\nUpgrade to CADET Pro to enable unlimited builds with no cooldowns."
-                    : $"A cooldown is active \u2014 next build available in {remaining}.\n\nUpgrade to CADET Pro to enable unlimited builds with no cooldowns.";
-                EditorUtility.DisplayDialog("Build Cooldown Active", msg, "OK");
-                return;
-            }
-
-            BuildProfile selectedProfile = viewModel.ProfileManager.GetSelectedProfileAsset()?.Profile;
-            if (!ShowDirectorySyncConfirmation(selectedProfile))
-            {
-                return;
-            }
-
-            bool runNotarizeMac = false;
-            bool runPublishSteam = false;
-            bool runPublishEpic = false;
-#else
             bool runNotarizeMac = viewModel.ActionButtons.NotarizeMacChecked;
             bool runPublishSteam = viewModel.ActionButtons.PublishSteamChecked;
             bool runPublishEpic = viewModel.ActionButtons.PublishEpicChecked;
-#endif
 
             BuildProfileAsset selectedProfileAsset = viewModel.ProfileManager.GetSelectedProfileAsset();
             string selectedProfileGuid = ResolveProfileGuid(selectedProfileAsset);
 
-#if !CADET_LITE
             CadetFilteredLogger.Debug(
                 $"{DiagnosticsPrefix} OnExecute selection resolved after {executeStopwatch.ElapsedMilliseconds}ms " +
                 $"profile='{selectedProfileAsset?.Profile?.profileName ?? string.Empty}' guid='{selectedProfileGuid ?? string.Empty}'.");
-#endif
 
             var result = await BuildExecutionSequenceService.ExecuteAsync(new BuildExecutionSequenceService.Request
             {
@@ -783,11 +730,9 @@ namespace Covyne.CADET.Editor
                 AppendOutput = (line, type) => viewModel.ConsoleOutput.AppendLine(line, type)
             });
 
-#if !CADET_LITE
             CadetFilteredLogger.Debug(
                 $"{DiagnosticsPrefix} OnExecute completed after {executeStopwatch.ElapsedMilliseconds}ms " +
                 $"result='{result.Code}' profile='{result.ProfileName ?? selectedProfileAsset?.Profile?.profileName ?? string.Empty}'.");
-#endif
 
             if (result.Code == BuildExecutionSequenceService.ExecuteResultCode.NoProfile)
             {
@@ -847,9 +792,7 @@ namespace Covyne.CADET.Editor
                 ShowBlockingSyncDialog = activeJob == null || (activeJob != null && activeJob.ShowBlockingSyncDialog),
                 OnBlockingSyncCancelRequested = OnCancelOperation,
                 Repaint = Repaint,
-#if !CADET_LITE
                 ExecuteDistScript = ExecuteDistScript
-#endif
             };
 
             return await BuildOperationExecutionService.ExecuteWithResultAsync(request);
@@ -879,9 +822,7 @@ namespace Covyne.CADET.Editor
                 ProgressBar = viewModel.ProgressBar,
                 KeepConsoleMirroringAfterCompletion = false,
                 Repaint = Repaint,
-#if !CADET_LITE
                 ExecuteDistScript = ExecuteDistScript
-#endif
             };
 
             return await BuildOperationExecutionService.ExecuteWithResultAsync(request);
@@ -897,7 +838,6 @@ namespace Covyne.CADET.Editor
             return result.Success;
         }
         
-#if !CADET_LITE
         private BuildResult ExecuteDistScript(
             string projectPath,
             string profileJsonPath,
@@ -919,7 +859,6 @@ namespace Covyne.CADET.Editor
                 activeJob,
                 processTracker: buildExecutionStateViewModel.ProcessTracker);
         }
-#endif
 
         private static void ShowBuildAlreadyInProgress(string profileName)
         {
@@ -929,34 +868,6 @@ namespace Covyne.CADET.Editor
                 $"Build already in progress for {displayName}.",
                 "Back");
         }
-
-#if CADET_LITE
-        internal static void SetDirectorySyncConfirmationDialogForTests(Func<string, string, string, string, bool> handler)
-        {
-            directorySyncConfirmationDialog = handler ?? ((title, message, ok, cancel) => EditorUtility.DisplayDialog(title, message, ok, cancel));
-        }
-
-        internal static void ResetDirectorySyncConfirmationDialogForTests()
-        {
-            directorySyncConfirmationDialog = (title, message, ok, cancel) => EditorUtility.DisplayDialog(title, message, ok, cancel);
-        }
-
-        private static bool ShowDirectorySyncConfirmation(BuildProfile profile)
-        {
-            if (profile == null || profile.useGit)
-            {
-                return true;
-            }
-
-            string title = CadetLocalization.GetString("Dialog.DirectorySync.Title");
-            string message = CadetLocalization.GetString("Dialog.DirectorySync.Message")
-                .Replace("\\n", "\n");
-            string ok = CadetLocalization.GetString("Dialog.DirectorySync.Ok");
-            string cancel = CadetLocalization.GetString("Window.Cadet.Buttons.Cancel");
-
-            return directorySyncConfirmationDialog(title, message, ok, cancel);
-        }
-#endif
 
         private void OnCancelOperation()
         {

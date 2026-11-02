@@ -2,7 +2,6 @@
     "name": "Covyne.CADET.Editor",
     "rootNamespace": "Covyne.CADET.Editor",
     "references": [
-        "Unity.ResourceManager",
         "Covyne.CADET.Editor.Lite"
     ],
     "includePlatforms": [

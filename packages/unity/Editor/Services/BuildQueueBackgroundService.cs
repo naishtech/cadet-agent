@@ -162,15 +162,12 @@ namespace Covyne.CADET.Editor.Services
                 KeepConsoleMirroringAfterCompletion = false,
                 ShowBlockingSyncDialog = activeJob == null || activeJob.ShowBlockingSyncDialog,
                 Repaint = () => { },
-#if !CADET_LITE
                 ExecuteDistScript = ExecuteDistScript
-#endif
             };
 
             return await BuildOperationExecutionService.ExecuteWithResultAsync(request);
         }
 
-#if !CADET_LITE
         private static BuildResult ExecuteDistScript(
             string projectPath,
             string profileJsonPath,
@@ -197,7 +194,6 @@ namespace Covyne.CADET.Editor.Services
                 activeJob,
                 processTracker: buildExecutionStateViewModel.ProcessTracker);
         }
-#endif
 
         private static void CancelTrackedRetryOperation()
         {

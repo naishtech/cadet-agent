@@ -29,11 +29,7 @@ namespace Covyne.CADET.Editor.Models
         public BuildProfile()
         {
             profileName = "";
-#if CADET_LITE
-            platform = "none";
-#else
             platform = "steam";
-#endif
             os = "windows";
             // Initialize with empty - will be populated by InitializeDefaults() if empty
             bundleId = "";

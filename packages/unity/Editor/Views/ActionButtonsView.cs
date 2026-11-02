@@ -39,54 +39,6 @@ namespace Covyne.CADET.Editor.Views
         /// </summary>
         public void DrawPublishingToolsButton()
         {
-#if CADET_LITE
-            // In Lite: show disabled button with Pro badge, no click action
-            EditorGUILayout.BeginHorizontal();
-            
-            // Get settings icon (Unity's built-in icon - automatically handles light/dark mode)
-            GUIContent settingsIcon = EditorGUIUtility.IconContent("SettingsIcon");
-            string buttonText = CadetLocalization.GetString("Window.PublishingToolsConfig.Buttons.PublishingTools");
-            
-            // Combine icon with text
-            GUIContent buttonContent;
-            if (settingsIcon != null && settingsIcon.image != null)
-            {
-                buttonContent = new GUIContent(buttonText, settingsIcon.image);
-            }
-            else
-            {
-                // If no icon found, just use text
-                buttonContent = new GUIContent(buttonText);
-            }
-            
-            // Create cyan button style
-            var cyanButtonStyle = new GUIStyle(GUI.skin.button);
-            cyanButtonStyle.normal.textColor = Color.white;
-            cyanButtonStyle.hover.textColor = Color.white;
-            
-            // Create dark blue texture for button background
-            if (cyanButtonStyle.normal.background == null || cyanButtonStyle.normal.background.name != "cyanButton")
-            {
-                Texture2D darkBlueTexture = MakeTex(2, 2, new Color(0f, 0.4f, 0.7f)); // Dark blue color
-                darkBlueTexture.name = "cyanButton";
-                cyanButtonStyle.normal.background = darkBlueTexture;
-                cyanButtonStyle.hover.background = MakeTex(2, 2, new Color(0f, 0.5f, 0.8f)); // Lighter dark blue on hover
-            }
-            
-            // Disabled button - no action on click
-            EditorGUI.BeginDisabledGroup(true);
-            GUILayout.Button(buttonContent, cyanButtonStyle, GUILayout.Height(30), GUILayout.Width(150));
-            EditorGUI.EndDisabledGroup();
-            
-            // Pro badge next to button
-            GUILayout.Space(5);
-            var proLabelStyle = new GUIStyle(EditorStyles.miniLabel);
-            proLabelStyle.normal.textColor = new Color(1f, 0.6f, 0f); // Orange color
-            proLabelStyle.fontStyle = FontStyle.Bold;
-            GUILayout.Label("PRO", proLabelStyle, GUILayout.Width(30));
-            
-            EditorGUILayout.EndHorizontal();
-#else
             // In Full: normal button behavior
             // Publishing Tools button - always visible, disabled when running, left-aligned with settings icon, cyan background
             EditorGUI.BeginDisabledGroup(viewModel.IsRunning);
@@ -126,7 +78,6 @@ namespace Covyne.CADET.Editor.Views
                 viewModel.RequestOpenPublishingTools();
             }
             EditorGUI.EndDisabledGroup();
-#endif
         }
         
         public void Draw(BuildProfile currentProfile = null)
@@ -208,7 +159,6 @@ namespace Covyne.CADET.Editor.Views
             GUILayout.Space(5);
             
             // Notarization is a Pro-only operation and must not be available in Lite.
-#if !CADET_LITE
             // Notarize macOS Build checkbox - only show if profile OS is mac or both
             bool showNotarizeCheckbox = false;
             if (currentProfile != null)
@@ -246,24 +196,8 @@ namespace Covyne.CADET.Editor.Views
                 
                 GUILayout.Space(5);
             }
-#endif
             
             // Publish to Steam checkbox
-#if CADET_LITE
-            EditorGUI.BeginDisabledGroup(true);
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.ToggleLeft(
-                new GUIContent(
-                    CadetLocalization.GetString("Window.Cadet.Checkboxes.PublishSteam"),
-                    "Steam publishing requires CADET Pro."
-                ),
-                false,
-                GUILayout.Width(200)
-            );
-            GUILayout.Label("PRO", EditorStyles.miniLabel);
-            EditorGUILayout.EndHorizontal();
-            EditorGUI.EndDisabledGroup();
-#else
             EditorGUI.BeginDisabledGroup(!steamAvailable || !hasProfile || viewModel.IsRunning || hasMissingDeps);
             EditorGUILayout.BeginHorizontal();
             bool steamChecked = EditorGUILayout.ToggleLeft(
@@ -294,24 +228,8 @@ namespace Covyne.CADET.Editor.Views
             }
             EditorGUILayout.EndHorizontal();
             EditorGUI.EndDisabledGroup();
-#endif
             
             // Publish to Epic checkbox
-#if CADET_LITE
-            EditorGUI.BeginDisabledGroup(true);
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.ToggleLeft(
-                new GUIContent(
-                    CadetLocalization.GetString("Window.Cadet.Checkboxes.PublishEpic"),
-                    "Epic publishing requires CADET Pro."
-                ),
-                false,
-                GUILayout.Width(200)
-            );
-            GUILayout.Label("PRO", EditorStyles.miniLabel);
-            EditorGUILayout.EndHorizontal();
-            EditorGUI.EndDisabledGroup();
-#else
             bool epicCheckboxDisabled = !epicAvailable || !hasProfile || viewModel.IsRunning || hasMissingDeps;
             
             EditorGUI.BeginDisabledGroup(epicCheckboxDisabled);
@@ -344,7 +262,6 @@ namespace Covyne.CADET.Editor.Views
             }
             EditorGUILayout.EndHorizontal();
             EditorGUI.EndDisabledGroup();
-#endif
             
             EditorGUILayout.EndVertical();
         }

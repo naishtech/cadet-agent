@@ -1,4 +1,3 @@
-#if !CADET_LITE
 using System;
 
 namespace Covyne.CADET.Editor.Lite.Models
@@ -17,4 +16,3 @@ namespace Covyne.CADET.Editor.Lite.Models
         public bool UseGitSyncFlag;
     }
 }
-#endif

@@ -87,10 +87,8 @@ namespace Covyne.CADET.Editor.Tests.Models
             job.Status = BuildJobStatus.Building;
             Assert.AreEqual(BuildJobStatus.Building, job.Status);
 
-#if !CADET_LITE
             job.Status = BuildJobStatus.Publishing;
             Assert.AreEqual(BuildJobStatus.Publishing, job.Status);
-#endif
 
             job.Status = BuildJobStatus.Completed;
             Assert.AreEqual(BuildJobStatus.Completed, job.Status);

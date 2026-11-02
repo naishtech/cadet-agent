@@ -1,6 +1,6 @@
 {
   "profileName": "unity-minimal",
-  "platform": "windows",
+  "platform": "none",
   "os": "windows",
   "bundleId": "com.example.minimal",
   "unity": {

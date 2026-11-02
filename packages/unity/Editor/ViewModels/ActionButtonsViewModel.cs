@@ -358,13 +358,8 @@ namespace Covyne.CADET.Editor.ViewModels
             EpicCredentialsConfigured = epicCredentialsConfigured;
             
             // Calculate combined availability
-#if CADET_LITE
-            SteamAvailable = false;
-            EpicAvailable = false;
-#else
             SteamAvailable = steamPlatformSelected && steamToolsConfigured && steamCredentialsConfigured;
             EpicAvailable = epicPlatformSelected && epicToolsConfigured && epicCredentialsConfigured;
-#endif
             
             // Uncheck unavailable platforms
             if (!SteamAvailable && publishSteamChecked)

@@ -1,6 +1,6 @@
 {
   "profileName": "unreal-minimal",
-  "platform": "windows",
+  "platform": "none",
   "os": "windows",
   "bundleId": "com.example.unreal",
   "unreal": {

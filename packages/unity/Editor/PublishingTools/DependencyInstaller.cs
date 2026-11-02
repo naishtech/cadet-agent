@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net;
+using Covyne.CADET.Editor.Lite.Services;
 using Covyne.CADET.Editor.Utilities;
 using UnityEditor;
 
@@ -23,7 +24,7 @@ namespace Covyne.CADET.Editor.PublishingTools
             // unityProjectPath is F:/unity/projects/cadet/cadet-unity
             unityProjectPath = Path.GetDirectoryName(UnityEngine.Application.dataPath);
             // download_deps.sh is deployed to the Unity CLI directory
-            downloadScriptPath = Path.Combine(unityProjectPath, "Assets", "Covyne", "Cadet", "CLI", "Deps", "download_deps.sh");
+            downloadScriptPath = CadetLitePathService.GetCliPath(unityProjectPath, "Deps", "download_deps.sh");
         }
 
         /// <summary>
@@ -400,7 +401,7 @@ namespace Covyne.CADET.Editor.PublishingTools
             try
             {
                 // Create target directory for extraction (legacy - for downloads directory)
-                string cosmosBaseDir = Path.Combine(unityProjectPath, "Assets", "Covyne", "Cadet", "CLI");
+                string cosmosBaseDir = CadetLitePathService.GetCliPath(unityProjectPath);
                 if (!Directory.Exists(cosmosBaseDir))
                 {
                     Directory.CreateDirectory(cosmosBaseDir);

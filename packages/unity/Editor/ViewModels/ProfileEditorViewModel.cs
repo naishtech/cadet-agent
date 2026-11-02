@@ -833,7 +833,6 @@ namespace Covyne.CADET.Editor.ViewModels
             }
             
             // Platform-specific validation
-#if !CADET_LITE
             if (profile.platform == "steam" || profile.platform == "both")
             {
                 if (profile.steam == null)
@@ -890,7 +889,6 @@ namespace Covyne.CADET.Editor.ViewModels
                 // Note: buildPatchToolPath validation is not required for saving profiles
                 // It will be validated only when executing Epic builds in CadetWindow
             }
-#endif
             
             return true;
         }

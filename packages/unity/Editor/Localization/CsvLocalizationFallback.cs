@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Covyne.CADET.Editor.Lite.Services;
 using UnityEngine;
 using UnityEditor;
 
@@ -12,7 +13,12 @@ namespace Covyne.CADET.Editor.Localization
     public static class CsvLocalizationFallback
     {
         private static Dictionary<string, string> localizationCache;
-        private const string CSV_RELATIVE_PATH = "Assets/Covyne/Cadet/Editor/Localization/CADET_Localization_en.csv";
+        private const string CSV_FILE_NAME = "CADET_Localization_en.csv";
+
+        private static string CsvRelativePath
+        {
+            get { return CadetLitePathService.PluginRoot + "/Editor/Localization/" + CSV_FILE_NAME; }
+        }
         
         /// <summary>
         /// Loads the CSV file and caches the key-value pairs
@@ -27,7 +33,7 @@ namespace Covyne.CADET.Editor.Localization
             try
             {
                 // Use AssetDatabase to find the CSV file
-                string csvPath = AssetDatabase.GetAssetPath(AssetDatabase.LoadAssetAtPath<TextAsset>(CSV_RELATIVE_PATH));
+                string csvPath = AssetDatabase.GetAssetPath(AssetDatabase.LoadAssetAtPath<TextAsset>(CsvRelativePath));
                 if (string.IsNullOrEmpty(csvPath))
                 {
                     // Try alternative: find by GUID or name
@@ -41,11 +47,12 @@ namespace Covyne.CADET.Editor.Localization
                 if (string.IsNullOrEmpty(csvPath) || !File.Exists(csvPath))
                 {
                     // Fallback to direct path resolution
-                    csvPath = Path.Combine(Application.dataPath, "..", CSV_RELATIVE_PATH);
-                    csvPath = Path.GetFullPath(csvPath);
+                    string projectRoot = Path.GetDirectoryName(Application.dataPath);
+                    csvPath = CadetLitePathService.GetPluginPath(
+                        projectRoot, "Editor", "Localization", CSV_FILE_NAME);
                     if (!File.Exists(csvPath))
                     {
-                        Debug.LogWarning($"[CADET Localization] CSV file not found. Expected at: {CSV_RELATIVE_PATH}. Using fallback values.");
+                        Debug.LogWarning($"[CADET Localization] CSV file not found. Expected at: {CsvRelativePath}. Using fallback values.");
                         return;
                     }
                 }

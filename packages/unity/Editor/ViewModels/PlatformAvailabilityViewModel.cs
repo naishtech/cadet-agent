@@ -229,9 +229,6 @@ namespace Covyne.CADET.Editor.ViewModels
 
         private bool CheckCosmosBinariesConfigured()
         {
-#if CADET_LITE
-            return true;
-#else
             if (Application.platform != RuntimePlatform.WindowsEditor)
             {
                 return true;
@@ -240,7 +237,6 @@ namespace Covyne.CADET.Editor.ViewModels
             string cosmosBinDir = Path.Combine(BuildToolsPathHelper.GetCosmosBinariesPath(), "bin");
             string bashPath = Path.Combine(cosmosBinDir, "bash");
             return File.Exists(bashPath);
-#endif
         }
 
         private bool CheckSteamCredentialsConfigured()

@@ -52,11 +52,7 @@ namespace Covyne.CADET.Editor.Validation.ProfileValidators
         
         public static bool ShouldValidate(BuildProfile profile)
         {
-#if CADET_LITE
-            return false;
-#else
             return profile != null && (profile.platform == "epic" || profile.platform == "both");
-#endif
         }
     }
 }

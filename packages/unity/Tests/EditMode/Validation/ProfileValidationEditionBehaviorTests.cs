@@ -44,11 +44,7 @@ namespace Covyne.CADET.Editor.Tests.Validation
 
             bool isValid = vm.ValidateProfile();
 
-#if CADET_LITE
-            Assert.IsTrue(isValid, "Lite should bypass publish-field validation for steam profiles.");
-#else
             Assert.IsFalse(isValid, "Full should require Steam publish fields when platform is steam.");
-#endif
         }
 
         [Test]
@@ -81,11 +77,7 @@ namespace Covyne.CADET.Editor.Tests.Validation
                 }
             }
 
-#if CADET_LITE
-            Assert.IsFalse(hasSteamErrors, "Lite should bypass all publish-related Steam validation.");
-#else
             Assert.IsTrue(hasSteamErrors, "Full should enforce Steam validation when platform is steam.");
-#endif
         }
 
     [Test]

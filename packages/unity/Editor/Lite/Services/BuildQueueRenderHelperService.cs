@@ -13,10 +13,8 @@ namespace Covyne.CADET.Editor.Lite.Services
                 BuildJobStatus.Queued => "⏳",
                 BuildJobStatus.Syncing => "📁",
                 BuildJobStatus.Building => "🔨",
-#if !CADET_LITE
                 BuildJobStatus.Publishing => "🚀",
                 BuildJobStatus.Notarizing => "✍️",
-#endif
                 BuildJobStatus.Completed => "✅",
                 BuildJobStatus.Failed => "❌",
                 BuildJobStatus.Cancelled => "⛔",

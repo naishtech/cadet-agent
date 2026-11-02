@@ -1011,7 +1011,6 @@ namespace Covyne.CADET.Editor.Lite.Services
 
         private static BuildJobStatus NormalizeLegacyTerminalStatus(BuildJobDefinition job, BuildJobStatus status)
         {
-#if !CADET_LITE
             bool hasPublishOrNotarizeOps = (job?.RunPublishSteam ?? false) ||
                                            (job?.RunPublishEpic ?? false) ||
                                            (job?.RunNotarizeMac ?? false);
@@ -1025,7 +1024,6 @@ namespace Covyne.CADET.Editor.Lite.Services
             {
                 return BuildJobStatus.Failed;
             }
-#endif
 
             return status;
         }

@@ -135,7 +135,6 @@ namespace Covyne.CADET.Editor.Lite.Services
             Utilities.LogTailMonitorUtility.OpenTailMonitor(logPath, "Unity Log Monitor");
         }
 
-#if !CADET_LITE
         public static void OpenBuildLogMonitor(string logPath)
         {
             if (string.IsNullOrWhiteSpace(logPath))
@@ -158,7 +157,6 @@ namespace Covyne.CADET.Editor.Lite.Services
 
             Utilities.LogTailMonitorUtility.OpenTailMonitor(logPath, "Build Log Monitor");
         }
-#endif
 
         public static void OpenLogFile(string logPath)
         {

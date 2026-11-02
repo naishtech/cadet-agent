@@ -54,9 +54,7 @@ namespace Covyne.CADET.Editor.Lite.Windows
         private readonly BuildQueueWorkspaceContextService.WorkspaceHistoryCacheState workspaceHistoryCacheState = new BuildQueueWorkspaceContextService.WorkspaceHistoryCacheState();
         private readonly Dictionary<string, BuildQueueWorkspaceContextService.WorkspaceInfoCacheEntry> workspaceInfoCache = new Dictionary<string, BuildQueueWorkspaceContextService.WorkspaceInfoCacheEntry>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, UnityLogTargetsCacheEntry> unityLogTargetsCache = new Dictionary<string, UnityLogTargetsCacheEntry>(StringComparer.OrdinalIgnoreCase);
-#if !CADET_LITE
         private readonly Dictionary<string, BuildLogPathCacheEntry> buildLogPathCache = new Dictionary<string, BuildLogPathCacheEntry>(StringComparer.OrdinalIgnoreCase);
-#endif
         private readonly Dictionary<string, FileExistsCacheEntry> fileExistsCache = new Dictionary<string, FileExistsCacheEntry>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, BuildQueueJobStateService.OpenBuildFolderCheckCacheEntry> openBuildFolderCheckCache = new Dictionary<string, BuildQueueJobStateService.OpenBuildFolderCheckCacheEntry>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, BuildQueueJobStateService.ExecutingStateCacheEntry> executingStateCache = new Dictionary<string, BuildQueueJobStateService.ExecutingStateCacheEntry>(StringComparer.OrdinalIgnoreCase);
@@ -99,9 +97,7 @@ namespace Covyne.CADET.Editor.Lite.Windows
             subscribedJobGuids.Clear();
             workspaceInfoCache.Clear();
             unityLogTargetsCache.Clear();
-#if !CADET_LITE
             buildLogPathCache.Clear();
-#endif
             fileExistsCache.Clear();
             openBuildFolderCheckCache.Clear();
             executingStateCache.Clear();
@@ -207,11 +203,7 @@ namespace Covyne.CADET.Editor.Lite.Windows
             bool hasActiveOperations = queueManager != null &&
                 (queueManager.ActiveExecutionCount > 0 || (runtimeState != null && runtimeState.IsOperationRunning));
 
-#if CADET_LITE
-            bool needsRepaint = hasActiveOperations || _iterationInsightsVM.IsInCooldown;
-#else
             bool needsRepaint = hasActiveOperations;
-#endif
             if (displayViewModel.ShouldRepaintActive(EditorApplication.timeSinceStartup, needsRepaint, ActiveRepaintIntervalSeconds))
             {
                 repaintAction();
@@ -279,9 +271,6 @@ namespace Covyne.CADET.Editor.Lite.Windows
                 }
             }
 
-#if CADET_LITE
-            DrawBuildLimitBadge();
-#endif
             EditorGUILayout.Space();
         }
 
@@ -303,42 +292,8 @@ namespace Covyne.CADET.Editor.Lite.Windows
                 EditorGUILayout.LabelField(
                     $"Active iteration session \u00b7 {_iterationInsightsVM.SessionBuildCount} builds",
                     EditorStyles.miniLabel);
-#if CADET_LITE
-                if (_iterationInsightsVM.IsInCooldown)
-                {
-                    // Flat LabelField — no HelpBox/inner groups which add unpredictable child counts.
-                    EditorGUILayout.LabelField(
-                        $"\u26a0 Cooldown active \u2014 next build in {_iterationInsightsVM.FormattedCooldownRemaining}",
-                        EditorStyles.miniLabel);
-                    if (GUILayout.Button("Upgrade to CADET Pro \u2197", EditorStyles.linkLabel))
-                    {
-                        UnityEngine.Application.OpenURL("https://www.covyne.com/store/p/-cadet-desktop-license");
-                    }
-                }
-                EditorGUILayout.LabelField(
-                    "Pro enables uninterrupted iteration with no build limits or cooldowns.",
-                    EditorStyles.miniLabel);
-#endif
             }
         }
-
-#if CADET_LITE
-        /// <summary>
-        /// Returns true when the Lite cooldown is currently active and a new build should be blocked.
-        /// Safe to call from outside the panel (e.g. CadetWindow.OnExecute).
-        /// </summary>
-        public bool IsInCooldown => _iterationInsightsVM.IsInCooldown;
-
-        /// <summary>
-        /// Human-readable remaining cooldown, e.g. "18s". Empty string when not in cooldown.
-        /// </summary>
-        public string CooldownRemainingText => _iterationInsightsVM.FormattedCooldownRemaining;
-
-        private static void DrawBuildLimitBadge()
-        {
-            // TODO: wire to limit system when daily build limits are implemented
-        }
-#endif
 
         private void DrawJobsList(bool limitJobListHeight)
         {
@@ -888,9 +843,7 @@ namespace Covyne.CADET.Editor.Lite.Windows
             workspaceHistoryCacheState.IsDirty = true;
             workspaceInfoCache.Clear();
             unityLogTargetsCache.Clear();
-#if !CADET_LITE
             buildLogPathCache.Clear();
-#endif
             fileExistsCache.Clear();
             openBuildFolderCheckCache.Clear();
             executingStateCache.Clear();
@@ -930,10 +883,6 @@ namespace Covyne.CADET.Editor.Lite.Windows
 
         private bool CanRetryJob(BuildJobDefinition job)
         {
-#if CADET_LITE
-            if (_iterationInsightsVM.IsInCooldown)
-                return false;
-#endif
             return BuildQueueJobStateService.CanRetryJob(
                 job,
                 trackedJob => queueManager != null && queueManager.CanRetryJob(trackedJob),
@@ -1050,7 +999,6 @@ namespace Covyne.CADET.Editor.Lite.Windows
             BuildQueueLogRoutingService.OpenLogFile(logPath);
         }
 
-#if !CADET_LITE
         private string ResolveBuildLogPath(BuildJobDefinition job)
         {
             BuildProfile profile = GetProfileForJob(job);
@@ -1072,7 +1020,6 @@ namespace Covyne.CADET.Editor.Lite.Windows
             buildLogPathCache[cacheKey] = new BuildLogPathCacheEntry(path, now + BuildLogPathCacheSeconds);
             return path;
         }
-#endif
 
         private List<BuildQueueLogTarget> GetCachedUnityLogTargets(BuildJobDefinition job)
         {
@@ -1192,9 +1139,7 @@ namespace Covyne.CADET.Editor.Lite.Windows
                     string jobCacheKey = GetJobCacheKey(job);
                     workspaceInfoCache.Remove(job.JobGuid);
                     unityLogTargetsCache.Remove(jobCacheKey);
-#if !CADET_LITE
                     buildLogPathCache.Remove(jobCacheKey);
-#endif
                     openBuildFolderCheckCache.Remove(job.JobGuid);
                     executingStateCache.Remove(job.JobGuid);
                     if (!string.IsNullOrWhiteSpace(job.ProfileGuid))
@@ -1206,9 +1151,7 @@ namespace Covyne.CADET.Editor.Lite.Windows
                 {
                     workspaceInfoCache.Clear();
                     unityLogTargetsCache.Clear();
-#if !CADET_LITE
                     buildLogPathCache.Clear();
-#endif
                     fileExistsCache.Clear();
                     openBuildFolderCheckCache.Clear();
                     executingStateCache.Clear();
@@ -1253,7 +1196,6 @@ namespace Covyne.CADET.Editor.Lite.Windows
             public List<JobActionButtonDefinition> Actions { get; }
         }
 
-#if !CADET_LITE
         private readonly struct BuildLogPathCacheEntry
         {
             public BuildLogPathCacheEntry(string path, double expiresAt)
@@ -1265,7 +1207,6 @@ namespace Covyne.CADET.Editor.Lite.Windows
             public string Path { get; }
             public double ExpiresAt { get; }
         }
-#endif
 
         private readonly struct FileExistsCacheEntry
         {

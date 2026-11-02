@@ -1,4 +1,3 @@
-#if !CADET_LITE
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -96,7 +95,7 @@ namespace Covyne.CADET.Editor.Services
                     return new BuildResult(output.ToString(), false, -1, invalidProfileJsonPath);
                 }
 
-                string distScript = Path.Combine(projectPath, "Assets", "Covyne", "Cadet", "CLI", "dist.sh");
+                string distScript = CadetLitePathService.GetCliPath(projectPath, "dist.sh");
 
                 if (!File.Exists(distScript))
                 {
@@ -335,4 +334,3 @@ namespace Covyne.CADET.Editor.Services
         }
     }
 }
-#endif

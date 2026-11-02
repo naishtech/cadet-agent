@@ -17,13 +17,11 @@ namespace Covyne.CADET.Editor.Lite.Models
         /// <summary>Job is currently building in Unity</summary>
         Building,
         
-#if !CADET_LITE
         /// <summary>Job is publishing to Steam/Epic (CICD only - CADET FULL)</summary>
         Publishing,
         
         /// <summary>Job is notarizing macOS build (CICD only - CADET FULL)</summary>
         Notarizing,
-#endif
         
         /// <summary>Job completed successfully</summary>
         Completed,

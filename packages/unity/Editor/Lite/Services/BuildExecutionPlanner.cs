@@ -37,7 +37,6 @@ namespace Covyne.CADET.Editor.Lite.Services
             _profileJsonAdapter = profileJsonAdapter ?? new ProfileJsonAdapter();
         }
 
-#if !CADET_LITE
         /// <summary>
         /// Prepares CICD execution request for bash script execution.
         /// CADET FULL ONLY - excluded from Lite (Asset Store) package.
@@ -88,7 +87,6 @@ namespace Covyne.CADET.Editor.Lite.Services
                 UseGitSyncFlag = useGitSync
             };
         }
-#endif
 
         /// <summary>
         /// Prepares Local execution request for Unity batch mode.
@@ -139,7 +137,6 @@ namespace Covyne.CADET.Editor.Lite.Services
             };
         }
 
-#if !CADET_LITE
         /// <summary>
         /// Cleans up temporary files for CICD execution.
         /// CADET FULL ONLY - excluded from Lite (Asset Store) package.
@@ -153,7 +150,6 @@ namespace Covyne.CADET.Editor.Lite.Services
 
             _profileJsonAdapter.CleanupTemporaryFile(request.ProfileJsonPath);
         }
-#endif
 
         private static BuildProfile CloneProfile(BuildProfile profile)
         {

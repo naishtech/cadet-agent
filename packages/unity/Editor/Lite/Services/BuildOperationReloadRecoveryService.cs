@@ -821,11 +821,9 @@ namespace Covyne.CADET.Editor.Lite.Services
                     workspace.LastBuildStatus == BuildJobStatus.Building ||
                     workspace.LastBuildStatus == BuildJobStatus.Syncing;
 
-#if !CADET_LITE
                 hasRecoverableActiveStatus = hasRecoverableActiveStatus ||
                     workspace.LastBuildStatus == BuildJobStatus.Publishing ||
                     workspace.LastBuildStatus == BuildJobStatus.Notarizing;
-#endif
 
                 if (hasRecoverableActiveStatus && !workspace.IsOperationActive)
                 {

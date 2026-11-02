@@ -1,6 +1,6 @@
 {
   "profileName": "unity-full",
-  "platform": "windows",
+  "platform": "both",
   "os": "windows",
   "bundleId": "com.example.full",
   "useGit": true,
@@ -13,7 +13,17 @@
     "projectName": "Full"
   },
   "steam": {
-    "appId": 2369850
+    "appId": "2369850",
+    "steamcmdExe": "CADET/Tools/steamcmd/steamcmd.exe",
+    "depots": [
+      {
+        "depotId": "2369851",
+        "os": "windows",
+        "localPath": "windows\\*",
+        "depotPath": ".",
+        "recursive": "1"
+      }
+    ]
   },
   "epic": {
     "productId": "prod-1",
@@ -23,7 +33,7 @@
     "buildPatchToolPath": "C:/tools/BuildPatchTool"
   },
   "macos": {
-    "signingIdentity": "Developer ID Application: Example (TEAM123)",
-    "teamId": "TEAM123"
+    "enableSigning": true,
+    "entitlementsPath": "Tools/MacOS/Example.entitlements"
   }
 }

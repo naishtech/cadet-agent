@@ -117,20 +117,12 @@ namespace Covyne.CADET.Editor.Validation.ProfileValidators
         
         private static bool ShouldValidateSteam(BuildProfile profile)
         {
-#if CADET_LITE
-            return false;
-#else
             return profile != null && (profile.platform == "steam" || profile.platform == "both");
-#endif
         }
         
         private static bool ShouldValidateEpic(BuildProfile profile)
         {
-#if CADET_LITE
-            return false;
-#else
             return profile != null && (profile.platform == "epic" || profile.platform == "both");
-#endif
         }
         
         private static bool ShouldValidateMacOSEntitlements(BuildProfile profile)

@@ -1,7 +1,7 @@
 {
   "profileName": "unreal-macos",
-  "platform": "macos",
-  "os": "macos",
+  "platform": "steam",
+  "os": "mac",
   "bundleId": "com.example.unreal.mac",
   "unreal": {
     "engineRoot": "/Users/Shared/Epic Games/UE_5.8",
@@ -11,11 +11,11 @@
     "buildConfiguration": "Shipping"
   },
   "steam": {
-    "appId": 2369851
+    "appId": "2369851",
+    "steamcmdSh": "CADET/Tools/steamcmd/steamcmd.sh"
   },
   "macos": {
-    "signingIdentity": "Developer ID Application: Example (TEAM123)",
-    "teamId": "TEAM123",
-    "notarizationAppleId": "developer@example.com"
+    "enableSigning": true,
+    "entitlementsPath": "Tools/MacOS/Game.entitlements"
   }
 }

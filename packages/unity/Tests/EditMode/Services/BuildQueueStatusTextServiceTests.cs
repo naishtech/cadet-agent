@@ -94,7 +94,6 @@ namespace Covyne.CADET.Editor.Tests.Services
             Assert.AreEqual("Git Sync, Unity Build, Publish Steam", detail);
         }
 
-#if !CADET_LITE
         [Test]
         public void NormalizeWorkspaceStatus_PublishingInactiveWithSuccessEvidence_ReturnsCompleted()
         {
@@ -109,6 +108,5 @@ namespace Covyne.CADET.Editor.Tests.Services
 
             Assert.AreEqual(BuildJobStatus.Completed, status);
         }
-#endif
     }
 }

@@ -263,28 +263,6 @@ namespace Covyne.CADET.Editor.Views
 
             EditorGUILayout.HelpBox("Profile Name is the label used in the queue and build history. Use a clear name like Steam-Windows-Release.", MessageType.Info);
             
-#if CADET_LITE
-            // In Lite: Platform is Pro feature - show disabled with Pro label
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField(new GUIContent(CadetLocalization.GetString("Window.ProfileEditor.Fields.Platform"), CadetLocalization.GetString("Window.ProfileEditor.Tooltips.Platform")), GUILayout.Width(EditorGUIUtility.labelWidth));
-            EditorGUI.BeginDisabledGroup(true);
-            string[] platformOptions = new[]
-            {
-                CadetLocalization.GetStringWithFallback("Window.ProfileEditor.Options.NoPublishing", "No Publishing"),
-                CadetLocalization.GetString("Window.ProfileEditor.Options.Steam"),
-                CadetLocalization.GetString("Window.ProfileEditor.Options.Epic"),
-                CadetLocalization.GetString("Window.ProfileEditor.Options.Both")
-            };
-            EditorGUILayout.Popup(GetPlatformIndex(currentPlatform, includeNone: true), platformOptions);
-            EditorGUI.EndDisabledGroup();
-            var proLabelStyle = new GUIStyle(EditorStyles.miniLabel);
-            proLabelStyle.normal.textColor = new Color(1f, 0.6f, 0f);
-            proLabelStyle.fontStyle = FontStyle.Bold;
-            GUILayout.Label("PRO", proLabelStyle, GUILayout.Width(30));
-            EditorGUILayout.EndHorizontal();
-
-            EditorGUILayout.HelpBox("Platform controls which publishing settings appear. Choose Steam, Epic, or Both based on your release targets.", MessageType.Info);
-#else
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField(new GUIContent(CadetLocalization.GetString("Window.ProfileEditor.Fields.Platform"), CadetLocalization.GetString("Window.ProfileEditor.Tooltips.Platform")), GUILayout.Width(EditorGUIUtility.labelWidth));
             GUI.SetNextControlName("platform");
@@ -315,7 +293,6 @@ namespace Covyne.CADET.Editor.Views
             DrawValidationError("platform", platformError);
 
             EditorGUILayout.HelpBox("Platform controls which publishing settings appear. Choose No Publishing, Steam, Epic, or Both based on your release targets.", MessageType.Info);
-#endif
             
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField(new GUIContent(CadetLocalization.GetString("Window.ProfileEditor.Fields.OperatingSystem"), CadetLocalization.GetString("Window.ProfileEditor.Tooltips.OperatingSystem")), GUILayout.Width(EditorGUIUtility.labelWidth));
@@ -567,30 +544,6 @@ namespace Covyne.CADET.Editor.Views
         {
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             
-#if CADET_LITE
-            // In Lite: Git Sync is Pro feature - force Directory Sync (useGit = false)
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField(new GUIContent("Sync Mode", "Lite supports Directory Sync only"), GUILayout.Width(EditorGUIUtility.labelWidth));
-            EditorGUI.BeginDisabledGroup(true);
-            EditorGUILayout.LabelField("Directory Sync", GUILayout.ExpandWidth(true));
-            EditorGUI.EndDisabledGroup();
-            var proLabelStyle = new GUIStyle(EditorStyles.miniLabel);
-            proLabelStyle.normal.textColor = new Color(1f, 0.6f, 0f);
-            proLabelStyle.fontStyle = FontStyle.Bold;
-            GUILayout.Label("PRO: Git Sync", proLabelStyle, GUILayout.Width(80));
-            EditorGUILayout.EndHorizontal();
-
-            EditorGUILayout.HelpBox("Sync Mode controls how the build workspace is prepared. Directory Sync copies files directly, while Git Sync uses repository checkout.", MessageType.Info);
-            
-            // Ensure useGit is false in Lite
-            if (viewModel.Profile.useGit)
-            {
-                viewModel.UpdateUseGit(false);
-            }
-            
-            // Show all Git fields as disabled with Pro labels
-            EditorGUI.BeginDisabledGroup(true);
-#else
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField(new GUIContent(CadetLocalization.GetString("Window.ProfileEditor.Fields.UseGit"), CadetLocalization.GetString("Window.ProfileEditor.Tooltips.UseGit")), GUILayout.Width(EditorGUIUtility.labelWidth));
             bool useGit = EditorGUILayout.Toggle(viewModel.Profile.useGit);
@@ -601,7 +554,6 @@ namespace Covyne.CADET.Editor.Views
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.HelpBox("Use Git enables repository-based sync instead of direct directory copy. Enable this when your build workspace should track a branch.", MessageType.Info);
-#endif
             
             // Only show warning message and git fields when useGit is enabled
             if (viewModel.Profile.useGit)
@@ -697,9 +649,6 @@ namespace Covyne.CADET.Editor.Views
                 }
             }
             
-#if CADET_LITE
-            EditorGUI.EndDisabledGroup();
-#endif
             EditorGUILayout.EndVertical();
         }
         
@@ -709,18 +658,7 @@ namespace Covyne.CADET.Editor.Views
             string appIdError = validationManager?.GetFieldError("steam.appId");
             
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            
-#if CADET_LITE
-            // In Lite: Steam Settings is Pro feature - show all fields disabled with Pro label
-            EditorGUILayout.BeginHorizontal();
-            var proLabelStyle = new GUIStyle(EditorStyles.boldLabel);
-            proLabelStyle.normal.textColor = new Color(1f, 0.6f, 0f);
-            GUILayout.Label("PRO FEATURE - Steam Publishing", proLabelStyle);
-            EditorGUILayout.EndHorizontal();
-            EditorGUILayout.Space(5);
-            EditorGUI.BeginDisabledGroup(true);
-#endif
-            
+
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField(new GUIContent(CadetLocalization.GetString("Window.ProfileEditor.Fields.AppID"), CadetLocalization.GetString("Window.ProfileEditor.Tooltips.AppID")), GUILayout.Width(EditorGUIUtility.labelWidth));
             GUI.SetNextControlName("steam.appId");
@@ -810,9 +748,6 @@ namespace Covyne.CADET.Editor.Views
                 viewModel.AddSteamDepot();
             }
             
-#if CADET_LITE
-            EditorGUI.EndDisabledGroup();
-#endif
             EditorGUILayout.EndVertical();
         }
         
@@ -903,18 +838,7 @@ namespace Covyne.CADET.Editor.Views
             bool showManualVersion = !viewModel.Profile.useGit || !viewModel.Profile.epic.useGitTagForVersion;
             
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            
-#if CADET_LITE
-            // In Lite: Epic Settings is Pro feature - show all fields disabled with Pro label
-            EditorGUILayout.BeginHorizontal();
-            var proLabelStyle = new GUIStyle(EditorStyles.boldLabel);
-            proLabelStyle.normal.textColor = new Color(1f, 0.6f, 0f);
-            GUILayout.Label("PRO FEATURE - Epic Publishing", proLabelStyle);
-            EditorGUILayout.EndHorizontal();
-            EditorGUILayout.Space(5);
-            EditorGUI.BeginDisabledGroup(true);
-#endif
-            
+
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField(new GUIContent(CadetLocalization.GetString("Window.ProfileEditor.Fields.ProductID"), CadetLocalization.GetString("Window.ProfileEditor.Tooltips.ProductID")), GUILayout.Width(EditorGUIUtility.labelWidth));
             GUI.SetNextControlName("epic.productId");
@@ -1000,9 +924,6 @@ namespace Covyne.CADET.Editor.Views
                 EditorGUILayout.HelpBox("Build Version is your explicit version string when not using Git tags. Use a stable format such as 1.2.3 or 2026.03.18.", MessageType.Info);
             }
             
-#if CADET_LITE
-            EditorGUI.EndDisabledGroup();
-#endif
             EditorGUILayout.EndVertical();
         }
         

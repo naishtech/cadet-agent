@@ -11,11 +11,7 @@ namespace Covyne.CADET.Editor.Tests.Models
         {
             var profile = new BuildProfile();
 
-#if CADET_LITE
-            Assert.AreEqual("none", profile.platform);
-#else
             Assert.AreEqual("steam", profile.platform);
-#endif
         }
     }
 }

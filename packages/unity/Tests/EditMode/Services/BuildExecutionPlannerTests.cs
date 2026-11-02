@@ -27,7 +27,6 @@ namespace Covyne.CADET.Editor.Tests.Services
             }
         }
 
-#if !CADET_LITE
         [Test]
         public void PrepareCicdExecution_DirectorySync_UsesWorkspacePathAndNoGitFlag()
         {
@@ -122,7 +121,6 @@ namespace Covyne.CADET.Editor.Tests.Services
             Assert.Throws<ArgumentNullException>(() => planner.PrepareCicdExecution(job, null, "F:/scripts/dist.sh"));
             Assert.Throws<ArgumentException>(() => planner.PrepareCicdExecution(job, profile, ""));
         }
-#endif
 
         [Test]
         public void PrepareLocalExecution_UsesBatchModeAndExecuteMethod()

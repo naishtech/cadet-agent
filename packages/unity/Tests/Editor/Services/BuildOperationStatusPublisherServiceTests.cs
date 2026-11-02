@@ -81,11 +81,7 @@ namespace Covyne.CADET.Editor.Tests.Services
             var service = new BuildOperationStatusPublisherService(job);
             service.PublishIfChanged("Checking workspace sync status...");
 
-#if CADET_LITE
-            Assert.AreEqual("Pre-sync", job.StatusDetail);
-#else
             Assert.AreEqual("Checking workspace sync status...", job.StatusDetail);
-#endif
         }
     }
 }
