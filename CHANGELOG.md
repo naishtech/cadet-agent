@@ -13,6 +13,23 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Added
+- **Three release artifacts from one packaging run, at one version.** `package-agent.ps1` now also writes
+  `cadet-unreal-X.Y.Z.zip`: the plugin at the zip root with the CLI in `CLI/` beside it, for a team that drops
+  `Plugins/CadetBuild` in by hand. The release workflow attaches that zip and the npm tarball beside the install
+  zip. `cadet-agent.zip` keeps its name on purpose — the installer finds the asset by that exact string.
+- **Each engine package carries its licence and its changelog.** The packager writes `LICENSE.md` (the one root
+  MIT text) and `CHANGELOG.md` (this version's root section) into `packages/unity` and `packages/unreal` at
+  package time. Neither is committed, so there is one copy to keep right.
+
+### Changed
+- **`bump-version.ps1` writes the four files that carry the version.** It added `packages/cli/VERSION` and
+  `packages/unreal/CadetBuild.uplugin` to `package.json` and `FrameworkManifest.json`, then reads all four back
+  and aborts before committing if one still holds the old number. The Unreal plugin descriptor had said `0.1.0`
+  since it was imported, so the version a consumer saw in the plugin browser was not the suite version.
+- `test/version-consistency.test.mjs` is that check without PowerShell: the four files must agree, and a failure
+  names the file that drifted.
+
 ### Fixed
 - **A story with a deferred `Play:` could never pass `state validate`.** `harness verify-play` wrote its
   record with no `reason`, and the validator refuses a `userPlaythroughConfirmed` record without one, so

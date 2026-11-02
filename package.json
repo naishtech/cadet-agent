@@ -14,7 +14,8 @@
   },
   "files": [
     "bin/",
-    "src/"
+    "src/",
+    "components.json"
   ],
   "keywords": [
     "cadet",

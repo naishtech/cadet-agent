@@ -54,8 +54,12 @@ $ErrorActionPreference = "Stop"
 $scriptDir = $PSScriptRoot
 
 # Files that carry the version string and are updated on every bump.
+# The four above/below are the ones code reads (plan 01 §5); ADAPTERS.md and the
+# CHANGELOG quote the version for a person.
 $packageJson = Join-Path $scriptDir "package.json"
 $manifestJson = Join-Path $scriptDir ".cadet\agent\core\FrameworkManifest.json"
+$cliVersionFile = Join-Path $scriptDir "packages\cli\VERSION"
+$unrealDescriptor = Join-Path $scriptDir "packages\unreal\CadetBuild.uplugin"
 $adaptersMd = Join-Path $scriptDir "ADAPTERS.md"
 $changelogMd = Join-Path $scriptDir "CHANGELOG.md"
 
@@ -164,7 +168,7 @@ try {
     Fail "Could not determine the current branch."
   }
 
-  foreach ($path in @($packageJson, $manifestJson, $adaptersMd, $changelogMd)) {
+  foreach ($path in @($packageJson, $manifestJson, $cliVersionFile, $unrealDescriptor, $adaptersMd, $changelogMd)) {
     if (-not (Test-Path $path)) { Fail "Expected file not found: $path" }
   }
 
@@ -269,6 +273,19 @@ try {
   Set-TextFile $manifestJson $manifestText
   Write-Ok ".cadet/agent/core/FrameworkManifest.json -> $targetRaw"
 
+  # packages/cli/VERSION — the whole file is the number. Written with a trailing
+  # newline, because a file of "0.64.0" with no terminator is a file every tool
+  # that reads lines reports as a missing final line.
+  Set-TextFile $cliVersionFile "$targetRaw`n"
+  Write-Ok "packages/cli/VERSION -> $targetRaw"
+
+  # packages/unreal/CadetBuild.uplugin — VersionName is what the Unreal editor
+  # shows in the plugin browser, so a stale one is the version a consumer reads.
+  $upluginText = Get-TextFile $unrealDescriptor
+  $upluginText = [regex]::Replace($upluginText, '("VersionName"\s*:\s*")[^"]*(")', "`${1}$targetRaw`${2}", 1)
+  Set-TextFile $unrealDescriptor $upluginText
+  Write-Ok "packages/unreal/CadetBuild.uplugin -> $targetRaw"
+
   # ADAPTERS.md — "Framework version: X.Y.Z", and refresh the Updated date.
   $adaptersText = Get-TextFile $adaptersMd
   $adaptersText = [regex]::Replace($adaptersText, '(Framework version:\s*)\d+\.\d+\.\d+', "`${1}$targetRaw", 1)
@@ -314,16 +331,26 @@ try {
   }
   Set-TextFile $changelogMd $changelogText
 
-  # Verify the writes landed before we commit anything.
-  $checkVersion = Get-JsonVersion $packageJson
-  if ($checkVersion -ne $targetRaw) {
-    Fail "package.json still reports $checkVersion after the bump; aborting before commit."
+  # Verify every write landed before we commit anything. A bump that missed one
+  # file is exactly the version split this script exists to prevent, and
+  # test/version-consistency.test.mjs reads the same four files in CI.
+  $written = [ordered]@{
+    "package.json"                             = (Get-JsonVersion $packageJson)
+    ".cadet/agent/core/FrameworkManifest.json" = ((Get-TextFile $manifestJson | ConvertFrom-Json).frameworkVersion)
+    "packages/cli/VERSION"                     = (((Get-TextFile $cliVersionFile)).Trim())
+    "packages/unreal/CadetBuild.uplugin"       = ((Get-TextFile $unrealDescriptor | ConvertFrom-Json).VersionName)
   }
+  foreach ($file in $written.Keys) {
+    if ($written[$file] -ne $targetRaw) {
+      Fail "$file still reports $($written[$file]) after the bump; aborting before commit."
+    }
+  }
+  Write-Ok "all four version files read back $targetRaw"
 
   # ── Commit ────────────────────────────────────────────────────────────────
 
   Write-Step "Committing"
-  Invoke-Git add -- $packageJson $manifestJson $adaptersMd $changelogMd
+  Invoke-Git add -- $packageJson $manifestJson $cliVersionFile $unrealDescriptor $adaptersMd $changelogMd
   Invoke-Git commit -m $commitMessage
   Write-Ok $commitMessage
 
