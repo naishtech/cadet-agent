@@ -13,6 +13,15 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Fixed
+- **A story with a deferred `Play:` could never pass `state validate`.** `harness verify-play` wrote its
+  record with no `reason`, and the validator refuses a `userPlaythroughConfirmed` record without one, so
+  the framework rejected evidence it had just written; the only ways out were to delete the record or to
+  hand-write a reason the validator exists to stop. `createEvidence` now keeps a `reason` it is given
+  (it used to drop the field silently), the deferral record carries the target and the story's own
+  reason, and the validator exempts an automated `play deferred` record from the person's-answer rule
+  while still refusing a record that claims a playthrough with no answer.
+
 ## [0.63.1] — 2026-10-19
 
 ### Added

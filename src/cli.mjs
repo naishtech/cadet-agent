@@ -1873,6 +1873,10 @@ async function cmdHarness(opts) {
       status: 'passed',
       command: `harness verify-play --story ${opts.story}`,
       result: `play deferred (${playValidation.code})`,
+      // A deferral is not a person's answer, but the record must say why the gate is satisfied. The
+      // text is the story's own declaration, and `source: automated` plus a `play deferred` result
+      // keeps a reader from mistaking it for an account of a playthrough.
+      reason: `play deferred to ${playDeclaration.deferTo}: ${playDeclaration.reason}`,
       exitCode: 0,
       commit: opts.commit || null,
       inputTreeHash: computeInputTreeHash(opts.targetDir, [storyRel]),
