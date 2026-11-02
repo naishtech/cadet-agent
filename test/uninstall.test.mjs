@@ -99,6 +99,21 @@ describe('generated directories', () => {
       ['Plugins/CadetBuild/Binaries'],
     );
   });
+
+  it('are removed with everything a build wrote inside them', async () => {
+    const dll = join(work, 'Plugins/CadetBuild/Binaries/Win64/UnrealEditor-CadetBuild.dll');
+    const obj = join(work, 'Plugins/CadetBuild/Intermediate/Build/Win64/x64/CadetBuild/Tab.obj');
+    for (const full of [dll, obj]) {
+      mkdirSync(dirname(full), { recursive: true });
+      writeFileSync(full, 'build output');
+    }
+    writeInstallRecord(work, makeRecord([], { components: ['engine.unreal.plugin'] }));
+
+    await uninstall(work, {});
+
+    assert.equal(existsSync(join(work, 'Plugins/CadetBuild/Binaries')), false);
+    assert.equal(existsSync(join(work, 'Plugins/CadetBuild/Intermediate')), false);
+  });
 });
 
 // ── The command ─────────────────────────────────────────────────────────────
@@ -175,5 +190,14 @@ describe('uninstall', () => {
     assert.equal(existsSync(join(work, 'Assets/Covyne/Cadet/CLI/dist.sh')), false);
     assert.ok(existsSync(join(work, 'Assets/Covyne/Cadet/CLI/cosmos-bash')));
     assert.ok(result.leftovers.some((l) => l.path === 'Assets/Covyne/Cadet/CLI'));
+  });
+
+  it('does not claim a folder it emptied itself was left behind', async () => {
+    const entry = installed('Plugins/CadetBuild/CLI/dist.sh', '#!/bin/bash');
+    writeInstallRecord(work, makeRecord([entry], { components: ['engine.unreal.plugin'] }));
+
+    const result = await uninstall(work, {});
+    assert.equal(existsSync(join(work, 'Plugins/CadetBuild/CLI')), false);
+    assert.equal(result.leftovers.some((l) => l.path === 'Plugins/CadetBuild/CLI'), false);
   });
 });

@@ -13,11 +13,13 @@
  *   2. User data is never a candidate. Policies, plans, state, reports, handoffs
  *      and the archive are not in the record, and the protected-path check
  *      refuses them even if a corrupt record names them.
- *   3. What cannot be hashed is reported, not deleted silently. Downloaded
- *      tools, build output and logs are named so the user can decide.
+ *   3. What cannot be hashed is split in two. Downloaded tools and logs are
+ *      reported, not deleted, because they are large, reusable and not this
+ *      install's to remove. Build output goes by rule, because no record can
+ *      hash it and leaving it behind breaks the next build.
  */
 
-import { existsSync, readdirSync, rmdirSync, statSync, unlinkSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, rmSync, rmdirSync, statSync, unlinkSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 
@@ -188,14 +190,11 @@ export async function uninstall(targetDir, opts = {}) {
     try { unlinkSync(join(targetDir, rel)); removed += 1; } catch { /* locked or gone */ }
   }
 
+  // Build output belongs to no record, so it goes by rule. Recursive on purpose:
+  // a UE module build nests its products (Binaries/Win64/*.dll, Intermediate/Build/...),
+  // and a shallow delete left them behind while the report claimed they were gone.
   for (const rel of generated) {
-    const full = join(targetDir, rel);
-    try {
-      for (const child of readdirSync(full, { withFileTypes: true })) {
-        if (child.isFile()) unlinkSync(join(full, child.name));
-      }
-      rmdirSync(full);
-    } catch { /* not empty: a build wrote outside our files */ }
+    try { rmSync(join(targetDir, rel), { recursive: true, force: true }); } catch { /* held by a running editor */ }
   }
 
   // Directories the install created, now empty. Deepest first, and computed
@@ -213,14 +212,19 @@ export async function uninstall(targetDir, opts = {}) {
   // stops at the first directory that still holds user data.
   removeEmptyAncestors(recordPath);
 
+  // Re-measured after the deletions: a folder that existed at report time can be
+  // emptied by the deletions themselves, and claiming it was "left behind" then
+  // points the user at a path that is gone.
+  const keptAfter = leftovers(record, { targetDir });
+
   console.log('');
   console.log(`✅ Removed ${removed} files.`);
   if (keepModified.length) {
     console.log(`   Kept ${keepModified.length} modified files — review them, then delete by hand.`);
   }
-  if (kept.length) {
+  if (keptAfter.length) {
     console.log('   Left behind:');
-    for (const item of kept) console.log(`     ${item.path}  (${item.why})`);
+    for (const item of keptAfter) console.log(`     ${item.path}  (${item.why})`);
   }
   if ((record.components || []).includes('engine.unreal.plugin')) {
     console.log('   Unreal: close the editor, then reopen the project to drop the module.');
@@ -233,6 +237,6 @@ export async function uninstall(targetDir, opts = {}) {
     removed,
     keptModified: keepModified,
     keptProtected: keepProtected,
-    leftovers: kept,
+    leftovers: keptAfter,
   };
 }
