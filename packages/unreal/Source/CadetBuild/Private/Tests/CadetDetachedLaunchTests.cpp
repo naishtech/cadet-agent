@@ -5,14 +5,14 @@
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FCadetDetachedLaunchBuildsPowerShellCommandTest,
-    "Bloodstone.CadetBuild.DetachedLaunch.BuildsPowerShellCommand",
+    "Cadet.CadetBuild.DetachedLaunch.BuildsPowerShellCommand",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FCadetDetachedLaunchBuildsPowerShellCommandTest::RunTest(const FString& Parameters)
 {
     FCadetDetachedLaunchRequest Request;
     Request.BashPath = TEXT("C:/Program Files/Git/bin/bash.exe");
-    Request.DistScriptPath = TEXT("F:/unity/projects/cadet/cadet-cli/Tools/CLI/dist.sh");
+    Request.DistScriptPath = TEXT("C:/Projects/ExampleProject/Plugins/CadetBuild/CLI/dist.sh");
     Request.RuntimeProfilePath = TEXT("F:/tmp/runtime.json");
     Request.VdfsDirectory = TEXT("F:/tmp/vdfs");
     Request.JobGuid = TEXT("job-guid-1");
@@ -37,7 +37,7 @@ bool FCadetDetachedLaunchBuildsPowerShellCommandTest::RunTest(const FString& Par
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FCadetDetachedLaunchRejectsEmptyPathsTest,
-    "Bloodstone.CadetBuild.DetachedLaunch.RejectsEmptyPaths",
+    "Cadet.CadetBuild.DetachedLaunch.RejectsEmptyPaths",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FCadetDetachedLaunchRejectsEmptyPathsTest::RunTest(const FString& Parameters)

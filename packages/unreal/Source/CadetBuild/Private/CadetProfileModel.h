@@ -78,6 +78,12 @@ public:
     static bool DeleteProfileByName(const FString& ProfileName, FString* OutError = nullptr);
     static bool ExportProfile(const FCadetProfileData& Profile, FString* OutFilePath = nullptr, FString* OutError = nullptr);
 
+    /** Model to JSON text, with the field names the shared schema defines. */
+    static bool SerializeProfileToString(const FCadetProfileData& Profile, FString& OutJson, FString* OutError = nullptr);
+
+    /** JSON text to model. Fails when the document has no profileName. */
+    static bool DeserializeProfileFromString(const FString& JsonText, FCadetProfileData& OutProfile, FString* OutError = nullptr);
+
 private:
     static FString MakeSafeProfileFileName(const FString& ProfileName);
 };

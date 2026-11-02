@@ -376,6 +376,47 @@ bool FCadetProfileStore::ExportProfile(const FCadetProfileData& Profile, FString
     return true;
 }
 
+bool FCadetProfileStore::SerializeProfileToString(const FCadetProfileData& Profile, FString& OutJson, FString* OutError)
+{
+    const TSharedPtr<FJsonObject> Obj = ToJsonObject(Profile);
+    const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&OutJson);
+    if (!FJsonSerializer::Serialize(Obj.ToSharedRef(), Writer))
+    {
+        if (OutError)
+        {
+            *OutError = TEXT("Failed to serialize profile to JSON.");
+        }
+        return false;
+    }
+
+    return true;
+}
+
+bool FCadetProfileStore::DeserializeProfileFromString(const FString& JsonText, FCadetProfileData& OutProfile, FString* OutError)
+{
+    const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(JsonText);
+    TSharedPtr<FJsonObject> Obj;
+    if (!FJsonSerializer::Deserialize(Reader, Obj) || !Obj.IsValid())
+    {
+        if (OutError)
+        {
+            *OutError = TEXT("Failed to parse profile JSON.");
+        }
+        return false;
+    }
+
+    if (!FromJsonObject(Obj, OutProfile))
+    {
+        if (OutError)
+        {
+            *OutError = TEXT("Profile JSON has no profileName.");
+        }
+        return false;
+    }
+
+    return true;
+}
+
 FString FCadetProfileStore::MakeSafeProfileFileName(const FString& ProfileName)
 {
     FString Safe = ProfileName;

@@ -2,6 +2,7 @@
 #include "Slate/SSteamCredentialsDialog.h"
 #include "CadetCosmosInstaller.h"
 #include "CadetSteamCmdInstaller.h"
+#include "CadetCliStatus.h"
 #include "CadetDependencyManager.h"
 #include "Styling/AppStyle.h"
 #include "Widgets/Input/SButton.h"
@@ -58,6 +59,14 @@ void SCadetPublishingToolsPanel::Construct(const FArguments& InArgs)
 				.Text(LOCTEXT("InfoBox", "Configure publishing dependencies and platform credentials required for Steam and other publishing platforms."))
 				.AutoWrapText(true)
 			]
+		]
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(12, 0, 12, 6)
+		[
+			SNew(STextBlock)
+			.Text(CadetCli::InspectInstalled().GetVersionText())
+			.Font(FAppStyle::GetFontStyle("ToolMenuContext.Label"))
 		]
 		+ SVerticalBox::Slot()
 		.AutoHeight()

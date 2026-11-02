@@ -1,6 +1,7 @@
 #include "Slate/SCadetBuildTab.h"
 
 #include "CadetDependencyManager.h"
+#include "CadetCliStatus.h"
 #include "CadetProfileModel.h"
 #include "Slate/SCadetPublishingToolsPanel.h"
 #include "Utils/CadetDetachedLaunch.h"
@@ -38,56 +39,6 @@ DEFINE_LOG_CATEGORY_STATIC(LogCadetBuild, Log, All);
 
 namespace
 {
-    bool ValidatePluginCliRuntime(const FString& PluginCliRoot, FString& OutError)
-    {
-        const TArray<FString> RequiredRelativePaths = {
-            TEXT("dist.sh"),
-            TEXT("Util/json_parser.sh"),
-            TEXT("Util/build_status.sh"),
-            TEXT("Steam/publish.sh"),
-            TEXT("Unreal/build.sh")
-        };
-
-        TArray<FString> MissingFiles;
-        for (const FString& RelativePath : RequiredRelativePaths)
-        {
-            const FString AbsolutePath = FPaths::Combine(PluginCliRoot, RelativePath);
-            if (!FPaths::FileExists(AbsolutePath))
-            {
-                MissingFiles.Add(AbsolutePath);
-            }
-        }
-
-        if (MissingFiles.Num() == 0)
-        {
-            OutError.Empty();
-            return true;
-        }
-
-        FString MissingList;
-        for (const FString& Missing : MissingFiles)
-        {
-            if (!MissingList.IsEmpty())
-            {
-                MissingList += TEXT("\n  - ");
-            }
-            else
-            {
-                MissingList = TEXT("  - ");
-            }
-            MissingList += Missing;
-        }
-
-        OutError = FString::Printf(
-            TEXT("CADET CLI runtime is incomplete under %s\n\n")
-            TEXT("Missing required files:\n%s\n\n")
-            TEXT("Resync the plugin CLI bundle from cadet-cli:\n")
-            TEXT("  powershell -NoProfile -ExecutionPolicy Bypass -File F:/unity/projects/cadet/cadet-cli/make.ps1 -Target sync -SyncUnrealPlugin"),
-            *PluginCliRoot,
-            *MissingList);
-        return false;
-    }
-
     struct FCadetDirectorySyncResult
     {
         bool bSuccess = false;
@@ -1660,12 +1611,12 @@ bool SCadetBuildTab::LaunchCadetForProfile(const FCadetProfileData& Profile, boo
         SaveDetachedManifest(TEXT("failed"), TEXT("launch"), OutError, true, -1);
         return false;
     }
-    FString CliRuntimeError;
-    if (!ValidatePluginCliRuntime(PluginCliRoot, CliRuntimeError))
+    const FCadetCliStatus CliStatus = CadetCli::InspectInstalled();
+    if (!CliStatus.IsInstalled())
     {
-        OutError = CliRuntimeError;
+        OutError = CliStatus.GetMissingText().ToString();
         AppendConsoleLine(TEXT("[DIST] CLI runtime preflight failed."));
-        AppendConsoleLine(CliRuntimeError);
+        AppendConsoleLine(OutError);
         SaveDetachedManifest(TEXT("failed"), TEXT("launch"), OutError, true, -1);
         return false;
     }
@@ -2291,6 +2242,11 @@ void SCadetBuildTab::Construct(const FArguments& InArgs)
     // Initialization will happen asynchronously to avoid blocking the editor
     bIsInitializing = true;
 
+    // A missing CLI is a first-run state, not a failure: say so before a profile is picked.
+    const FCadetCliStatus CliStatus = CadetCli::InspectInstalled();
+    const EVisibility CliBannerVisibility = CliStatus.IsInstalled() ? EVisibility::Collapsed : EVisibility::Visible;
+    const FText CliBannerText = CliStatus.GetMissingText();
+
     PlatformOptions.Reset();
     PlatformOptions.Add(MakeShared<FString>(TEXT("steam")));
 
@@ -2336,6 +2292,21 @@ void SCadetBuildTab::Construct(const FArguments& InArgs)
                         }
                         return FReply::Handled();
                     })
+                ]
+            ]
+            + SVerticalBox::Slot()
+            .AutoHeight()
+            .Padding(0, 0, 0, 6)
+            [
+                SNew(SBorder)
+                .Padding(8.0f)
+                .BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
+                .Visibility(CliBannerVisibility)
+                [
+                    SNew(STextBlock)
+                    .Text(CliBannerText)
+                    .AutoWrapText(true)
+                    .ColorAndOpacity(FLinearColor(0.85f, 0.25f, 0.25f))
                 ]
             ]
             + SVerticalBox::Slot()
