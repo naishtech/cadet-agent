@@ -277,6 +277,18 @@ foreach ($component in $components.components) {
 
 $fileCount = (Get-ChildItem -Path $staging -Recurse -File).Count
 
+# Every shell script must be LF inside the package. Bash cannot run a CRLF copy, and
+# install.mjs refuses to finish an install that carries one. The working tree can hold
+# CRLF on Windows (core.autocrlf), so the package normalises here instead of trusting
+# the checkout. The index marks *.sh eol=lf; this makes the artifact match it.
+$shellScripts = Get-ChildItem -Path $staging -Recurse -File -Filter *.sh
+foreach ($script in $shellScripts) {
+    $bytes = [System.IO.File]::ReadAllBytes($script.FullName)
+    if ([Array]::IndexOf($bytes, [byte]13) -lt 0) { continue }
+    $text = [System.IO.File]::ReadAllText($script.FullName) -replace "`r`n", "`n"
+    [System.IO.File]::WriteAllText($script.FullName, $text, (New-Object System.Text.UTF8Encoding($false)))
+}
+
 Compress-Archive -Path (Join-Path $staging "*") -DestinationPath $outputZip
 
 Remove-Item $staging -Recurse -Force
