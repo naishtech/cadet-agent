@@ -85,14 +85,20 @@ run_cmd() {
   "$@"
 }
 
-# Configurable Variables (defaults retained)
+# Configurable variables. No identity is baked in here: signing and notarization
+# read these from $HOME/.env_cadet_mac_creds (see load_creds) or from the
+# environment. The file looks like this:
+#   DEV_ID="Developer ID Application: Your Company (ABCDE12345)"
+#   APPLE_ID="you@example.com"
+#   TEAM_ID="ABCDE12345"
+#   GEN_PW="abcd-efgh-ijkl-mnop"
 WORKING_DIR=${WORKING_DIR:-"../../Bin/macos"}
 APP=${APP:-"MyGame"}
 ENTITLEMENTS=${ENTITLEMENTS:-"../../Tools/macos/MyGame.entitlements"}
-DEV_ID=${DEV_ID:-"Developer ID Application: Andrew Naish (K2J6AHHBA2)"}
-APPLE_ID=${APPLE_ID:-"andrewgnaish@gmail.com"}
+DEV_ID=${DEV_ID:-""}
+APPLE_ID=${APPLE_ID:-""}
 GEN_PW=${GEN_PW:-""}
-TEAM_ID=${TEAM_ID:-"K2J6AHHBA2"}
+TEAM_ID=${TEAM_ID:-""}
 UNITY_BUNDLE_ID="${UNITY_BUNDLE_ID}"
 REQUEST_UUID=${REQUEST_UUID:-""}
 
@@ -150,6 +156,12 @@ get_version() {
 }
 
 codesign_app() {
+  if [ -z "${DEV_ID}" ]; then
+    echo "[ERR] DEV_ID is not set, so there is no signing identity." >&2
+    echo "[ERR] Put it in $HOME/.env_cadet_mac_creds, for example:" >&2
+    echo '[ERR]   DEV_ID="Developer ID Application: Your Company (ABCDE12345)"' >&2
+    exit 1
+  fi
   echo "Making build executable..."
   if command -v chmod.ape >/dev/null 2>&1; then
     run_cmd chmod.ape -R a+xr "${APP}.app"
@@ -185,6 +197,10 @@ upload() {
   fi
   echo "Submitting to Apple notarization service..."
   echo "Using zip file: ${zip_file}"
+  if [ -z "${APPLE_ID}" ] || [ -z "${TEAM_ID}" ]; then
+    echo "Error: APPLE_ID and TEAM_ID are not set. Put them in $HOME/.env_cadet_mac_creds, for example 'you@example.com' and 'ABCDE12345'."
+    return 1
+  fi
   if [ -n "${GEN_PW}" ]; then
     # Use stdbuf to disable output buffering for real-time progress logs
     if command -v stdbuf >/dev/null 2>&1; then
@@ -335,6 +351,18 @@ if [ -n "$PROFILE_JSON" ]; then
 fi
 
 load_creds
+
+# A dry run only prints the commands, so fill any credential the file did not
+# supply with a sample. It runs after load_creds, so a real
+# ~/.env_cadet_mac_creds always wins. A real run keeps the empty value and stops
+# with the message that names the file.
+if $DRY_RUN; then
+  DEV_ID=${DEV_ID:-"Developer ID Application: Your Company (ABCDE12345)"}
+  APPLE_ID=${APPLE_ID:-"you@example.com"}
+  TEAM_ID=${TEAM_ID:-"ABCDE12345"}
+  GEN_PW=${GEN_PW:-"sample-app-specific-password"}
+fi
+
 get_version
 
 if $DRY_RUN; then

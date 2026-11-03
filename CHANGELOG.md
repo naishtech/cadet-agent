@@ -24,6 +24,16 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
   what it forbids — and the Unity-Burst cleanup folder is now derived from the profile's `projectName`
   instead of hardcoding one.
 
+### Fixed
+- **The macOS signing script shipped a person's identity, and never read its own credentials file.**
+  `Tools/MacOS/sign_and_upload.sh` defaulted `DEV_ID`, `APPLE_ID` and `TEAM_ID` to one owner's Apple
+  Developer ID, Apple ID address and team id, which is both somebody's personal data in a downloadable
+  package and the reason `~/.env_cadet_mac_creds` was ignored: `load_creds` treats "all four set" as "the
+  environment already has them", so the file branch could never run. The defaults are now empty, the file
+  is read, and a real sign or upload without credentials stops with a message naming the file and showing
+  the shape of each value. A `--dry-run` fills the gaps with sample values so the printed commands read
+  correctly.
+
 ## [0.64.0] — 2026-11-03
 
 ### Fixed
