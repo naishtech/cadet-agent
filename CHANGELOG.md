@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.64.0] — 2026-11-03
+
 ### Fixed
 - **A deferral may name a story the plan declares but state has not begun.** `collectWorkItems` read
   only `.cadet/state.json`, so a story whose `Play:` or `Reachability:` deferred to the next story had
