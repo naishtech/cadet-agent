@@ -123,7 +123,7 @@ function relativePath(targetDir, abs) {
  *
  * WHY THIS EXISTS. The plan built these two paths by joining the plans root with the ids from
  * `state.json`, which assumes the PACKAGED layout. A real project nests its plans and names its own
- * folders — this repository keeps `.cadet/agent/project-plans/dolven-tactics-mvp/epics/<epic>/` — so the
+ * folders — a consumer keeps `.cadet/agent/project-plans/<project>-mvp/epics/<epic>/` — so the
  * plan reported the host's own active story as MISSING on every phase of every story, and its epic as
  * absent. A check that fires on a correct project teaches its reader to ignore the output; the
  * reconciler records that same lesson, for this same repository, in its REQUIRED_ARTIFACTS comment.

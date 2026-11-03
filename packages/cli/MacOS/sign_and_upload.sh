@@ -87,8 +87,8 @@ run_cmd() {
 
 # Configurable Variables (defaults retained)
 WORKING_DIR=${WORKING_DIR:-"../../Bin/macos"}
-APP=${APP:-"Dolven"}
-ENTITLEMENTS=${ENTITLEMENTS:-"../../Tools/macos/Dolven.entitlements"}
+APP=${APP:-"MyGame"}
+ENTITLEMENTS=${ENTITLEMENTS:-"../../Tools/macos/MyGame.entitlements"}
 DEV_ID=${DEV_ID:-"Developer ID Application: Andrew Naish (K2J6AHHBA2)"}
 APPLE_ID=${APPLE_ID:-"andrewgnaish@gmail.com"}
 GEN_PW=${GEN_PW:-""}

@@ -479,7 +479,7 @@ describe('reconcile: output shape', () => {
 // ── Layouts that a real project actually uses ───────────────────────────────
 //
 // Every case here comes from running the command against a real consumer repo
-// (`dolven-tactics`), where the first version reported 15 blocking findings for
+// (a real consumer), where the first version reported 15 blocking findings for
 // epics that existed one level deeper, two for documents that existed under
 // other names, and ~120 more for fields that simply predated the templates.
 // A check that fires on a correct project is worse than no check.

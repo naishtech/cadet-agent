@@ -28,7 +28,7 @@ Cosmos git requires `GIT_EXEC_PATH` to find helper commands:
 
 2. Get a fresh Steam Guard code from your email
 
-3. Create `~/.env_dolven_build_steam`:
+3. Create `~/.env_mygame_build_steam`:
    ```bash
    STEAM_USERNAME="your_username"
    STEAM_PASSWORD="your_password"
@@ -40,7 +40,7 @@ Cosmos git requires `GIT_EXEC_PATH` to find helper commands:
    bash Tools/Steam/auth.sh --profile-json profile.json
    ```
 
-5. After successful authentication, edit `~/.env_dolven_build_steam` and remove the Steam Guard code:
+5. After successful authentication, edit `~/.env_mygame_build_steam` and remove the Steam Guard code:
    ```bash
    STEAM_USERNAME="your_username"
    STEAM_PASSWORD="your_password"
@@ -298,7 +298,7 @@ Optional macOS-specific settings.
 {
   "macos": {
     "enableSigning": true,
-    "entitlementsPath": "Tools/MacOS/Dolven.entitlements"
+    "entitlementsPath": "Tools/MacOS/MyGame.entitlements"
   }
 }
 ```
@@ -314,7 +314,7 @@ Optional macOS-specific settings.
 
 Credentials are **never** stored in Build Profile JSON. They are stored in user-specific files:
 
-- **Steam**: `$HOME/.env_dolven_build_steam`
+- **Steam**: `$HOME/.env_mygame_build_steam`
   ```bash
   STEAM_USERNAME=your_username
   STEAM_PASSWORD=your_password
@@ -343,7 +343,7 @@ The `json_parser.sh` validates:
 
 See complete examples in:
 - `Test/test_data/valid_complete.json` - Full profile with all fields
-- `Test/test_data/dolven/dolven_3155821_profile.json` - Real-world profile
+- `Test/test_data/mygame/mygame_profile.json` - Real-world profile
 - `Test/test_data/valid_steam_only.json` - Steam-only profile
 
 ---

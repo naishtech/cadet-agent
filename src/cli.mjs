@@ -53,7 +53,7 @@ function showHelp() {
   ╚██████╗██║  ██║██████╔╝███████╗   ██║
    ╚═════╝╚═╝  ╚═╝╚═════╝ ╚══════╝   ╚═╝
 
-  Cross-IDE agent framework for Unity/C# game-development
+  Agentic Game Development
 
   Usage:
     npx cadet-agent@latest init     Install Cadet-Agent into the current directory

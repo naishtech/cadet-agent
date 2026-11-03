@@ -61,7 +61,7 @@ namespace Covyne.CADET.Editor.Tests.Utilities
         public void BuildStartInfoForPlatform_Mac_UsesTerminalTailCommand()
         {
             var psi = LogTailMonitorUtility.BuildStartInfoForPlatform(
-                "/Volumes/CORSAIR/Amethyst Lite/Logs/unity_build_macos.log",
+                "/Volumes/CORSAIR/MyGame Lite/Logs/unity_build_macos.log",
                 "Unity Log (macOS)",
                 RuntimePlatform.OSXEditor);
 
@@ -69,7 +69,7 @@ namespace Covyne.CADET.Editor.Tests.Utilities
             StringAssert.Contains("set logPath to", psi.Arguments);
             StringAssert.Contains("quoted form of logPath", psi.Arguments);
             StringAssert.Contains("tell application \\\"Terminal\\\" to do script tailCommand", psi.Arguments);
-            StringAssert.Contains("Amethyst Lite/Logs/unity_build_macos.log", psi.Arguments);
+            StringAssert.Contains("MyGame Lite/Logs/unity_build_macos.log", psi.Arguments);
         }
 
         [Test]

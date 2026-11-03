@@ -495,8 +495,8 @@ describe('context protocol — adapter conformance', () => {
  * from `state.json`, which assumes the PACKAGED layout. A real project nests its plans one level deeper
  * and names the epic document as it pleases, so on a correct project the plan reported the host's OWN
  * active story as MISSING, and its epic as absent, on every phase of every story. Measured in
- * `dolven-tactics` on 2026-10-19: `.cadet/agent/project-plans/epic-13-magical-network/story-14-...`
- * against a file at `.cadet/agent/project-plans/dolven-tactics-mvp/epics/epic-13-magical-network/`.
+ * a real consumer on 2026-10-19: `.cadet/agent/project-plans/epic-13-magical-network/story-14-...`
+ * against a file at `.cadet/agent/project-plans/mygame-mvp/epics/epic-13-magical-network/`.
  */
 describe('context protocol — the work item is found, not assumed', () => {
   const stateOf = (dir) => JSON.parse(readFileSync(join(dir, '.cadet/state.json'), 'utf-8'));
@@ -504,7 +504,7 @@ describe('context protocol — the work item is found, not assumed', () => {
   it('finds a nested story, and the epic beside it under whatever name it has', () => {
     const dir = fixture();
     try {
-      const nested = join(dir, '.cadet/agent/project-plans/dolven-tactics-mvp/epics/epic-1');
+      const nested = join(dir, '.cadet/agent/project-plans/mygame-mvp/epics/epic-1');
       mkdirSync(nested, { recursive: true });
       writeFileSync(join(nested, 'Epic.md'), '# the epic\n');
       writeFileSync(join(nested, 'story-1.md'), 'Status: in-progress\n## AC-1\nGiven a\nWhen b\nThen c\n');
@@ -512,8 +512,8 @@ describe('context protocol — the work item is found, not assumed', () => {
 
       const state = stateOf(dir);
       const docs = resolveWorkItemDocs(dir, state);
-      assert.equal(docs.story, '.cadet/agent/project-plans/dolven-tactics-mvp/epics/epic-1/story-1.md');
-      assert.equal(docs.epic, '.cadet/agent/project-plans/dolven-tactics-mvp/epics/epic-1/Epic.md',
+      assert.equal(docs.story, '.cadet/agent/project-plans/mygame-mvp/epics/epic-1/story-1.md');
+      assert.equal(docs.epic, '.cadet/agent/project-plans/mygame-mvp/epics/epic-1/Epic.md',
         'the epic is found beside the story, and reported under the name it actually has');
       assert.deepEqual(docs.ambiguous, []);
 

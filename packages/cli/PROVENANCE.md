@@ -20,4 +20,4 @@ Every file is byte-identical to its source (`sha256sum` compared file by file, 2
 ## What this replaces
 
 - `cadet-cli/Tools/CLI` in the `cadet` repository.
-- The copy at `Bloodstone/Plugins/CadetBuild/CLI`, which `make.ps1 -Target sync -SyncUnrealPlugin` kept in step by hand.
+- The copy inside a game project at `Plugins/CadetBuild/CLI`, which `make.ps1 -Target sync -SyncUnrealPlugin` kept in step by hand.

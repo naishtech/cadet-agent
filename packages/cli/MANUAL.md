@@ -434,7 +434,7 @@ Optional macOS-specific settings:
 {
   "macos": {
     "enableSigning": true,
-    "entitlementsPath": "Tools/MacOS/Dolven.entitlements"
+    "entitlementsPath": "Tools/MacOS/MyGame.entitlements"
   }
 }
 ```
@@ -462,7 +462,7 @@ See `Test/test_data/` for complete example profiles:
 - `valid_complete.json` - Full profile with all fields
 - `valid_steam_only.json` - Steam-only profile
 - `valid_epic_only.json` - Epic-only profile
-- `dolven/dolven_3155821_profile.json` - Real-world profile
+- `examples/mygame_profile.json` - Real-world profile
 
 ---
 
@@ -760,7 +760,7 @@ Enable signing in your Build Profile:
   "os": "mac",
   "macos": {
     "enableSigning": true,
-    "entitlementsPath": "Tools/MacOS/Dolven.entitlements"
+    "entitlementsPath": "Tools/MacOS/MyGame.entitlements"
   }
 }
 ```

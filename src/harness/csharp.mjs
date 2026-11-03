@@ -213,8 +213,8 @@ export function scanComponents(pkg, { packages = [pkg], exclude = DEFAULT_EXCLUD
  * namespace that is a PREFIX of it: `using A.B.C` maps to a component `A.B` (or
  * `A.B.C` when that exists), because a namespace nested deeper is a different
  * component. The reverse match was a bug the real-project test caught: with both
- * `Dolven.Game.Rendering` and `Dolven.Game.Rendering.Crowd` present, a plain
- * `using Dolven.Game.Rendering;` was attributed to the longer `…Crowd` sibling.
+ * `MyGame.Game.Rendering` and `MyGame.Game.Rendering.Crowd` present, a plain
+ * `using MyGame.Game.Rendering;` was attributed to the longer `…Crowd` sibling.
  *
  * This is an approximation by design: it reads declarations, not the compiled
  * type graph, and it says so in the docs.

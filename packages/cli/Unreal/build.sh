@@ -96,7 +96,7 @@ ensure_editor_target_receipt() {
   mkdir_p "$synced_project_dir/Binaries/Win64"
 
   # The detached runner executes from the host project plugin directory
-  # (for example .../Bloodstone/Plugins/CadetBuild/CLI/Unreal). If the synced
+  # (for example <GameProject>/Plugins/CadetBuild/CLI/Unreal). If the synced
   # workspace is missing the editor receipt, copy it from the host project.
   local host_project_dir
   host_project_dir="$(cd "$SCRIPT_DIR/../../../../" 2>/dev/null && pwd || true)"

@@ -2,7 +2,7 @@
 
 Copied, not merged. There is no shared history with the source repository (D9).
 
-- Source repository: `F:/Unreal/Projects/Covyne/Bloodstone`
+- Source repository: a private game project (path withheld)
 - Source path: `Plugins/CadetBuild`
 - Source commit: `2ad46a07` — "docs(handoff): the montage table is done, and its two-hour trap is written down"
 - Copied: 2026-10-28
@@ -21,4 +21,4 @@ Every file is byte-identical to its source.
 
 ## What this replaces
 
-`Bloodstone/Plugins/CadetBuild` as the only copy of the Unreal plugin.
+the vendor copy inside that game project as the only copy of the Unreal plugin.

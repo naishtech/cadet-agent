@@ -354,8 +354,8 @@ build_windows() {
     # Check if Unity Windows build was successful
     if [ $exit_code -eq 0 ]; then
         log_build "Unity Windows build completed successfully."
-        # Remove Dolven_BurstDebugInformation_DoNotShip folder
-        TARGET_FOLDER="$BUILD_OUTPUT_PATH/windows/Dolven_BurstDebugInformation_DoNotShip"
+        # Remove the Unity-Burst debug folder, which Unity names after the project
+        TARGET_FOLDER="$BUILD_OUTPUT_PATH/windows/${PROJECT_NAME}_BurstDebugInformation_DoNotShip"
         TARGET_FOLDER_BASH="$(to_bash_path "$TARGET_FOLDER")"
         if [ -d "$TARGET_FOLDER_BASH" ]; then
             log_build "Removing $TARGET_FOLDER ..."
@@ -424,8 +424,8 @@ build_macos() {
     # Check if Unity MacOS build was successful
     if [ $exit_code -eq 0 ]; then
         log_build "Unity MacOS build completed successfully."
-        # Remove Dolven_BurstDebugInformation_DoNotShip folder
-        TARGET_FOLDER="$BUILD_OUTPUT_PATH/macos/Dolven_BurstDebugInformation_DoNotShip"
+        # Remove the Unity-Burst debug folder, which Unity names after the project
+        TARGET_FOLDER="$BUILD_OUTPUT_PATH/macos/${PROJECT_NAME}_BurstDebugInformation_DoNotShip"
         TARGET_FOLDER_BASH="$(to_bash_path "$TARGET_FOLDER")"
         if [ -d "$TARGET_FOLDER_BASH" ]; then
             log_build "Removing $TARGET_FOLDER ..."

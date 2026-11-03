@@ -20,7 +20,7 @@ for a `state.schema.json` that says 5.
 The cursor must be rewritten whenever a gate flips. The logs must never be rewritten. Fused, the
 cost of every write grew with all accumulated history.
 
-Measured on a real consumer repository (dolven-tactics), before this change:
+Measured on a real consumer repository, before this change:
 
 | Section | Bytes | Share | Content |
 |---|---:|---:|---|

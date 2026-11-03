@@ -561,7 +561,7 @@ describe('strict closure — exception taxonomy', () => {
 
   it('does not apply taxonomy rules when strict closure is disabled', () => {
     // Legacy exception shape (no category) must keep working — it is what
-    // Dolven's own changeHistory contains today.
+    // A consumer's own changeHistory contains today.
     const r = validateState(
       withException({ gate: 'codeReviewCompleted', reason: 'merged already', rationale: 'already verified', expiresAt: null }),
       { strictClosure: validatePolicy({}) },

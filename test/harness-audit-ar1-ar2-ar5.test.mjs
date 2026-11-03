@@ -1,5 +1,5 @@
 // Tests for the Agent Reviewer audit findings AR-1 / AR-2 / AR-5
-// (2026-09-15, dolven-tactics PR #51).
+// (2026-09-15, a consumer repository, PR #51).
 //
 // AR-1 — a gate record MUST be able to cite the commit it attests. Before this
 //        change no evidence field carried one and no CLI flag could supply one,

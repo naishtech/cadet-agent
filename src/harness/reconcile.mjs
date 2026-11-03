@@ -71,8 +71,8 @@ export const PLANS_DEFAULT_DIR = '.cadet/agent/project-plans';
  * PATTERN rather than by a fixed path.
  *
  * The fixed-path version of this check was wrong in practice. A real project
- * (`dolven-tactics`) keeps its artifacts under a named project folder with its
- * own document names — `.cadet/agent/project-plans/dolven-tactics-mvp/
+ * (a real consumer) keeps its artifacts under a named project folder with its
+ * own document names — `.cadet/agent/project-plans/<project>-mvp/
  * mvp-requirements.md` — so looking for `requirements.md` at the plans root
  * reported two blocking findings against a project that had both documents. A
  * check that fires on a correct project is worse than no check: it teaches the

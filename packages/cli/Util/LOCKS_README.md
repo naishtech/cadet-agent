@@ -14,7 +14,7 @@ Prevents multiple Unity builds of the same project from running simultaneously. 
 - Unity editor crashes from multiple instances accessing the same project
 - Resource exhaustion from parallel builds
 
-**Example**: When building "Dolven", the lock `unity_build_Dolven` is held.
+**Example**: When building "MyGame", the lock `unity_build_MyGame` is held.
 
 ### 2. Steam Uploads
 **Lock Name**: `steamcmd_<APP_ID>`
@@ -49,7 +49,7 @@ Start-Process -FilePath $bashPath -ArgumentList "-lc `"$cmd`"" -NoNewWindow -Wai
 ### Manually Remove a Specific Lock
 ```powershell
 # If you're certain a process isn't running, you can manually remove its lock
-Remove-Item "Tools\.locks\unity_build_Dolven.lock"
+Remove-Item "Tools\.locks\unity_build_MyGame.lock"
 Remove-Item "Tools\.locks\steamcmd_3155820.lock"
 ```
 
@@ -80,7 +80,7 @@ Locks are automatically cleaned up when:
 Lock files are stored in `Tools/.locks/` and contain:
 
 ```
-PROCESS: unity_build_Dolven
+PROCESS: unity_build_MyGame
 PID: 12345
 TIME: 2025-12-18 02:30:45
 HOST: DESKTOP-ABC123

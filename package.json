@@ -1,7 +1,7 @@
 {
   "name": "cadet-agent",
   "version": "0.64.0",
-  "description": "Cross-IDE agent framework for Unity/C# game-development — one-command install",
+  "description": "Agentic Game Development — cross-IDE agent framework, one-command install",
   "type": "module",
   "bin": {
     "cadet-agent": "bin/cli.mjs"

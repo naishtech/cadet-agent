@@ -15,7 +15,7 @@ proving that the evidence proving it is still true.**
    long `review`/`validation`, and closure still succeeds.
 2. A `manual-confirmation` record needs only `command: null` and a free-text `result`. v2
    has no required `reason`, no mandatory expiry, no environment detail, and no explicit
-   scope field. Dolven's own `state.json` demonstrates the consequence: several records
+   scope field. A consumer's own `state.json` demonstrates the consequence: several records
    carry `"expiresAt": null` and `"freshnessPolicy": null`, i.e. **an unbounded-evidence
    record that is nevertheless accepted as a valid freshness bound**, because
    `validateEvidenceShape` only checks that the *key* exists, not that it carries a value.
@@ -67,7 +67,7 @@ it at the last possible moment (closure) maximises the amount of work that must 
 
 > **Deliberate asymmetry.** The version bump allows v3 to *express* strictness; it does not
 > *impose* it. Imposition happens only via `strictClosure.enabled`. This is what "opt-in
-> first, then default in next schema/version" requires, and it is why Dolven's existing
+> first, then default in next schema/version" requires, and it is why an existing
 > `manual-confirmation` records do not break on upgrade.
 
 ## 2. `strictClosure` policy block
@@ -108,7 +108,7 @@ Lives in `.cadet/harness.json`. Absent block == disabled == v2 behaviour.
 **Rejected at policy load time** (not silently ignored): unknown `strictClosure` keys,
 unknown keys inside `manualConfirmation`, a `disallowManualFor` entry that is not a known
 gate name, and `revalidateOnClosure: true` with `enabled: false` (a contradiction that would
-otherwise be inert — the exact `budgets.default` failure mode from Dolven's history).
+otherwise be inert — the exact `budgets.default` failure mode from a real project's history).
 
 ### 2.1 Why `disallowManualFor` names these gates and not `compileCheckConfirmed`
 
@@ -152,7 +152,7 @@ no bypass option. A `--reason` containing a token or connection string is stored
 
 v2 `validateEvidenceShape` accepts `{ expiresAt: undefined, freshnessPolicy: undefined }` as
 an error, but accepts `{ expiresAt: null, freshnessPolicy: null }` as **valid** — because
-only key presence is checked (state.mjs §"A freshness bound is mandatory"). Dolven's
+only key presence is checked (state.mjs §"A freshness bound is mandatory"). A consumer's
 `state.json` contains exactly this: five records with both fields `null`, and one
 (`3f0146e7`) backs a claimed-true `compileCheckConfirmed`.
 
@@ -203,7 +203,7 @@ cadet-agent harness confirm \
   --gate compileCheckConfirmed \
   --reason "Unity CLI unavailable in this environment; editor reports 0 errors" \
   --expires-at 2026-09-14T00:00:00Z \
-  --environment "projectPath=E:/unity/projects/dolven-tactics,editorVersion=6000.6.0f1" \
+  --environment "projectPath=D:/Projects/MyGame,editorVersion=6000.6.0f1" \
   --scope "Assets/Scripts/Game/SimulationHost.cs,Assets/Scenes/Main.unity" \
   --files Assets/Scripts/Game/SimulationHost.cs,Assets/Scenes/Main.unity
 ```
@@ -238,7 +238,7 @@ cadet-agent harness confirm \
 
 ### 5.2 Why a command rather than a documented procedure
 
-Dolven's `state.json` shows manual evidence was previously created by hand. That makes the
+A consumer's `state.json` shows manual evidence was previously created by hand. That makes the
 *record shape* unreviewable at creation time: the constraints in §3 can only be checked later,
 by `state validate`, after the work item has moved on. A command checks them at the moment of
 creation, when the human still remembers what was verified.
@@ -268,7 +268,7 @@ creation, when the human still remembers what was verified.
 ## 7. Rollout
 
 1. **This change (v0.31.0):** `strictClosure` present and honoured, default **off**.
-   Contract doc, schemas, CLI, tests updated atomically. Dolven's existing state validates
+   Contract doc, schemas, CLI, tests updated atomically. A consumer's existing state validates
    unchanged, and `state transition --to closed` behaves exactly as it does today.
 2. **Next schema/version (v0.32.0):** flip `enabled` default to `true`; provide a
    `state migrate --to v3 --strict` that flags legacy manual-confirmation records that would
