@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.64.1] — 2026-11-03
+
 ### Changed
 - **The product line is "Agentic Game Development", and the documentation names no game project.**
   The banner and the npm description carried "cross-IDE agent framework for Unity/C# game-development",
