@@ -1,7 +1,7 @@
 {
   "FileVersion": 3,
   "Version": 1,
-  "VersionName": "0.64.1",
+  "VersionName": "0.64.2",
   "FriendlyName": "Cadet Build",
   "Description": "Editor tooling for CADET build/publish workflows.",
   "Category": "Editor Utilities",

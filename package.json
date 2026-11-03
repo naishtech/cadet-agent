@@ -1,6 +1,6 @@
 {
   "name": "cadet-agent",
-  "version": "0.64.1",
+  "version": "0.64.2",
   "description": "Agentic Game Development — cross-IDE agent framework, one-command install",
   "type": "module",
   "bin": {
