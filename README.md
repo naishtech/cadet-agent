@@ -2,7 +2,7 @@
 
 Cadet-Agent is an **opinionated** cross-IDE agent framework for game-development workflows. It is built on foundational software engineering practices and real-world game-development experience, with the goal of **guiding you through the entire development process** — from requirements and technical design through TDD, implementation, and review.
 
-Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished game from a single prompt. Instead, it walks you through each phase methodically: calibrating the learner model, scoping work into epics and stories, planning architecture, writing tests first, and iterating on feedback. The shared framework core integrates with GitHub Copilot, Cursor, Continue, Claude Code, Deep Code, and Hermes.
+Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished game from a single prompt. Instead, it walks you through each phase methodically: calibrating the learner model, scoping work into epics and stories, planning architecture, writing tests first, and iterating on feedback. The shared framework core integrates with GitHub Copilot, Cursor, Continue, Claude Code, Deep Code, and Hermes, and it drives one engine at a time through an **engine pack** — a set of commands and conventions for **Unity** or **Unreal** that the phase skills defer to.
 
 ## Repository Layout
 - `.cadet/agent/core/` contains the shared Cadet-Agent framework documents.
@@ -11,6 +11,7 @@ Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished g
   - `harness.schema.json` and `state.schema.json` are the machine-readable schemas for harness records and session state.
   - `skills/` contains scoped workflow-phase skills (PlanningReview, Requirements, Architecture, DesignReview, Spike, StoryBreakdown, TDD, Debugging, CodeReview, VisualEvidence, Resume, MCPSetup, AgentReviewer, Handoff, Reconciliation).
   - `templates/` contains runtime templates for planning artifacts.
+  - `engines/unity/` and `engines/unreal/` are the engine packs: the commands and conventions each engine needs, read through `.cadet/engine.json`.
 - `.cadet/harness.json` holds repository-local budget/policy overrides (preserved by sync).
 - `.cadet/runs/` holds sanitized run ledgers (preserved by sync; no secrets or raw prompts by default).
 - `src/harness/` contains the harness implementation (policy, budget, state, verification, context, routing, redaction, ledger, archive, hook, C# scan and diagram generation). Its one runtime dependency is `nomnoml`, the UML renderer used by `harness diagram` — see [Component diagrams](#component-diagrams).
@@ -22,9 +23,16 @@ Cadet-Agent is **not a one-shot code generator**. It won't spit out a finished g
 - `.claude/` contains Claude Code-specific authored files.
 - `.agents/skills/` contains Deep Code / Hermes (cross-client) skill adapters.
 - These IDE folders hold thin integration shims; the core framework logic still lives in `.cadet/agent/core/`.
-- `package-agent.ps1` builds the distributable `cadet-agent.zip` package.
-- `bump-version.ps1` bumps the version, updates version-bearing files, commits, tags, and pushes. It runs `npm run lint` first and refuses to release if the link check fails.
-- `npm run lint` checks all markdown links (the same offline check CI runs); `npm run verify` runs tests + lint.
+- `packages/` holds the engine products, one directory each, all at the suite version:
+  - `packages/cli/` — the Cadet CLI (`build.sh`, `dist.sh`, `Steam/`, `Epic/`, profile fixtures and schema). This is the only copy.
+  - `packages/unity/` — the Unity editor tooling, installed to `Assets/Covyne/Cadet/`. It is copied files, never a UPM package.
+  - `packages/unreal/` — the `CadetBuild` plugin, installed to `Plugins/CadetBuild/`.
+  - Each package carries a `PROVENANCE.md` naming the commit it came from.
+- `components.json` lists every installable component with the zip paths it takes and where it lands, so one archive can install different shapes.
+- `test/` holds the node suite (`npm test`) over the framework, the installer, the uninstaller and the engine packages.
+- `package-agent.ps1` builds the distributable `cadet-agent.zip` (the installer's payload), the hand-drop `cadet-unreal-<version>.zip`, and writes each engine package's `LICENSE.md` and `CHANGELOG.md` into them at package time.
+- `bump-version.ps1` bumps the version in the four files code reads (`package.json`, `FrameworkManifest.json`, `packages/cli/VERSION`, `packages/unreal/CadetBuild.uplugin`), reads all four back, commits, tags, and pushes. It runs `npm run lint` first and refuses to release if the link check fails. Pushing the tag is what publishes the release.
+- `npm run lint` checks all markdown links (the same offline check CI runs); `npm run test:cli` runs the CLI's own gate; `npm run verify` runs tests, the CLI gate and lint.
 
 ## Cross-IDE Support
 
@@ -62,11 +70,33 @@ All adapters delegate to the canonical files under `.cadet/agent/core/` — no d
 npx cadet-agent@latest init
 ```
 
-This downloads the latest framework release and extracts it into your current directory. For a specific target directory:
+The installer asks three questions — **which hosts**, **which engine**, and **whether to install the plugin** — and writes only what you choose. The framework core is always installed. Every answer has a flag, so the same command works in CI:
 
 ```bash
-npx cadet-agent@latest init --target ./my-unity-project
+npx cadet-agent@latest init --hosts claude,hermes --engine unity --yes
+npx cadet-agent@latest init --target ./my-project --engine unreal --no-plugins
+npx cadet-agent@latest init --components core,host.cursor     # name the set outright
 ```
+
+What each choice installs:
+
+| Choice | Files that land | Where |
+|---|---|---|
+| Core (always) | `.cadet/agent/` — directive, harness, skills, templates, engine packs | project root |
+| `copilot` | agent definitions, slash-command prompts, the git-guard hook | `.github/` |
+| `claude` | base, reviewer and per-phase skills | `.claude/skills/` |
+| `hermes`, `deepcode` | the same skills, as the cross-client root both hosts read | `.agents/skills/` |
+| `cursor` | rule files | `.cursor/rules/` |
+| `continue` | rules and command config | `.continue/` |
+| `unity` | the editor tooling and the CLI | `Assets/Covyne/Cadet/` and `Assets/Covyne/Cadet/CLI/` |
+| `unreal` | the `CadetBuild` plugin and the CLI | `Plugins/CadetBuild/` and `Plugins/CadetBuild/CLI/` |
+
+The engine is detected from the project when you do not say: an `Assets/` folder means Unity, a `.uproject` means Unreal, and a project with both gets both.
+
+Two records are written, and both matter later:
+
+- `.cadet/agent/install.json` — every installed file with its sha256, the components, the engine and the install targets. This is what makes `sync` and `uninstall` exact.
+- `.cadet/engine.json` — the engine, its plugin and CLI roots, and the editor version. The phase skills read their commands from it.
 
 ### Keeping the Framework Updated
 
@@ -74,13 +104,20 @@ npx cadet-agent@latest init --target ./my-unity-project
 npx cadet-agent@latest sync
 ```
 
-When a new release is available, `sync` downloads the updated framework and replaces managed files (`.cadet/agent/core/`, IDE integration shims, agent definitions). Your local policies (`.cadet/agent/policies/`), project plans (`.cadet/agent/project-plans/`), harness overrides (`.cadet/harness.json`), and run ledgers (`.cadet/runs/`) are automatically preserved. After syncing, start a fresh chat for the changes to take effect.
-
-To sync a specific directory:
+`sync` installs exactly the components the record names: a component that is new in the release is reported with the `init` command that would add it, and is not installed. Managed files (`.cadet/agent/core/`, IDE shims, agent definitions) are replaced. Your local policies (`.cadet/agent/policies/`), project plans (`.cadet/agent/project-plans/`), harness overrides (`.cadet/harness.json`), run ledgers (`.cadet/runs/`) and state (`.cadet/state.json`) are preserved. A file you edited after install is reported and left alone. After syncing, start a fresh chat for the changes to take effect.
 
 ```bash
-npx cadet-agent@latest sync --target ./my-unity-project
+npx cadet-agent@latest sync --target ./my-project
 ```
+
+### Uninstalling
+
+```bash
+npx cadet-agent@latest uninstall --dry-run   # show the four lists, delete nothing
+npx cadet-agent@latest uninstall
+```
+
+`uninstall` removes a file only when its hash still matches the record. A file you edited is kept and named; the paths that hold your own work — policies, plans, state, reports, handoffs, archives — are never touched, even if a corrupt record names them. For Unreal it also removes `Plugins/CadetBuild/Binaries/` and `Intermediate/` by rule, leaves downloaded tools (Cosmos, SteamCMD, BuildPatchTool) in place, names the logs, and says to close the editor and reopen the project. A second run finds no record and exits clean.
 
 #### AGENTS.md is create-only
 
@@ -96,12 +133,28 @@ npx cadet-agent@latest sync --agents-md keep       # never touch an existing AGE
 npx cadet-agent@latest sync --yes                  # non-interactive; keeps existing files
 ```
 
-## Manual Install (fallback)
+## Manual install (when you cannot run the installer)
 
-If you prefer to install from a packaged release artifact, download `cadet-agent.zip` from [GitHub Releases](https://github.com/naishtech/cadet-agent/releases) and extract it into your Unity project root:
+There is no extract-it-yourself path for the whole suite any more. `cadet-agent.zip` is the installer's payload: a componentised archive that `init` maps to the folders you chose, so extracting it at a project root would land `packages/` and the core in the wrong places. Two supported alternatives exist:
+
+**Unreal, hand drop.** `cadet-unreal-<version>.zip` carries the plugin at its root with the CLI in `CLI/` beside it. Extract it into `Plugins/CadetBuild/`:
 
 ```powershell
-Expand-Archive .\cadet-agent.zip -DestinationPath . -Force
+Expand-Archive .\cadet-unreal-0.64.0.zip -DestinationPath .\Plugins\CadetBuild -Force
+```
+
+A hand drop has no install record, so `sync` and `uninstall` cannot see those files. Keep the archive to update by hand.
+
+**Offline or internal mirror.** Serve the release JSON and the zip yourself and point the installer at that JSON:
+
+```bash
+npx cadet-agent@latest init --source http://127.0.0.1:8000/latest.json --engine unity --hosts claude --yes
+```
+
+The JSON names the asset, and the asset must be called `cadet-agent.zip`:
+
+```json
+{"tag_name":"v0.64.0","assets":[{"name":"cadet-agent.zip","browser_download_url":"http://127.0.0.1:8000/cadet-agent.zip"}]}
 ```
 
 ## Getting Started
@@ -173,7 +226,7 @@ Hard gates are enforced at every phase transition. The agent reads `.cadet/state
 |---|---|
 | architectureComplete → story-breakdown | `designReviewCompleted` when `designReview.enabled` is set — the formal design review, recorded by `harness verify-design-review` |
 | implementation → review | `testsPassed`, `compileCheckConfirmed`, `unityAnalyzerClean`, `storyTrackingUpdated`, and `architectureFitnessPassed` when the project declares architecture checks and enables them |
-| review → validation | `codeReviewCompleted`, `securityReviewPassed`, `acceptanceCriteriaValidated`, `reachabilityAddressed` when `reachability.enabled` is set, and `userPlaythroughConfirmed` when `userPlay.enabled` is set — a story declares `Play: required — <what the user does and what they see>` or `Play: deferred to <work item> — <why>`. A person's own answer satisfies `required` (ask them, then `harness confirm --gate userPlaythroughConfirmed --reason "<their answer>"`); `harness verify-play` records `deferred`, and the deferral expires when the named work item closes |
+| review → validation | `codeReviewCompleted`, `securityReviewPassed`, `acceptanceCriteriaValidated`, `reachabilityAddressed` when `reachability.enabled` is set, and `userPlaythroughConfirmed` when `userPlay.enabled` is set — a story declares `Play: required — <what the user does and what they see>` or `Play: deferred to <work item> — <why>`. The target of a deferral may be a story the plan declares and the state has not begun yet, so a story can hand the playthrough to the next one before that one exists as a work item. A person's own answer satisfies `required` (ask them, then `harness confirm --gate userPlaythroughConfirmed --reason "<their answer>"`); `harness verify-play` records `deferred`, and the deferral expires when the named work item closes |
 | validation → closed | `designArtifactSyncConfirmed`, and `humanAcceptanceConfirmed` when `humanAcceptance.enabled` is set — a person's own answer, recorded with `harness confirm --gate humanAcceptanceConfirmed --reason "<their answer>"`; no command can produce it |
 
 ### Runtime context protocol (opt-in, and the framework's own claim discipline)
@@ -388,26 +441,28 @@ If a specific game repository needs local conventions, add a policy file under `
 - which Unity packages or UI stack are the project default
 
 ## Package Output
-Running `./package-agent.ps1` produces `cadet-agent.zip` with this layout:
-- `.cadet/agent/core/` (including `HarnessRuntime.md`, `Harness.md`, `harness.schema.json`, and `state.schema.json`)
-- `.cadet/agent/core/skills/`
-- `.cadet/agent/core/templates/`
-- `.github/agents/cadet.agent.md`
-- `.github/agents/cadet-agent-reviewer.agent.md`
-- `.github/prompts/cadet-*.prompt.md`
-- `.github/hooks/` (the Copilot `git-guard` hook and its scripts)
-- `.githooks/pre-commit` (the portable Git hook; installed by you with `git config core.hooksPath .githooks`)
-- `.cursor/rules/cadet-agent.md`
-- `.cursor/rules/cadet-agent-reviewer.md`
-- `.continue/rules/cadet-agent.md`
-- `.continue/rules/cadet-agent-reviewer.md`
-- `.continue/config.yaml`
-- `.claude/skills/cadet-agent/SKILL.md`
-- `.claude/skills/cadet-*/SKILL.md`
-- `.agents/skills/cadet-agent/SKILL.md` (the cross-client root Deep Code and Hermes read)
-- `.agents/skills/cadet-*/SKILL.md`
-- `AGENTS.md` (create-only: an existing consumer copy is never overwritten)
+
+`./package-agent.ps1` writes two archives, both at the suite version:
+
+**`cadet-agent.zip` — the installer's payload, and the only install source.**
+- `.cadet/agent/core/` (directive, `HarnessRuntime.md`, `Harness.md`, the schemas, the skills, the templates, the engine packs)
 - `.cadet/harness.json` (create-only: the new-consumer policy seed)
+- `AGENTS.md` (create-only: an existing consumer copy is never overwritten)
+- `.githooks/pre-commit` (the portable Git hook; installed by you with `git config core.hooksPath .githooks`)
+- `.github/agents/`, `.github/prompts/`, `.github/hooks/` (Copilot)
+- `.claude/skills/` (Claude Code)
+- `.agents/skills/` (the cross-client root Deep Code and Hermes read)
+- `.cursor/rules/`, `.continue/` (Cursor, Continue)
+- `packages/cli/`, `packages/unity/`, `packages/unreal/`
+- `components.json` — what each component takes and where it installs
+
+Where those files land in your project is decided by `components.json`, not by the zip layout.
+
+**`cadet-unreal-<version>.zip` — the hand-drop plugin.** The plugin at the zip root (`CadetBuild.uplugin`, `Source/`, `Config/`, `README.md`) with the CLI in `CLI/` beside it.
+
+Both engine packages carry `LICENSE.md` (the root MIT text) and `CHANGELOG.md` (the release notes for that version), written at package time rather than committed: there is one licence and one changelog to keep right.
+
+The release workflow also runs `npm pack`, so a release carries the npm tarball (`bin/`, `src/`, `components.json`) beside the two zips.
 
 ## Notes
 - `.cadet/agent/core/FrameworkManifest.json` defines the managed and preserved paths for packaged installs.
