@@ -1,0 +1,12 @@
+{
+  "profileName": "unity-minimal",
+  "platform": "none",
+  "os": "windows",
+  "bundleId": "com.example.minimal",
+  "unity": {
+    "editorPath": "C:/Program Files/Unity/Hub/Editor/2022.3.62f3/Editor/Unity.exe",
+    "projectPath": "C:/projects/minimal",
+    "buildOutputPath": "C:/builds/minimal",
+    "projectName": "Minimal"
+  }
+}

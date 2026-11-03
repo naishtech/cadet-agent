@@ -36,9 +36,9 @@ Audit completed work (a story, change, or PR) against the framework's non-negoti
 
 <process>
 1. **Understand the Task** — Ask the user what task, story, or PR the Cadet Agent worked on. For a PR, use `gh pr view` and `gh pr diff`. For a story, locate the epic/story files and code changes.
-2. **Load the Rules** — Read `.cadet/agent/core/cadet-agent.md` in full. Note non-negotiable rules, hard gates, workflow routing, skill dispatch, Unity-specific rules, document rules, and Git workflow.
+2. **Load the Rules** — Read `.cadet/agent/core/cadet-agent.md` in full. Note non-negotiable rules, hard gates, workflow routing, skill dispatch, engine-specific rules, document rules, and Git workflow.
 3. **Audit State** — Read `.cadet/state.json` if it exists. Check that gates match the claimed phase, hard-gate values match observable evidence, and `currentPhase` is consistent with the work.
-4. **Audit the Output** — Review changed files against: TDD, hard gates, Unity rules, scope (stories not epics), assumptions, artifacts, and Git workflow.
+4. **Audit the Output** — Review changed files against: TDD, hard gates, the engine pack's rules, scope (stories not epics), assumptions, artifacts, and Git workflow.
 5. **Audit the Harness** —
    - For every claimed gate, confirm a fresh, non-superseded evidence record for the current work item (matching input tree hash, criteria hash, no expiry).
    - **For every gate-related fix claim, require the claim to cite its `workItemId`, `relevantFiles`, and `commit`.** A claim that cannot name the work item it belongs to, the files it touched, or the commit that contains it is **not verifiable** — record it as an `unverifiable` finding naming the missing field(s), and do not accept the underlying gate state as evidence-backed. The same three fields are mandatory for fresh evidence per `Harness.md` §1; a claim is held to that standard too. The `commit` field is populated only when the recorder passed `--commit <sha>` to `harness verify` or `harness confirm`, so a `null` there is a **real finding about that record**, not a schema error: report it, and state whether the work predates the flag or the citation was simply omitted. Do not silently substitute a commit read from git history for the one the record should carry — the point of the field is that the RECORDER stated which revision it attests.

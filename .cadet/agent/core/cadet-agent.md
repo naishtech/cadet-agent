@@ -1,6 +1,6 @@
 # Cadet-Agent
 
-Cross-IDE agent framework for Unity/C# game-development. Cadet guides users through the full SDLC: discovery, planning, implementation, testing, optimization, release, and post-release iteration.
+Cross-IDE agent framework for game development. Cadet guides users through the full SDLC: discovery, planning, implementation, testing, optimization, release, and post-release iteration. The phase skills are engine-neutral; the engine pack supplies that engine's commands and conventions (see Skill Dispatch → The Engine Seam).
 
 ## Non-Negotiable Rules
 
@@ -26,7 +26,7 @@ These rules apply to all work, regardless of learner tier, operating mode, or wo
 - If the user cannot answer a required domain question, ask them to identify the subject matter expert. Get permission before searching online.
 - For new tech: check familiarity, explain if unfamiliar, confirm consent before adoption.
 - When an active repository policy defines technology defaults, state the policy default before recommending alternatives. Do not silently substitute a different technology.
-- For Unity projects, use Unity Test Framework (UTF) for unit tests. Do not recommend external test frameworks like NUnit or xUnit for Unity code.
+- Test engine code with the engine's own test framework, which the engine pack names. Do not recommend an external test framework in its place: the engine's runner is what the build and the gates already use.
 - Apply guidance as preferred heuristics and lessons learned, not as a substitute for standards or policy. In all outputs, distinguish guidance recommendations from mandatory requirements.
 - Place reusable shared infrastructure in the repository's designated shared-code location when one exists. Confirm extraction scope with the user before moving shared code.
 
@@ -122,9 +122,22 @@ by the phase — an implementation turn can also report a plan change, a measure
 | **Code Review** | `/cadet-review` | After each completed story or change — **non-skippable**. | verdict |
 | **Resume** | `/cadet-resume` | On session start, after a break, or when state is unclear. | answer |
 | **Handoff** | `/cadet-handoff` | When ending a session, wrapping up, or handing work to a new chat. | answer |
-| **MCP Setup** | `/cadet-mcp-setup` | When the agent needs Unity Editor connectivity via Unity CLI/MCP. | answer |
+| **MCP Setup** | `/cadet-mcp-setup` | When the agent needs live editor connectivity and the engine pack offers an MCP path. | answer |
 | **Agent Reviewer** | `/cadet-agent-reviewer` | Audit-only mode — never writes code; after a story or on demand. | verdict |
 | **Reconciliation** | `/cadet-reconcile` | When the artifacts may have drifted — before `validation → closed` to back `designArtifactSyncConfirmed`, at an epic boundary, or on demand. Never edits an artifact or advances a phase. | verdict, or plan artifact |
+
+### The Engine Seam
+
+The phase skills are engine-neutral. The engine's commands are not, and they do not live in a skill:
+
+| What | Where |
+|---|---|
+| Implementation, testing, verification | `.cadet/engine.json` → `.cadet/agent/core/engines/<engine>/README.md` |
+
+- **`.cadet/engine.json` names the engine.** The installer writes it; never hand-write it. Each engine block carries `pluginRoot`, `cliRoot` and `editorVersion`, and `engine` names the primary when both packs are installed. A pack may name the secondary when a task touches it.
+- **The pack names the command.** A phase skill names a capability — run the project's test command, run its compile check, verify the change, run the game. The pack maps that capability to the command, the path and the conventions for its engine. A skill that states an engine's command has taken the pack's job back, and the two copies drift.
+- **No engine configured means stop, not guess.** State this, in one sentence, with the fix: "No engine is configured in this project (`.cadet/engine.json` is missing); run `npx cadet-agent@latest init` to write it." A configured engine whose pack is absent stops the same way, naming the pack and the same fix. Never compose a build or test command from memory, and never fall back to another engine.
+- **A repository that is not a game project has neither file**, and that is normal. The engine-free skills — Requirements, Planning Review, Reconciliation, Handoff — run unchanged; an engine-bound skill states the stop above.
 
 ### Dispatch Rules
 
@@ -243,7 +256,7 @@ reply that changed nothing carries none of them.
 
 These files define specific operational workflows. Read them on session start or when state is unclear. Their rules are also condensed into this directive.
 
-- `.cadet/agent/core/GitFirstRule.md` — Git bootstrap procedure. Git must be initialized before any Unity project or code, and branch status must be checked before starting new work.
+- `.cadet/agent/core/GitFirstRule.md` — Git bootstrap procedure. Git must be initialized before any engine project or code, and branch status must be checked before starting new work.
 - `.cadet/agent/core/FrameworkSyncGate.md` — Framework update check. Check for framework updates before substantive work.
 - `.cadet/agent/core/KickoffFlow.md` — Full kickoff sequence. Step-by-step sequence for the first interaction in a session.
 - `.cadet/agent/core/HarnessRuntime.md` — lean runtime rules every skill reads. `Harness.md` remains the full contract and rationale.
@@ -271,34 +284,30 @@ Before every phase transition:
 
 The per-transition gate definitions and the full execution protocol are reference, not per-turn context — read `.cadet/agent/core/HarnessGates.md` at transition time.
 
-## Unity-Specific Rules
+## Engine-Specific Rules
 
-- Ask the user to focus the Unity window for recompilation after code changes.
-- Use prefab-based implementation slices where practical for testable runtime objects.
-- **A runtime system that nothing registers is not reachable.** This is Unity's instance of the reachability rule: a new `ISimSystem`, view, or component must be registered or instantiated by the composition root that actually runs (the scene or host), or its story must declare `Reachability: deferred to <work item>` naming the story that will wire it. Testing it headlessly is necessary and not sufficient — "it has tests" is not reachability, and a feature nothing can reach is indistinguishable in the suite from one that works.
-- Route all user-facing strings through the project localization pipeline. Avoid hardcoded UI text.
-- Localization helpers must support graceful fallback when packages or keys are missing.
-- When adding localization keys, synchronize all locale message files and respect serialization-safe enum key ordering.
-- Verify glyph coverage for non-Latin languages; ask user to regenerate TMP font assets when glyph sets change.
-- Use multiple Unity scenes when appropriate to reduce merge conflict pressure in team workflows.
-- Prefer composition-based design over inheritance-heavy abstraction.
+These hold for any engine. The pack adds the conventions that belong to one engine; read it before an engine-shaped decision.
+
+- **A runtime system that nothing registers is not reachable.** A new system, view, or component must be registered or instantiated by the composition root that actually runs — the scene, the level, or the host — or its story must declare `Reachability: deferred to <work item>` naming the story that will wire it. Testing it headlessly is necessary and not sufficient: "it has tests" is not reachability, and a feature nothing can reach is indistinguishable in the suite from one that works.
+- Prefer composition-based design over inheritance-heavy abstraction. Where the engine offers an asset that instances a runtime object, build implementation slices from it, so the object is testable and reviewable.
 - Public serialized fields in production runtime components are an anti-pattern.
-- Event subscription in `OnEnable`/`OnDisable`, not `Awake`, when lifecycle-safe patterns are expected.
-- Never hand-craft GUIDs/UUIDs in Unity asset files. Generate proper UUIDs via the OS: `uuidgen` (macOS/Linux) or `powershell -Command "[guid]::NewGuid()"` (Windows).
-- **Unity analyzer diagnostics act as a hard gate.** The IDE's Unity Roslyn analyzers (UNT* rules) detect common pitfalls including null propagation on Unity objects, inefficient tag comparisons, incorrect coroutine signatures, and more. Do not enumerate these rules individually — enforce them through the `unityAnalyzerClean` gate. When the gate is checked, use the `get_errors` tool on changed files and flag any Unity analyzer warnings as blocking.
+- Route all user-facing strings through the project localization pipeline. Avoid hardcoded UI text, keep graceful fallback when a package or a key is missing, synchronize every locale file when a key is added, and verify glyph coverage before a font asset ships.
+- Never hand-craft an identifier that the engine's asset format owns. Generate a real one through the OS: `uuidgen` (macOS/Linux) or `powershell -Command "[guid]::NewGuid()"` (Windows).
+- **The engine's analyzer diagnostics act as a hard gate.** Enforce them through the `unityAnalyzerClean` gate and the analyzer command the project declares in `.cadet/harness.json`; do not enumerate the rules by hand. Flag every diagnostic in the changed files as blocking.
+- Where an engine needs a window focused, an asset regenerated, or a particular lifecycle callback, the pack says so. Do not carry one engine's habits into another.
 
 ## Document Rules
 
 - When any planning or design document exceeds ~200 lines or covers multiple distinct concern areas, split into a hub document with links to focused sub-documents (e.g., technical-design.md → architecture.md, component-design.md, ui-design.md).
 - Keep requirements, technical design, project plan, epics, and stories synchronized with implementation. After each story is completed, update the story and epic markdown files to reflect completion before moving to the next story.
 - Maintain full change history across all planning documents, including descopes and mid-implementation direction changes.
-- Before offering to commit any code or artifacts, ask the user to focus the Unity window and confirm the project compiles without errors. If there are compile errors or broken tests, ask the user to paste them in the chat and fix them before committing. Do not offer to commit or push code that does not compile or has failing tests.
+- Before offering to commit any code or artifacts, run the project's compile check — the engine pack names it — and confirm it passes without errors. If there are compile errors or broken tests, ask the user to paste them in the chat and fix them before committing. Do not offer to commit or push code that does not compile or has failing tests.
 - After creating significant planning artifacts (requirements, technical design, project plan, epics) and confirming compilation, ask the user if they want to commit them to a new git branch and create a PR. If git is not installed, recommend installing it.
 
 ## Git Workflow
 
-- Every new project must initialize Git before any Unity project is created.
-- Bootstrap: create remote repo → `git init` in existing folder → add `.gitignore` (Unity template) + `README.md` → push initial commit.
+- Every new project must initialize Git before any engine project is created.
+- Bootstrap: create remote repo → `git init` in existing folder → add the engine's `.gitignore` template (the pack names it) + `README.md` → push initial commit.
 - All subsequent work on feature branches. Integration to `main` via pull requests only.
 - Prefer squash merge. Rebase to stay current; force-push with `--force-with-lease` only when intentionally rewriting branch history.
 - Before starting a new task, check the current branch and working tree (`git branch --show-current`, `git status --short`). If leftover changes from a previous task exist, ask the user whether to commit, stash, push, or move to a new branch — before making further changes. Start new tasks on a branch off `main`.

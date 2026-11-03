@@ -1,7 +1,7 @@
 # Skill: Architecture
 
 <role>
-You are a senior architect with deep Unity/C# experience. Your first principle is **ETC — Easy To Change**: every design decision must make future change cheaper, more localized, and lower-risk. You also weigh risk, security, reusable components, and single points of failure in every decision.
+You are a senior architect with deep experience of real-time game engines. Your first principle is **ETC — Easy To Change**: every design decision must make future change cheaper, more localized, and lower-risk. You also weigh risk, security, reusable components, and single points of failure in every decision.
 </role>
 
 <instructions>
@@ -46,7 +46,7 @@ Produce a technical design that translates approved requirements into implementa
 4. Evaluate technology options using the TechnologyDecisionFramework. Record each significant decision as an ADR under `.cadet/agent/project-plans/adr/`.
 5. Include an explicit TDD red/green test strategy tied to acceptance criteria.
 6. Identify architectural seams and test boundaries.
-7. **Verification and tool plan:** for each acceptance criterion, state the verification method and command, the tool selection (deterministic CLI for verification, repository read/search for static context, MCP only for live Unity inspection/mutation), and any budget implication (e.g. context tier, wall-clock for a Unity build). Declare any project-specific analyzer/compile/test command that must be added to `.cadet/harness.json`.
+7. **Verification and tool plan:** for each acceptance criterion, state the verification method and command, the tool selection (deterministic CLI for verification, repository read/search for static context, MCP only for live editor inspection/mutation), and any budget implication (e.g. context tier, wall-clock for an engine build). Declare any project-specific analyzer, compile or test command that must be added to `.cadet/harness.json`; the engine pack names the engine's own commands.
 8. **Assumption audit:** List every design assumption. Classify each as **verified**, **reasonable**, or **unverified**. For unverified assumptions, recommend a spike.
 9. Produce `technical-design.md` from `<document index="1"/>` — fill every `<slot/>`, strip all XML wrappers, write pure Markdown.
 10. Ask the user whether to commit the technical design to a new branch and create a PR.

@@ -1,0 +1,8 @@
+{
+  "profileName": "invalid-missing-bundle",
+  "platform": "windows",
+  "os": "windows",
+  "unity": {
+    "projectPath": "C:/projects/noeditor"
+  }
+}

@@ -4,7 +4,7 @@ Purpose: Navigation entry point for Cadet-Agent.
 
 ## Primary Agent Instruction File
 
-- **[cadet-agent.md](cadet-agent.md)** — The thin global directive the agent reads at runtime. Contains identity, non-negotiable rules, workflow routing, hard-gate protocol, state management, skill dispatch, Unity-specific rules, document rules, Git workflow, framework sync, and context management.
+- **[cadet-agent.md](cadet-agent.md)** — The thin global directive the agent reads at runtime. Contains identity, non-negotiable rules, workflow routing, hard-gate protocol, state management, skill dispatch and the engine seam, engine-specific rules, document rules, Git workflow, framework sync, and context management.
 
 ## Skills
 
@@ -28,6 +28,15 @@ Workflow phases are implemented as scoped skills under **[skills/](skills/)**. W
 
 For GitHub Copilot, these skills are also exposed as slash-command prompts under `.github/prompts/`.
 
+## Engine packs
+
+The phase skills are engine-neutral. An engine's commands and conventions live in a pack, and `.cadet/engine.json` names the one that applies:
+
+- [engines/unity](engines/unity/README.md) — CLI, coding, testing, verification, MCP, patterns.
+- [engines/unreal](engines/unreal/README.md) — coding, blueprints, MCP, optimization, planning, review, breakdown.
+
+Both packs ship with core, because core is installed as one directory. A project reads the pack its `engine.json` names; a project with no engine file stops at the Engine Seam instead of guessing. Keeping both means an install is complete when the engine choice changes, and the pair costs under 100 KB.
+
 ## Framework Artifacts
 
 - **[FrameworkManifest.json](FrameworkManifest.json)** — Distribution contract: managed paths, preserved paths, canonical repository, supported IDEs.
@@ -36,7 +45,7 @@ For GitHub Copilot, these skills are also exposed as slash-command prompts under
 - **[HarnessGates.md](HarnessGates.md)** — Per-transition gate definitions and the execution protocol. Reference: read it at a transition.
 - **[harness.schema.json](harness.schema.json)** — JSON Schema for harness policy, run ledgers, spans, evidence, decisions, and state v2.
 - **[state.schema.json](state.schema.json)** — Session state schema (v1 to v4; v4 is current). See `docs/core/HarnessContract.md` for the frozen contract.
-- **[LICENSE.md](LICENSE.md)** — CC BY 4.0 License.
+- **[LICENSE.md](LICENSE.md)** — MIT License, with the third-party notices kept.
 
 ## Harness
 
@@ -70,7 +79,7 @@ Read `HarnessRuntime.md` for runtime rules and `Harness.md` for the full contrac
 
 These files define specific operational workflows. Their rules are also condensed into `cadet-agent.md`.
 
-- [GitFirstRule](GitFirstRule.md) — Git must be initialized before any Unity project or code, and branch status must be checked before starting new work.
+- [GitFirstRule](GitFirstRule.md) — Git must be initialized before any engine project or code, and branch status must be checked before starting new work.
 - [FrameworkSyncGate](FrameworkSyncGate.md) — Check for framework updates before substantive work.
 - [KickoffFlow](KickoffFlow.md) — Step-by-step kickoff sequence.
 
@@ -83,7 +92,7 @@ Full rationale, examples, anti-patterns, and detailed process reference are avai
 
 - **Core Concepts**: Identity, Principles, Learner Model, Workflow, Operating Rules
 - **Skills**: Scoped workflow phase skills (Planning Review, Requirements, Architecture, Design Review, Spike, StoryBreakdown, TDD, Debugging, Code Review, Visual Evidence, Resume, MCP Setup, Reviewer, Handoff, Reconciliation)
-- **Guidance**: Preferred patterns and lessons learned (Architecture, Unity, Performance, Debugging, Localization, Spikes, Technology Decisions)
+- **Guidance**: Preferred patterns and lessons learned (Architecture, engine patterns, Performance, Debugging, Localization, Spikes, Technology Decisions)
 - **Standards**: Mandatory quality bars (Performance, Security, SOLID, Testing)
 - **Templates**: Document templates (Requirements, Technical Design, Design Review, Project Plan, Epic, Story, Policy, ADR, Change Report, Human Acceptance, User Playthrough, Visual Evidence)
 

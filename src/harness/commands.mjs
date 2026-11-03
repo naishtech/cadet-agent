@@ -34,6 +34,14 @@ export const COMMANDS = {
     writes: ['.cadet/**', 'AGENTS.md'],
     unattended: true,
   },
+  uninstall: {
+    mutates: true,
+    summary: 'Remove what the install record proves this project received.',
+    writes: ['.cadet/**', 'AGENTS.md', 'Assets/Covyne/Cadet/**', 'Plugins/CadetBuild/**'],
+    unattended: true,
+    // `--dry-run` evaluates the record and reports; the handler owns the flag.
+    evaluatesOnDryRun: true,
+  },
 
   'state brief': {
     mutates: false,

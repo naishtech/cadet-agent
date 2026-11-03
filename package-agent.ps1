@@ -235,15 +235,145 @@ foreach ($managedPath in $manifest.managedPaths) {
     Copy-Item -Path $src -Destination $dest -Force
 }
 
+# ---------------------------------------------------------------- engine products
+# The CLI, the Unity tooling and the Unreal plugin ship at `packages/...` inside
+# the zip. components.json maps each one to the path it is installed at
+# (`Assets/Covyne/Cadet/`, `Plugins/CadetBuild/`), so the zip layout and the
+# install layout stay independent.
+foreach ($rel in @("packages\cli", "packages\unity", "packages\unreal")) {
+    $src = Join-Path $scriptDir $rel
+    if (-not (Test-Path $src)) {
+        Write-Error "Package source not found: $src"
+        exit 1
+    }
+    Copy-TreeIntoStaging -SourceRoot $src -StagingRoot $staging -TargetRoot ($rel -replace '\\', '/')
+}
+
+$suiteVersion = (Get-Content (Join-Path $scriptDir "package.json") -Raw | ConvertFrom-Json).version
+
+# Each engine package carries the licence and the changelog section for this
+# version. Both are written here, at package time, and neither is kept in git:
+# there is one root MIT LICENSE and one authoritative CHANGELOG.md (plan 01 §5
+# and §6). A copy in the tree would be a second thing to update and a second
+# thing to drift.
+$rootLicense = Join-Path $scriptDir "LICENSE"
+if (-not (Test-Path $rootLicense)) {
+    Write-Error "LICENSE not found at: $rootLicense"
+    exit 1
+}
+
+# The section of the root changelog that belongs to this version: from its
+# "## [x.y.z]" heading to the next "## [" line.
+$releaseNotes = $null
+$changelogLines = (Get-Content (Join-Path $scriptDir "CHANGELOG.md") -Raw) -split "`n"
+$sectionStart = -1
+for ($i = 0; $i -lt $changelogLines.Count; $i++) {
+    if ($changelogLines[$i] -match "^## \[$([regex]::Escape($suiteVersion))\]") { $sectionStart = $i; break }
+}
+if ($sectionStart -ge 0) {
+    $sectionEnd = $changelogLines.Count
+    for ($j = $sectionStart + 1; $j -lt $changelogLines.Count; $j++) {
+        if ($changelogLines[$j] -match '^## \[') { $sectionEnd = $j; break }
+    }
+    $releaseNotes = (($changelogLines[$sectionStart..($sectionEnd - 1)]) -join "`n").TrimEnd()
+}
+
+foreach ($package in @("unity", "unreal")) {
+    $packageStaging = Join-Path $staging (Join-Path "packages" $package)
+    if (-not (Test-Path $packageStaging)) { continue }
+    Copy-Item -Path $rootLicense -Destination (Join-Path $packageStaging "LICENSE.md") -Force
+    if ($releaseNotes) {
+        $packageChangelog = @(
+            "# Changelog"
+            ""
+            "This package ships at the suite version. The section below is the root"
+            "CHANGELOG.md entry for v$suiteVersion; earlier history is in the repository's"
+            "root changelog."
+            ""
+            $releaseNotes
+            ""
+        ) -join "`n"
+        [System.IO.File]::WriteAllText(
+            (Join-Path $packageStaging "CHANGELOG.md"),
+            $packageChangelog,
+            (New-Object System.Text.UTF8Encoding($false)))
+    }
+    else {
+        Write-Warning "CHANGELOG.md has no section for $suiteVersion; packages/$package ships without one."
+    }
+}
+
+# Stage components.json with the suite version stamped in. Written without a BOM
+# because the installer parses it with JSON.parse.
+$componentsSource = Join-Path $scriptDir "components.json"
+if (-not (Test-Path $componentsSource)) {
+    Write-Error "components.json not found at: $componentsSource"
+    exit 1
+}
+$packageJson = Get-Content (Join-Path $scriptDir "package.json") -Raw | ConvertFrom-Json
+$components = Get-Content $componentsSource -Raw | ConvertFrom-Json
+$components | Add-Member -NotePropertyName suiteVersion -NotePropertyValue $packageJson.version -Force
+$componentsTarget = Join-Path $staging "components.json"
+$componentsText = $components | ConvertTo-Json -Depth 10
+[System.IO.File]::WriteAllText($componentsTarget, $componentsText, (New-Object System.Text.UTF8Encoding($false)))
+
+# Every zip path the manifest names must exist in the package. A component that
+# points at nothing is a packaging error, not a consumer surprise.
+foreach ($component in $components.components) {
+    foreach ($zipPath in @($component.zipPaths)) {
+        $probe = Join-Path $staging (($zipPath.TrimEnd('/')) -replace '/', '\')
+        if (-not (Test-Path $probe)) {
+            Write-Error "components.json names a path the package does not contain: $zipPath (component $($component.id))"
+            exit 1
+        }
+    }
+}
+
 $fileCount = (Get-ChildItem -Path $staging -Recurse -File).Count
 
+# Every shell script must be LF inside the package. Bash cannot run a CRLF copy, and
+# install.mjs refuses to finish an install that carries one. The working tree can hold
+# CRLF on Windows (core.autocrlf), so the package normalises here instead of trusting
+# the checkout. The index marks *.sh eol=lf; this makes the artifact match it.
+$shellScripts = Get-ChildItem -Path $staging -Recurse -File -Filter *.sh
+foreach ($script in $shellScripts) {
+    $bytes = [System.IO.File]::ReadAllBytes($script.FullName)
+    if ([Array]::IndexOf($bytes, [byte]13) -lt 0) { continue }
+    $text = [System.IO.File]::ReadAllText($script.FullName) -replace "`r`n", "`n"
+    [System.IO.File]::WriteAllText($script.FullName, $text, (New-Object System.Text.UTF8Encoding($false)))
+}
+
 Compress-Archive -Path (Join-Path $staging "*") -DestinationPath $outputZip
+
+# ------------------------------------------------ the hand-drop Unreal artifact
+# `cadet-agent.zip` is the only install source; the installer reads it by that
+# exact name, which is why it is not renamed per version. This second zip exists
+# for a team that wants to put Plugins/CadetBuild in by hand: the plugin at the
+# zip root, with the CLI in `CLI/` beside it, which is the layout the plugin
+# already resolves and the installer's own layout for that project (D6).
+$unrealZip = Join-Path $scriptDir ("cadet-unreal-{0}.zip" -f $suiteVersion)
+$unrealStage = Join-Path ([System.IO.Path]::GetTempPath()) ("cadet-unreal-" + [guid]::NewGuid().ToString('N'))
+try {
+    New-Item -ItemType Directory -Path $unrealStage -Force | Out-Null
+    Copy-Item -Path (Join-Path $staging "packages\unreal\*") -Destination $unrealStage -Recurse -Force
+    Copy-Item -Path (Join-Path $staging "packages\cli") -Destination (Join-Path $unrealStage "CLI") -Recurse -Force
+    if (-not (Test-Path (Join-Path $unrealStage "CadetBuild.uplugin"))) {
+        Write-Error "The Unreal artifact would carry no CadetBuild.uplugin; the plugin must sit at the zip root."
+        exit 1
+    }
+    if (Test-Path $unrealZip) { Remove-Item $unrealZip -Force }
+    Compress-Archive -Path (Join-Path $unrealStage "*") -DestinationPath $unrealZip
+}
+finally {
+    Remove-Item $unrealStage -Recurse -Force -ErrorAction SilentlyContinue
+}
 
 Remove-Item $staging -Recurse -Force
 $zipSize   = [math]::Round((Get-Item $outputZip).Length / 1KB, 1)
 
 Write-Host ""
 Write-Host "Packaged $fileCount files -> $(Split-Path $outputZip -Leaf) ($zipSize KB)"
+Write-Host "Also wrote $(Split-Path $unrealZip -Leaf) ($([math]::Round((Get-Item $unrealZip).Length / 1KB, 1)) KB) — the plugin at the zip root, for a hand drop into Plugins/CadetBuild."
 Write-Host ""
 Write-Host "To install in another project:"
 Write-Host "  1. Copy $(Split-Path $outputZip -Leaf) to the target project root"

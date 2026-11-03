@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, copyFi
 import { fileURLToPath } from 'node:url';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { install, sync } from './install.mjs';
+import { uninstall } from './uninstall.mjs';
 import {
   validateState, migrateStateFile, readState, writeState, evaluateTransition, applyTransition,
   workItemIdOf, loadPolicy, RunLedger, loadRun, listRuns, cleanupRuns, buildReport, formatReport,
@@ -57,8 +58,12 @@ function showHelp() {
   Usage:
     npx cadet-agent@latest init     Install Cadet-Agent into the current directory
     npx cadet-agent@latest init --target <dir>   Install into a specific directory
+    npx cadet-agent@latest init --components core,host.claude   Install only these components
+    npx cadet-agent@latest init --hosts claude,hermes --engine unity   Configure without questions
     npx cadet-agent@latest sync     Update framework, preserving local policies/plans
     npx cadet-agent@latest sync --target <dir>   Sync a specific directory
+    npx cadet-agent@latest uninstall   Remove what the install record proves, and nothing else
+    npx cadet-agent@latest uninstall --dry-run   Show the four lists; delete nothing
 
     cadet-agent state init          Create the first .cadet/state.json (never overwrites one)
     cadet-agent state brief         Print the tier-0 summary: phase, work item, gates, archivable records
@@ -185,6 +190,12 @@ function parseArgs(argv) {
     switch (a) {
       case '--target': case '-t': opts.targetDir = value(a); break;
       case '--source': opts.sourceUrl = value(a); break;
+      case '--components': opts.components = value(a).split(',').map((s) => s.trim()).filter(Boolean); break;
+      case '--hosts': opts.hosts = value(a).split(',').map((s) => s.trim()).filter(Boolean); break;
+      case '--engine': opts.engine = value(a); break;
+      case '--plugins': opts.plugins = true; break;
+      case '--no-plugins': opts.plugins = false; break;
+      case '--force': opts.force = true; break;
       case '--format': opts.format = value(a); break;
       case '--to': opts.to = value(a); break;
       case '--gate': opts.gate = value(a); break;
@@ -1644,7 +1655,7 @@ async function cmdHarness(opts) {
       fail(opts, `cannot read story "${opts.story}": ${err.message}`, () => 1, { ok: false, code: 'story-unreadable', story: opts.story });
     }
 
-    const workItems = exists ? collectWorkItems(state) : null;
+    const workItems = exists ? collectWorkItems(state, { targetDir: opts.targetDir }) : null;
     const validation = validateReachabilityDeclaration(declaration, { workItems, self: basename(storyPath) });
 
     // The deferral graph over this story's own epic. A cycle is the gap no single
@@ -1796,7 +1807,7 @@ async function cmdHarness(opts) {
       fail(opts, `cannot read story "${opts.story}": ${err.message}`, () => 1, { ok: false, code: 'story-unreadable', story: opts.story });
     }
 
-    const playWorkItems = exists ? collectWorkItems(state) : null;
+    const playWorkItems = exists ? collectWorkItems(state, { targetDir: opts.targetDir }) : null;
     const playValidation = validatePlayDeclaration(playDeclaration, { workItems: playWorkItems, self: basename(storyPath) });
     const playSiblings = readSiblingPlayDeclarations(storyPath, { workItems: playWorkItems });
     const playGraph = playSiblings.length > 0
@@ -1862,6 +1873,10 @@ async function cmdHarness(opts) {
       status: 'passed',
       command: `harness verify-play --story ${opts.story}`,
       result: `play deferred (${playValidation.code})`,
+      // A deferral is not a person's answer, but the record must say why the gate is satisfied. The
+      // text is the story's own declaration, and `source: automated` plus a `play deferred` result
+      // keeps a reader from mistaking it for an account of a playthrough.
+      reason: `play deferred to ${playDeclaration.deferTo}: ${playDeclaration.reason}`,
       exitCode: 0,
       commit: opts.commit || null,
       inputTreeHash: computeInputTreeHash(opts.targetDir, [storyRel]),
@@ -2637,6 +2652,10 @@ export async function run(argv) {
   const installOpts = {
     sourceUrl: opts.sourceUrl,
     yes: opts.yes === true,
+    components: opts.components,
+    hosts: opts.hosts,
+    engine: opts.engine,
+    plugins: opts.plugins,
     createOnlyPolicy: opts.agentsMd ? { 'AGENTS.md': opts.agentsMd } : undefined,
   };
 
@@ -2647,6 +2666,9 @@ export async function run(argv) {
         break;
       case 'sync':
         await sync(opts.targetDir, installOpts);
+        break;
+      case 'uninstall':
+        await uninstall(opts.targetDir, { dryRun: opts.dryRun === true, force: opts.force === true });
         break;
       case 'state':
         await cmdState(opts);

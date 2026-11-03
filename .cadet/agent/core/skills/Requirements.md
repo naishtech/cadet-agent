@@ -44,7 +44,7 @@ Capture requirements with clear, testable Given/When/Then acceptance criteria th
 3. Capture requirements in Markdown with Given/When/Then acceptance criteria.
 4. Walk the user through each criterion at a depth matching the learner tier, unless they request end-only review.
 5. Validate each criterion is testable and maps to an expected outcome.
-6. **Harness planning:** for each criterion, record the expected verification method (automated command vs. manual confirmation), the tool selection (deterministic CLI / repository read / MCP), and any budget constraint the work implies (e.g. long Unity builds, large context). Note anything that will need a `.cadet/harness.json` override.
+6. **Harness planning:** for each criterion, record the expected verification method (automated command vs. manual confirmation), the tool selection (deterministic CLI / repository read / MCP), and any budget constraint the work implies (e.g. long engine builds and cook times, large context). Note anything that will need a `.cadet/harness.json` override.
 7. Run an ambiguity scan after initial drafting.
 8. Ask permission before running one-by-one clarification questions.
 9. **Assumption audit:** List every assumption. Classify each as **verified**, **reasonable**, or **unverified**. For unverified assumptions, recommend a spike.

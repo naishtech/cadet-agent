@@ -51,9 +51,9 @@ git remote add origin $remoteUrl
 - This is safe to run with files already present. Nothing is deleted or moved.
 
 **Step 4 — Bootstrap commit: `.gitignore`, `README.md`, and agent docs:**
-- Download the Unity `.gitignore` template:
+- Download the engine's `.gitignore` template from `https://github.com/github/gitignore`; the engine pack names the file to take:
 ```powershell
-Invoke-WebRequest "https://raw.githubusercontent.com/github/gitignore/main/Unity.gitignore" -OutFile .gitignore
+Invoke-WebRequest "https://raw.githubusercontent.com/github/gitignore/main/<Engine>.gitignore" -OutFile .gitignore
 ```
 - Ask the user for a one-line game description and create `README.md` with it.
 - The agent docs from the extracted zip are already in `agent\core\` — include them.
@@ -74,54 +74,39 @@ gh pr create --base main --head chore/bootstrap-framework --title "chore: bootst
 gh pr merge --squash --delete-branch
 ```
 
-**Step 5 — Create the Unity project inside this folder:**
+**Step 5 — Create the project with the engine's own tooling.**
 
-The folder already contains `.gitignore`, `README.md`, and the Cadet bootstrap files, so it is non-empty. `unity projects new` / `unity projects create` refuse any existing folder (verified against Unity CLI v1.0.0-beta.4), so project creation stays on the Unity Editor CLI (`-batchmode -createProject`), which has no empty-folder restriction. The Unity CLI handles the editor-management and registration steps around it.
+The folder already contains `.gitignore`, `README.md`, and the Cadet bootstrap files, so it is not empty. Some engines refuse to create a project in a folder that already holds files, and others do not, so the pack states the route that works: create in place when the engine allows it, or create beside the folder and move the generated tree in. The pack names every command in this step; this file names the sequence and the waiting points.
 
-**5a — Install the Editor (if needed):**
-```powershell
-unity install <version-or-alias> -m <modules>
-# examples:
-unity install lts
-unity install 6000.0.47f1 -m android ios webgl
-```
-- `<version-or-alias>` may be `lts`, `latest`, or a specific version string (e.g. `6000.0.47f1`).
-- If the Unity CLI itself is not installed: Windows `$env:UNITY_CLI_CHANNEL='beta'; irm https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.ps1 | iex`; macOS/Linux `brew install --cask unity-cli` or the install script.
-- This replaces the old "open Unity Hub → Installs → add version" step.
+**5a — Install the editor (if needed):**
+- Use the pack's install command and its aliases for a version or a release channel.
+- If the engine's own CLI is missing, the pack names how to install it.
+- This replaces the manual "open the launcher → Installs → add version" step.
 
-**5b — Discover the installed Editor:**
-```powershell
-unity editors -i --format json
-```
-- Lists installed editors as structured JSON (including their install paths) — no hardcoded `C:\Program Files\Unity\Hub\Editor` assumption.
-- If empty, the editor is not installed (or was installed outside the CLI's registry) — run `unity install <version>` first, or register an existing install with `unity editors add <path>`.
-- If more than one version is listed, ask the user to confirm which version to use.
+**5b — Discover the installed editor:**
+- Run the pack's command that lists installed editors as structured output, so no install path is assumed.
+- If the list is empty, the editor is not installed, or it was installed outside the tool's registry; the pack names how to register an existing install.
+- If more than one version is listed, ask the user to confirm which version the project uses. Do not choose for them.
 
-**5c — Create the project via the Unity Editor CLI:**
-```powershell
-$unityVersion = "<version-confirmed-in-5b>"
-$unityExe = "<editor-executable-from-5b-json>"  # e.g. C:\Program Files\Unity\Hub\Editor\<version>\Editor\Unity.exe
-& $unityExe -batchmode -createProject "$PWD" -quit
-```
-- `-batchmode -quit` creates the Unity project files (`Assets/`, `Packages/`, `ProjectSettings/`) and exits without opening the editor UI.
-- This takes 20–60 seconds. Wait for the process to exit before continuing.
-- Once complete, register the project with the Hub and open it:
-  - `unity projects add "$PWD"` — register the existing folder in the Hub registry.
-  - `unity open "$PWD"` — open it with the resolved editor.
+**5c — Create the project files, then register and open the project:**
+- Run the engine's create command with the version confirmed in 5b, pointed at the current folder.
+- This takes between seconds and minutes, and the engine writes hundreds of files. Wait for the process to exit before continuing: a commit taken mid-write captures a half-built project.
+- Register the folder with the engine's launcher, then open it, using the pack's commands. Registration is what makes the editor and the project agree about the version.
+- Confirm the generated marker exists — the pack names it (a project descriptor, or the settings folder). If it is absent, the create step failed; report that instead of committing.
 
-- After the bootstrap state is established on `main` and Unity finishes generating files, create a new branch, commit the scaffold, and merge it through a pull request:
+- After the bootstrap state is established on `main` and the engine has finished generating files, create a new branch, commit the scaffold, and merge it through a pull request:
 ```powershell
 git checkout main
 git pull --ff-only
-git checkout -b chore/unity-initial-scaffold
+git checkout -b chore/initial-engine-scaffold
 git add .
-git commit -m "chore: initial Unity project scaffold"
-git push -u origin chore/unity-initial-scaffold
-gh pr create --base main --head chore/unity-initial-scaffold --title "chore: initial Unity project scaffold" --body "Add the initial Unity-generated project scaffold."
+git commit -m "chore: initial engine-generated project scaffold"
+git push -u origin chore/initial-engine-scaffold
+gh pr create --base main --head chore/initial-engine-scaffold --title "chore: initial project scaffold" --body "Add the initial engine-generated project scaffold."
 gh pr merge --squash --delete-branch
 ```
 
-Do not proceed to detailed game vision, requirements, or planning until all five steps are complete: remote repo created or confirmed, Git initialized in the folder, bootstrap state established on `main`, Unity project created, and scaffold PR merged.
+Do not proceed to detailed game vision, requirements, or planning until all five steps are complete: remote repo created or confirmed, Git initialized in the folder, bootstrap state established on `main`, the project created by its engine, and scaffold PR merged.
 
 ---
 

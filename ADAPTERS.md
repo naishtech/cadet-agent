@@ -25,6 +25,10 @@ The permitted prose in an adapter is *connective pointer text* ("Read X, then fo
 
 > **Enforcement:** `test/adapters.test.mjs` contains Shape A, Shape B, size-budget, and discovery guards. If a change makes them fail, the change is wrong, not the test. The discovery guard mechanically compares adapter sentences against core sentences; its known limit is that it catches verbatim duplication, not paraphrase — a human re-read is still required.
 
+### Engine packs are core content, not adapters
+
+A phase skill is engine-neutral, so an engine's commands and conventions live in an **engine pack** at `.cadet/agent/core/engines/<engine>/`, installed with core. An adapter therefore never names an engine and never carries a pack's command: an adapter that says "install the Unreal plugin" has pulled core content into a pointer file, which is the duplication this contract forbids. The direction runs one way — an engine pack does not name an adapter either. `test/adapters.test.mjs` checks both directions, and a file that fails it is the wrong file to change.
+
 ## Inventory
 
 | IDE | File | Type | Canonical Dependency |

@@ -29,7 +29,7 @@ Version: <slot id="version"/> · Last Updated: <slot id="lastUpdated"/> · Owner
 - TDD coverage expectation: <slot id="tddCoverage"/>
 - Acceptance criteria verification method: <slot id="acceptanceCriteriaVerification"/>
 - Security checks: <slot id="securityChecks"/>
-- Unity recompile checkpoints requiring user focus: <slot id="unityRecompileCheckpoints"/>
+- Engine recompile checkpoints requiring user focus: <slot id="engineRecompileCheckpoints"/>
 
 ## Progress Tracking
 - Completed Since Last Update: <slot id="completedSinceLastUpdate"/>

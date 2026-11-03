@@ -22,7 +22,7 @@ Lean runtime subset for agents. `Harness.md` remains the full contract and ratio
 - Classify failures before retrying.
 - Retry only transient failures within the retry budget.
 - Never persist secrets, raw prompts, credentials, or unredacted tool output.
-- Use deterministic CLI checks first, repository reads second, and live Unity tools only for live inspection or mutation.
+- Use deterministic CLI checks first, repository reads second, and live editor tools only for live inspection or mutation.
 - Live-editor mutation requires explicit user approval.
 
 ## Full contract references

@@ -1,6 +1,6 @@
-# Unity CLI — Capability Reference
+# Unity CLI — command reference
 
-Single source of truth for when Cadet uses the Unity CLI (`unity`) and how its commands map onto the framework's hard gates. This file is canonical; skills and adapters must reference it, not duplicate it.
+Single source of truth for when Cadet uses the Unity CLI (`unity`) and how its commands map onto the framework's hard gates. This page is part of the Unity engine pack: a phase skill names a capability, the pack names the command (`.cadet/agent/core/cadet-agent.md` § Engine Seam), and [README](README.md) is the pack's index.
 
 ## Two modes: CLI commands vs MCP
 

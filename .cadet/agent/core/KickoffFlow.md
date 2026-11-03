@@ -28,7 +28,7 @@
    - Record the durable answer there.
 8. Dispatch the next skill from `cadet-agent.md`.
 9. Keep requirements, design, plan, epics, and stories synchronized as work proceeds.
-10. Ask the user to focus Unity before recompilation after Unity code changes.
+10. Run the project's compile check after engine code changes; the engine pack names it, and it names the window to focus when the engine needs one.
 11. Recommend a fresh chat when the run nears its context budget.
 
 ## Backlinks

@@ -547,7 +547,13 @@ function validateEvidenceShape(ev, strict = null) {
   // Both gates carried `witness` and `limitations` here until 2026-10-03, when the form that
   // produced them was removed; the substance moved into `reason`, which now holds what the person
   // said. Two fields on two gates existed only to mirror that form.
-  if (ev.gate === HUMAN_ACCEPTANCE_GATE || ev.gate === USER_PLAY_GATE) {
+  // An automated deferral record is not a claim that a person answered the question: `verify-play`
+  // writes it for a story whose `Play:` line says the work cannot be played yet, and there is no
+  // person to quote. Without this exemption the framework rejects a record it wrote itself, and the
+  // only ways out are to delete the record or to hand-write a reason the validator exists to stop.
+  const isAutomatedDeferral =
+    ev.source === 'automated' && /^play deferred/i.test(String(ev.result ?? ''));
+  if (!isAutomatedDeferral && (ev.gate === HUMAN_ACCEPTANCE_GATE || ev.gate === USER_PLAY_GATE)) {
     const hasReason = typeof ev.reason === 'string' && ev.reason.trim() !== '';
     // `witness` + `limitations` are the shape the removed form wrote: two fields that existed only
     // to mirror it. A record already written under that shape keeps validating, because the
@@ -1142,6 +1148,10 @@ export function createEvidence({
   status,
   command = null,
   result = null,
+  // Why the gate is satisfied, in words. A manual confirmation carries the person's own answer here;
+  // an automated deferral carries the story's own declaration. The field was written by
+  // `harness confirm` only, so a builder that passed it had the value dropped without a word.
+  reason = null,
   exitCode = null,
   durationMs = null,
   outputBytes = null,
@@ -1173,6 +1183,7 @@ export function createEvidence({
     status,
     command,
     result,
+    reason,
     exitCode,
     // WHAT THE RUN COST. Both are measured for the attempt span already, and neither was written where
     // an operator reads a gate: `state.json -> gateEvidence` carried the command, the exit code and the

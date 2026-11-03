@@ -1,0 +1,620 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b11a58205ec3474ca216360e9fa74a8, type: 3}
+  m_Name: CADET Shared Data
+  m_EditorClassIdentifier: 
+  m_TableCollectionName: CADET
+  m_TableCollectionNameGuidString: 466cb8ae31477084da6e574329c1db9d
+  m_Entries:
+  - m_Id: 144891314176
+    m_Key: Window.ProfileEditor.Title
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451520
+    m_Key: Window.ProfileEditor.CreateNewProfile
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451521
+    m_Key: Window.ProfileEditor.EditProfile
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451522
+    m_Key: Window.ProfileEditor.BasicSettings
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451523
+    m_Key: Window.ProfileEditor.UnitySettings
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451524
+    m_Key: Window.ProfileEditor.SteamSettings
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451525
+    m_Key: Window.ProfileEditor.EpicSettings
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451526
+    m_Key: Window.ProfileEditor.MacOSSettings
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451527
+    m_Key: Window.ProfileEditor.Depots
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451528
+    m_Key: Window.ProfileEditor.DepotLabel
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451529
+    m_Key: Window.ProfileEditor.Fields.ProfileName
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451530
+    m_Key: Window.ProfileEditor.Tooltips.ProfileName
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451531
+    m_Key: Window.ProfileEditor.Fields.Platform
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451532
+    m_Key: Window.ProfileEditor.Tooltips.Platform
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451533
+    m_Key: Window.ProfileEditor.Fields.OperatingSystem
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451534
+    m_Key: Window.ProfileEditor.Tooltips.OperatingSystem
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451535
+    m_Key: Window.ProfileEditor.Fields.BuildOnly
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451536
+    m_Key: Window.ProfileEditor.Tooltips.BuildOnly
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451537
+    m_Key: Window.ProfileEditor.Fields.MacOSSigning
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451538
+    m_Key: Window.ProfileEditor.Tooltips.MacOSSigning
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451539
+    m_Key: Window.ProfileEditor.Fields.GitBranch
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451540
+    m_Key: Window.ProfileEditor.Tooltips.GitBranch
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451541
+    m_Key: Window.ProfileEditor.Fields.EditorPath
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451542
+    m_Key: Window.ProfileEditor.Tooltips.EditorPath
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451543
+    m_Key: Window.ProfileEditor.Fields.ProjectPath
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451544
+    m_Key: Window.ProfileEditor.Tooltips.ProjectPath
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451545
+    m_Key: Window.ProfileEditor.Fields.BuildOutputPath
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451546
+    m_Key: Window.ProfileEditor.Tooltips.BuildOutputPath
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451547
+    m_Key: Window.ProfileEditor.Fields.ProjectName
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144937451548
+    m_Key: Window.ProfileEditor.Tooltips.ProjectName
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840128
+    m_Key: Window.ProfileEditor.Fields.AppID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840129
+    m_Key: Window.ProfileEditor.Tooltips.AppID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840130
+    m_Key: Window.ProfileEditor.Fields.SteamCMDWindows
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840131
+    m_Key: Window.ProfileEditor.Tooltips.SteamCMDWindows
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840132
+    m_Key: Window.ProfileEditor.Fields.SteamCMDMacOSLinux
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840133
+    m_Key: Window.ProfileEditor.Tooltips.SteamCMDMacOSLinux
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840134
+    m_Key: Window.ProfileEditor.Fields.UseSentryFile
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840135
+    m_Key: Window.ProfileEditor.Tooltips.UseSentryFile
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840136
+    m_Key: Window.ProfileEditor.Fields.Description
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840137
+    m_Key: Window.ProfileEditor.Tooltips.Description
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840138
+    m_Key: Window.ProfileEditor.Fields.SetLiveBranch
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840139
+    m_Key: Window.ProfileEditor.Tooltips.SetLiveBranch
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840140
+    m_Key: Window.ProfileEditor.Fields.ContentRoot
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840141
+    m_Key: Window.ProfileEditor.Tooltips.ContentRoot
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840142
+    m_Key: Window.ProfileEditor.Fields.BuildOutput
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840143
+    m_Key: Window.ProfileEditor.Tooltips.BuildOutput
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840144
+    m_Key: Window.ProfileEditor.Fields.DepotID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840145
+    m_Key: Window.ProfileEditor.Tooltips.DepotID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840146
+    m_Key: Window.ProfileEditor.Fields.OS
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840147
+    m_Key: Window.ProfileEditor.Tooltips.DepotOS
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840148
+    m_Key: Window.ProfileEditor.Fields.LocalPath
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840149
+    m_Key: Window.ProfileEditor.Tooltips.LocalPath
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840150
+    m_Key: Window.ProfileEditor.Fields.DepotPath
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840151
+    m_Key: Window.ProfileEditor.Tooltips.DepotPath
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840152
+    m_Key: Window.ProfileEditor.Fields.Recursive
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840153
+    m_Key: Window.ProfileEditor.Tooltips.Recursive
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840154
+    m_Key: Window.ProfileEditor.Fields.ProductID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840155
+    m_Key: Window.ProfileEditor.Tooltips.ProductID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840156
+    m_Key: Window.ProfileEditor.Fields.OrganizationID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840157
+    m_Key: Window.ProfileEditor.Tooltips.OrganizationID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840158
+    m_Key: Window.ProfileEditor.Fields.ArtifactID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840159
+    m_Key: Window.ProfileEditor.Tooltips.ArtifactID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840160
+    m_Key: Window.ProfileEditor.Fields.SandboxID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840161
+    m_Key: Window.ProfileEditor.Tooltips.SandboxID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840162
+    m_Key: Window.ProfileEditor.Fields.BuildPatchToolPath
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840163
+    m_Key: Window.ProfileEditor.Tooltips.BuildPatchToolPath
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840164
+    m_Key: Window.ProfileEditor.Fields.EnableSigning
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840165
+    m_Key: Window.ProfileEditor.Tooltips.EnableSigning
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840166
+    m_Key: Window.ProfileEditor.Fields.EntitlementsPath
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840167
+    m_Key: Window.ProfileEditor.Tooltips.EntitlementsPath
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840168
+    m_Key: Window.ProfileEditor.Buttons.Cancel
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840169
+    m_Key: Window.ProfileEditor.Buttons.Save
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840170
+    m_Key: Window.ProfileEditor.Buttons.Browse
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840171
+    m_Key: Window.ProfileEditor.Buttons.Edit
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840172
+    m_Key: Window.ProfileEditor.Buttons.Done
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840173
+    m_Key: Window.ProfileEditor.Buttons.Remove
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840174
+    m_Key: Window.ProfileEditor.Buttons.AddDepot
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840175
+    m_Key: Window.ProfileEditor.Buttons.OK
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840176
+    m_Key: Window.ProfileEditor.Messages.ValidationError
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840177
+    m_Key: Window.ProfileEditor.Messages.ProfileSaved
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840178
+    m_Key: Window.ProfileEditor.Messages.InitializationFailed
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840179
+    m_Key: Window.ProfileEditor.Dialogs.SelectUnityEditor
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840180
+    m_Key: Window.ProfileEditor.Dialogs.SelectUnityProject
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840181
+    m_Key: Window.ProfileEditor.Dialogs.SelectBuildOutputDirectory
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840182
+    m_Key: Window.ProfileEditor.Dialogs.SelectBuildPatchToolDirectory
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840183
+    m_Key: Window.ProfileEditor.Dialogs.SelectEntitlementsFile
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840184
+    m_Key: Window.ProfileEditor.Options.Steam
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840185
+    m_Key: Window.ProfileEditor.Options.Epic
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840186
+    m_Key: Window.ProfileEditor.Options.Both
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840187
+    m_Key: Window.ProfileEditor.Options.Windows
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840188
+    m_Key: Window.ProfileEditor.Options.Mac
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840189
+    m_Key: Window.ProfileEditor.Options.Yes1
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840190
+    m_Key: Window.ProfileEditor.Options.No0
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840191
+    m_Key: Window.Cadet.Title
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840192
+    m_Key: Window.Cadet.Header
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840193
+    m_Key: Window.Cadet.ProfileLabel
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840194
+    m_Key: Window.Cadet.Buttons.New
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840195
+    m_Key: Window.Cadet.Buttons.Edit
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840196
+    m_Key: Window.Cadet.Buttons.Delete
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840197
+    m_Key: Window.Cadet.Buttons.Duplicate
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840198
+    m_Key: Window.Cadet.Buttons.Cancel
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840199
+    m_Key: Window.Cadet.Buttons.OK
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840200
+    m_Key: Window.Cadet.Buttons.TestBinary
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840201
+    m_Key: Window.Cadet.Buttons.ConfigureDependencies
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840202
+    m_Key: Window.Cadet.Buttons.BuildOnly
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840203
+    m_Key: Window.Cadet.Buttons.PublishOnly
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840204
+    m_Key: Window.Cadet.Buttons.BuildAndPublish
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840205
+    m_Key: Window.Cadet.Buttons.ClearOutput
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840206
+    m_Key: Window.Cadet.Buttons.SaveLog
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840207
+    m_Key: Window.Cadet.Messages.TestingBinary
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840208
+    m_Key: Window.Cadet.Messages.RunningDistScript
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840209
+    m_Key: Window.Cadet.Messages.NoProfilesAvailable
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840210
+    m_Key: Window.Cadet.ProfileInfo.Platform
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840211
+    m_Key: Window.Cadet.ProfileInfo.UnityProject
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840212
+    m_Key: Window.Cadet.ProfileInfo.BuildOutput
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840213
+    m_Key: Window.Cadet.Dialogs.DeleteProfile.Title
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840214
+    m_Key: Window.Cadet.Dialogs.DeleteProfile.Message
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840215
+    m_Key: Window.Cadet.Dialogs.DuplicateProfile.Title
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840216
+    m_Key: Window.Cadet.Dialogs.DuplicateProfile.Message
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840217
+    m_Key: Window.Cadet.Dialogs.SaveLog.Title
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840218
+    m_Key: Window.Cadet.ConsoleOutput.Label
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840219
+    m_Key: Window.Cadet.ConsoleOutput.Placeholder
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840220
+    m_Key: Window.WelcomeScreen.Title
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840221
+    m_Key: Window.WelcomeScreen.Header
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840222
+    m_Key: Window.WelcomeScreen.Subtitle
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840223
+    m_Key: Window.WelcomeScreen.InfoBox
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840224
+    m_Key: Window.WelcomeScreen.RequiredDependencies
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840225
+    m_Key: Window.WelcomeScreen.ConsoleOutput
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840226
+    m_Key: Window.WelcomeScreen.OutputPlaceholder
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840227
+    m_Key: Window.WelcomeScreen.Buttons.ClearOutput
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840228
+    m_Key: Window.WelcomeScreen.Buttons.SkipForNow
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840229
+    m_Key: Window.WelcomeScreen.Buttons.ContinueToCadet
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840230
+    m_Key: Window.WelcomeScreen.Buttons.SkipAndContinue
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840231
+    m_Key: Window.WelcomeScreen.DependencyCard.Description
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840232
+    m_Key: Window.WelcomeScreen.DependencyCard.InstallLocation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840233
+    m_Key: Window.WelcomeScreen.DependencyCard.LicenseAgreementRequired
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840234
+    m_Key: Window.WelcomeScreen.DependencyCard.AcceptLicense
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840235
+    m_Key: Window.WelcomeScreen.DependencyCard.CustomPathLabel
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840236
+    m_Key: Window.WelcomeScreen.DependencyCard.Buttons.DownloadExtract
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840237
+    m_Key: Window.WelcomeScreen.DependencyCard.Buttons.Uninstall
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840238
+    m_Key: Window.WelcomeScreen.DependencyCard.Buttons.VerifyInstallation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840239
+    m_Key: Window.WelcomeScreen.DependencyCard.Buttons.Retry
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840240
+    m_Key: Window.WelcomeScreen.DependencyCard.Buttons.ManualDownload
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840241
+    m_Key: Window.WelcomeScreen.DependencyCard.Buttons.ViewLicense
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840242
+    m_Key: Window.WelcomeScreen.DependencyCard.Buttons.Browse
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840243
+    m_Key: Window.WelcomeScreen.DependencyCard.Buttons.VerifyCustomPath
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840244
+    m_Key: Window.WelcomeScreen.DependencyCard.Dialogs.SelectDirectory
+    m_Metadata:
+      m_Items: []
+  - m_Id: 144945840245
+    m_Key: Window.WelcomeScreen.DependencyCard.Dialogs.SelectFile
+    m_Metadata:
+      m_Items: []
+  m_Metadata:
+    m_Items: []
+  m_KeyGenerator:
+    rid: 8859825547800215592
+  references:
+    version: 2
+    RefIds:
+    - rid: 8859825547800215592
+      type: {class: DistributedUIDGenerator, ns: UnityEngine.Localization.Tables, asm: Unity.Localization}
+      data:
+        m_CustomEpoch: 1766115213199

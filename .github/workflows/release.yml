@@ -18,8 +18,14 @@ jobs:
         shell: pwsh
         run: ./package-agent.ps1
 
+      - name: Build the npm tarball
+        run: npm pack
+
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: cadet-agent.zip
+          files: |
+            cadet-agent.zip
+            cadet-unreal-*.zip
+            cadet-agent-*.tgz
           generate_release_notes: true

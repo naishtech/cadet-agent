@@ -60,6 +60,60 @@ export function normalizeWorkItemRef(ref) {
 }
 
 /**
+ * Read the work items a project plan declares on disk.
+ *
+ * The layout is the one the breakdown skill writes:
+ * `.cadet/agent/project-plans/<project>/epics/<epic>/<story>.md`, where `epic.md`
+ * carries the epic rather than a story. Every story file becomes a work item
+ * with status `planned`, and each epic directory becomes an epic work item.
+ *
+ * This exists because state records only what has started. A story that defers
+ * to the next story had no legal target, so it could not close, and the next
+ * story could not start until it closed: a deadlock the framework created for
+ * the most ordinary deferral there is.
+ */
+function collectPlannedWorkItems(targetDir) {
+  const planned = new Map();
+  if (!targetDir) return planned;
+
+  const plansRoot = join(targetDir, '.cadet', 'agent', 'project-plans');
+  for (const project of safeDirectoryNames(plansRoot)) {
+    const epicsRoot = join(plansRoot, project, 'epics');
+    for (const epic of safeDirectoryNames(epicsRoot)) {
+      planned.set(normalizeWorkItemRef(epic), 'planned');
+
+      for (const file of safeFileNames(join(epicsRoot, epic))) {
+        if (!file.endsWith('.md') || file === 'epic.md') continue;
+        planned.set(normalizeWorkItemRef(`${epic}::${file}`), 'planned');
+        planned.set(normalizeWorkItemRef(file), 'planned');
+      }
+    }
+  }
+
+  return planned;
+}
+
+function safeDirectoryNames(dir) {
+  try {
+    return readdirSync(dir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+}
+
+function safeFileNames(dir) {
+  try {
+    return readdirSync(dir, { withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Extract the set of work items that exist, from a state document.
  *
  * Includes stories (`epic::story`), bare story file names and epic keys, plus
@@ -71,7 +125,7 @@ export function normalizeWorkItemRef(ref) {
  * 'complete' | 'planned'` so the caller can tell an in-flight target from a
  * finished one.
  */
-export function collectWorkItems(state) {
+export function collectWorkItems(state, options = {}) {
   const refs = new Set();
   const status = new Map();
 
@@ -95,6 +149,17 @@ export function collectWorkItems(state) {
       add(full, storyStatus);
       add(storyFile, storyStatus);
     }
+  }
+
+  // The plan declares stories that state has not begun. Without them a story
+  // cannot defer to the one after it: the target does not exist in state until
+  // the deferring story closes, and the deferring story cannot close until the
+  // target exists. The file is the plan's own statement that the work item is
+  // real, so it counts; a status state already holds always wins, because state
+  // is where `done` and `in-progress` live.
+  for (const [ref, plannedStatus] of collectPlannedWorkItems(options.targetDir)) {
+    if (refs.has(ref)) continue;
+    add(ref, plannedStatus);
   }
 
   const spikes = state && typeof state === 'object' && state.spikes && typeof state.spikes === 'object'

@@ -45,7 +45,7 @@ Diagnose and resolve defects through reproducible evidence, minimal-risk fixes, 
 6. Ensure failures surface concrete diagnostic reasons, not generic messages.
 7. Re-run validation to confirm resolution and guard against regression — ideally via `cadet-agent harness verify --gate testsPassed`.
 8. Update technical design, plan, and epic status if the fix affects scope or sequencing.
-9. If Unity code changed, ask the user to focus Unity and trigger recompilation. (When the user wants agent-driven verification, use the Unity CLI / MCP per `.cadet/agent/core/UnityCli.md` — CLI commands for deterministic reproduction, MCP mode for live context.)
+9. If engine code changed, run the project's compile check, and ask the user to run the engine's own recompile step when the pack cannot automate it. (When the user wants agent-driven verification, use the connection the engine pack defines — editor commands for deterministic reproduction, live MCP inspection for context.)
 10. **If the defect is visual or spatial** — something is not visible, is in the wrong place, is the wrong size, or does not update on screen — dispatch the **Visual Evidence** skill (`.cadet/agent/core/skills/VisualEvidence.md`) and cite its finding as the reproduction or resolution evidence. Do not describe what the artifact should show in place of inspecting it. A **"does not update"** defect is temporal, so capture a motion artifact — a clip or timed frame sequence — because a still frame shows one instant and cannot establish the absence of change.
 11. If the defect is not resolved after three genuine fix attempts, invoke the **Persistent-Failure Protocol** below. This is distinct from automatic retries: three failed repairs escalate to the user, they do not keep looping.
 

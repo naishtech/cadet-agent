@@ -72,7 +72,7 @@ Identify defects, regressions, security concerns, and process drift before chang
 15. Compare the implementation against relevant guidance documents.
 16. Confirm the implementation satisfies relevant standards and active repository policy.
 17. Confirm localization behavior, fallback handling, and asset updates remain correct when localization is affected.
-18. Confirm prefab usage, scene boundaries, and composition choices support testability and team scalability.
+18. Confirm composition and instantiation choices (prefabs, scenes, blueprints, levels) support testability and team scalability.
 19. Confirm spikes are reference-only after feasibility is proven.
 20. **Report unresolved escalations:** list any budget exhaustion, stale evidence, or deterministic failures that were escalated and not resolved.
 21. Provide findings ordered by severity with clear remediation steps.

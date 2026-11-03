@@ -8,12 +8,14 @@
   },
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "lint": "lychee --offline --include-fragments \"**/*.md\"",
-    "verify": "npm test && npm run lint"
+    "test:cli": "bash packages/cli/test/run.sh",
+    "lint": "lychee --offline --include-fragments \"**/*.md\" \".cadet/**/*.md\"",
+    "verify": "npm test && npm run test:cli && npm run lint"
   },
   "files": [
     "bin/",
-    "src/"
+    "src/",
+    "components.json"
   ],
   "keywords": [
     "cadet",
@@ -25,7 +27,7 @@
     "cursor",
     "claude-code"
   ],
-  "license": "CC-BY-4.0",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/naishtech/cadet-agent.git"

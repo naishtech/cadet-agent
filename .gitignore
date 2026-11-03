@@ -1,6 +1,8 @@
 # Cadet-Agent build outputs
 cadet-agent.zip
 cadet-agent-updated.zip
+cadet-unreal-*.zip
+*.tgz
 
 # Node (CLI tool)
 node_modules/

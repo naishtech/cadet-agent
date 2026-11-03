@@ -31,8 +31,8 @@ Hard gates are structurally enforced checkpoints tracked in `.cadet/state.json �
       red — and its remedy is a `tooling-gap` exception naming who accepted it, never a hand record.
     </gate>
     <gate id="testsPassed">All tests for the current story pass — red/green confirmed.</gate>
-    <gate id="compileCheckConfirmed">User confirmed Unity compiles without errors.</gate>
-    <gate id="unityAnalyzerClean">Zero Unity analyzer diagnostics (UNT*) in changed files. Use `get_errors` tool to verify.</gate>
+    <gate id="compileCheckConfirmed">The project's compile check passed, or the user confirmed that the project compiles without errors.</gate>
+    <gate id="unityAnalyzerClean">Zero analyzer diagnostics in the changed files, through the project's declared analyzer command.</gate>
     <gate id="storyTrackingUpdated">Story markdown marked complete, epic progress updated.</gate>
   </transition>
   <transition from="review" to="validation">
@@ -97,7 +97,7 @@ Hard gates are structurally enforced checkpoints tracked in `.cadet/state.json �
 3. **Evidence is required.** A gate may only be `true` when backed by a fresh, non-superseded record in `state.json → gateEvidence` (see §1). Evidence from a different work item, a changed input tree, changed acceptance criteria, an expired record, or a superseded record does not satisfy a gate.
    - Build evidence with `cadet-agent harness verify --gate <gate>` for automated checks, or record a user `manual-confirmation` when automation is unavailable.
    - `cadet-agent state transition --to <phase> --dry-run` enforces this mechanically and lists every missing or stale gate. **Always pass `--dry-run` to check** — without it the transition is applied and `state.json` is written.
-4. **For `compileCheckConfirmed` and `unityAnalyzerClean`:** prefer the Unity CLI commands in `.cadet/agent/core/UnityCli.md` (`cadet-agent harness verify` runs them). If Unity CLI is unavailable, record the user's manual confirmation with project path, editor version, timestamp, and scope. The `get_errors` tool may be used as supporting context, but a `manual-confirmation` record is required for the gate.
+4. **For `compileCheckConfirmed` and `unityAnalyzerClean`:** prefer the project's declared command — `cadet-agent harness verify` runs it, and the engine pack names the engine's own CLI. If the editor's CLI is unavailable, record the user's manual confirmation with project path, editor version, timestamp, and scope. The editor's own diagnostics view may be used as supporting context, but a `manual-confirmation` record is required for the gate.
 5. Apply reset semantics exactly as current rules define (gates reset to `false` on new story/epic), then re-check before transition.
 
 ### Failure to satisfy a gate

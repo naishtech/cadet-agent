@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "components": [
+    {
+      "id": "core",
+      "group": "framework",
+      "label": "Cadet framework",
+      "required": true,
+      "zipPaths": [".cadet/agent/core/", ".cadet/harness.json", ".githooks/", "AGENTS.md"],
+      "installTo": ".",
+      "createOnly": ["AGENTS.md", ".cadet/harness.json"]
+    },
+    {
+      "id": "host.copilot",
+      "group": "host",
+      "label": "GitHub Copilot",
+      "zipPaths": [".github/agents/", ".github/prompts/", ".github/hooks/"],
+      "installTo": "."
+    },
+    {
+      "id": "host.claude",
+      "group": "host",
+      "label": "Claude Code",
+      "zipPaths": [".claude/"],
+      "installTo": "."
+    },
+    {
+      "id": "host.agents",
+      "group": "host",
+      "label": "Deep Code / Hermes",
+      "zipPaths": [".agents/"],
+      "installTo": "."
+    },
+    {
+      "id": "host.cursor",
+      "group": "host",
+      "label": "Cursor",
+      "zipPaths": [".cursor/"],
+      "installTo": "."
+    },
+    {
+      "id": "host.continue",
+      "group": "host",
+      "label": "Continue",
+      "zipPaths": [".continue/"],
+      "installTo": "."
+    },
+    {
+      "id": "engine.unity.plugin",
+      "group": "engine",
+      "engine": "unity",
+      "label": "Unity editor tooling",
+      "zipPaths": ["packages/unity/"],
+      "installTo": "Assets/Covyne/Cadet/",
+      "exclude": ["PROVENANCE.md", "Tests/"]
+    },
+    {
+      "id": "engine.unity.cli",
+      "group": "engine",
+      "engine": "unity",
+      "label": "Cadet CLI (Unity project layout)",
+      "zipPaths": ["packages/cli/"],
+      "installTo": "Assets/Covyne/Cadet/CLI/",
+      "requires": ["engine.unity.plugin"],
+      "exclude": ["PROVENANCE.md", "test/"]
+    },
+    {
+      "id": "engine.unreal.plugin",
+      "group": "engine",
+      "engine": "unreal",
+      "label": "Unreal plugin",
+      "zipPaths": ["packages/unreal/"],
+      "installTo": "Plugins/CadetBuild/",
+      "exclude": ["PROVENANCE.md"]
+    },
+    {
+      "id": "engine.unreal.cli",
+      "group": "engine",
+      "engine": "unreal",
+      "label": "Cadet CLI (Unreal project layout)",
+      "zipPaths": ["packages/cli/"],
+      "installTo": "Plugins/CadetBuild/CLI/",
+      "requires": ["engine.unreal.plugin"],
+      "exclude": ["PROVENANCE.md", "test/"]
+    }
+  ]
+}

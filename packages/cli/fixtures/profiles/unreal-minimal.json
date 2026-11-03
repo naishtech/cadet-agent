@@ -1,0 +1,13 @@
+{
+  "profileName": "unreal-minimal",
+  "platform": "none",
+  "os": "windows",
+  "bundleId": "com.example.unreal",
+  "unreal": {
+    "engineRoot": "C:/Program Files/Epic Games/UE_5.8",
+    "projectPath": "F:/unreal/projects/game/Game.uproject",
+    "buildOutputPath": "F:/builds/game",
+    "projectName": "Game",
+    "buildConfiguration": "Development"
+  }
+}
