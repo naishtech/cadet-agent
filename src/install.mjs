@@ -1208,28 +1208,6 @@ export function buildInstallRecord({ targetDir, version, components, engine, wri
 }
 
 /**
- * Infer the component set from what is on disk, for a project installed before
- * records existed (0.63.x). Probes only paths the framework itself created.
- */
-export function inferComponentsFromDisk(targetDir) {
-  const ids = ['core'];
-  for (const host of HOSTS) {
-    if (existsSync(join(targetDir, host.marker))) ids.push(host.id);
-  }
-  if (isDirectory(join(targetDir, 'Assets', 'Covyne', 'Cadet'))) {
-    ids.push('engine.unity.plugin');
-    if (existsSync(join(targetDir, 'Assets', 'Covyne', 'Cadet', 'CLI', 'dist.sh'))) ids.push('engine.unity.cli');
-  }
-  if (existsSync(join(targetDir, 'Plugins', 'CadetBuild', 'CadetBuild.uplugin'))) {
-    ids.push('engine.unreal.plugin');
-    if (existsSync(join(targetDir, 'Plugins', 'CadetBuild', 'CLI', 'dist.sh'))) ids.push('engine.unreal.cli');
-  }
-  return ids;
-}
-
-
-
-/**
  * Every installed shell script must be LF, and the consumer's checkout must keep
  * it that way.
  *
@@ -1366,29 +1344,50 @@ export async function sync(targetDir, opts = {}) {
     return install(targetDir, opts);
   }
 
-  // 2. Fetch release metadata
+  // 2. A sync may touch only what the record proves.
+  //
+  // Without a record there is no way to tell a component this install wrote from
+  // one the consumer already had: a `.cursor/` folder, a `.github/agents/` tree
+  // or a `Plugins/CadetBuild` on disk is a marker, not an installation. Inferring
+  // from markers widened a Unity-only project with four hand-installed adapters
+  // to seven components and wrote 84 files, so sync stops and names the adoption
+  // command instead.
+  const record = readInstallRecord(targetDir);
+  if (!record?.components?.length) {
+    console.log('');
+    console.error(`❌ No install record at ${INSTALL_RECORD_PATH.replace(/\\/g, '/')}.`);
+    console.error('   Sync will not guess which components this project owns: a marker folder or an');
+    console.error('   engine plugin on disk does not prove this install wrote it.');
+    console.error('   Adopt the project once, and the record is written:');
+    console.error(`     ${INIT_COMMAND} --components core,host.agents,engine.unity.plugin,engine.unity.cli`);
+    console.error('   Choose the components this project actually uses; the wizard offers them with');
+    console.error('   `init` and marks only the marker folders it can see, which are not proof.');
+    process.exitCode = 1;
+    return;
+  }
+
+  // 3. Fetch release metadata
   const release = await fetchLatestRelease(opts.sourceUrl);
   const newVersion = normalizeVersion(release.tag_name);
   const oldVersionNorm = normalizeVersion(oldVersion);
   console.log(`   Latest: v${newVersion} (published ${release.published_at})\n`);
 
-  // 2b. Ensure the repo-role marker exists even when no files change, so an
+  // 3b. Ensure the repo-role marker exists even when no files change, so an
   // existing install synced by an older CLI still gets the boundary recorded.
-  const record = readInstallRecord(targetDir);
   if (!readRepoRoleMarker(targetDir)) {
     writeRepoRoleMarker(targetDir, REPO_ROLES.CONSUMER);
   }
 
-  // 2c. Refresh the engine seam, for the same reason: an install that predates
+  // 3c. Refresh the engine seam, for the same reason: an install that predates
   // `.cadet/engine.json` gets it on its next sync, even when no other file moves.
-  // The record's primary engine outranks a fresh detection, so a project whose
-  // markers were edited by hand keeps the engine its owner chose.
+  // The record answers, and nothing else does: `resolveEngines` takes the
+  // recorded primary and secondary, then falls back to what the recorded
+  // components prove. No marker on disk is consulted.
   const engines = resolveEngines({
-    answered: [record?.engine?.primary, record?.engine?.secondary].filter(Boolean),
-    detected: detectProject(targetDir).engines,
-    components: record?.components?.length ? record.components : inferComponentsFromDisk(targetDir),
+    answered: [record.engine?.primary, record.engine?.secondary].filter(Boolean),
+    components: record.components,
   });
-  const engineFile = writeEngine(targetDir, { engines, components: record?.components || [] });
+  const engineFile = writeEngine(targetDir, { engines, components: record.components });
   reportEngine(engineFile, engines);
 
   if (oldVersionNorm === newVersion) {
@@ -1396,21 +1395,16 @@ export async function sync(targetDir, opts = {}) {
     return;
   }
 
-  // 3. Download
+  // 4. Download
   const asset = findZipAsset(release);
   const zipBuf = await downloadZip(asset.browser_download_url);
   console.log(`   Downloaded ${(zipBuf.length / 1024).toFixed(0)} KB\n`);
 
-  // 3b. Which components does this project own? The record answers. A project
-  // installed before records existed is inferred from disk, once, and the
-  // inference is written at the end of this run.
+  // 4b. The components this project owns are the recorded ones, exactly. A
+  // component that is new in the release is reported and not installed, because
+  // adding it would change the shape of a project nobody asked to change.
   const zipComponents = readComponentsFromZip(zipBuf);
-  const components = record?.components?.length
-    ? record.components
-    : inferComponentsFromDisk(targetDir);
-  if (!record?.components?.length) {
-    console.log(`   No install record: inferred ${components.length} components from disk`);
-  }
+  const components = record.components;
   if (zipComponents) {
     const added = zipComponents.components.map((c) => c.id).filter((id) => !components.includes(id));
     if (added.length) {

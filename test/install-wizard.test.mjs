@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import {
   HOSTS, detectHosts, normalizeHostIds, normalizeEngines, componentsForChoice, parseNumberList,
   configureInstall, buildInstallRecord, readInstallRecord, writeInstallRecord,
-  inferComponentsFromDisk, installRecordPath,
+  installRecordPath,
 } from '../src/install.mjs';
 
 const REPO_ROOT = resolve(dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
@@ -223,13 +223,12 @@ describe('install record', () => {
     assert.equal(installRecordPath(work), join(work, '.cadet', 'agent', 'install.json'));
   });
 
-  it('infers a component set from what is on disk', () => {
-    mkdirSync(join(work, '.claude'));
-    write('Assets/Covyne/Cadet/CLI/dist.sh', '#!/bin/bash');
-    write('Plugins/CadetBuild/CadetBuild.uplugin', '{}');
-    assert.deepEqual(inferComponentsFromDisk(work), [
-      'core', 'host.claude', 'engine.unity.plugin', 'engine.unity.cli',
-      'engine.unreal.plugin',
-    ]);
+  it('has no disk-inference helper left: sync reads the record instead', async () => {
+    // The helper existed to guess a component set for a project installed before
+    // records existed. It turned marker folders into components, which widened a
+    // Unity-only project with hand-installed adapters, so it is gone:
+    // test/install-sync-record.test.mjs holds the replacement behaviour.
+    const mod = await import('../src/install.mjs');
+    assert.equal('inferComponentsFromDisk' in mod, false);
   });
 });

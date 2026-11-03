@@ -27,6 +27,7 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
   instead of hardcoding one.
 
 ### Fixed
+- **`sync` widened a project instead of honouring its install record.** A consumer installed before records existed — five hand-installed IDE adapters, one engine — had no `.cadet/agent/install.json`, so `sync` fell back to `inferComponentsFromDisk`, which turns any marker folder into a component. It re-added every adapter it found and wrote 84 files into a Unity-only project, then wrote a record that described the wider shape. A marker folder or an engine plugin on disk is not evidence that this install wrote it. `sync` now stops when there is no record, writes nothing (not even `.cadet/engine.json`), exits non-zero, and names the adoption command: `init --components <ids>`. The inference helper is deleted, and the engine seam on sync comes from the record and the recorded components only — no marker detection. `test/install-sync-record.test.mjs` covers both: a refusal that writes nothing, and a sync that installs the recorded components while a `.cursor/` folder sits on disk.
 - **The macOS signing script shipped a person's identity, and never read its own credentials file.**
   `Tools/MacOS/sign_and_upload.sh` defaulted `DEV_ID`, `APPLE_ID` and `TEAM_ID` to one owner's Apple
   Developer ID, Apple ID address and team id, which is both somebody's personal data in a downloadable
