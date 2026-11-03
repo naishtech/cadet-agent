@@ -1655,7 +1655,7 @@ async function cmdHarness(opts) {
       fail(opts, `cannot read story "${opts.story}": ${err.message}`, () => 1, { ok: false, code: 'story-unreadable', story: opts.story });
     }
 
-    const workItems = exists ? collectWorkItems(state) : null;
+    const workItems = exists ? collectWorkItems(state, { targetDir: opts.targetDir }) : null;
     const validation = validateReachabilityDeclaration(declaration, { workItems, self: basename(storyPath) });
 
     // The deferral graph over this story's own epic. A cycle is the gap no single
@@ -1807,7 +1807,7 @@ async function cmdHarness(opts) {
       fail(opts, `cannot read story "${opts.story}": ${err.message}`, () => 1, { ok: false, code: 'story-unreadable', story: opts.story });
     }
 
-    const playWorkItems = exists ? collectWorkItems(state) : null;
+    const playWorkItems = exists ? collectWorkItems(state, { targetDir: opts.targetDir }) : null;
     const playValidation = validatePlayDeclaration(playDeclaration, { workItems: playWorkItems, self: basename(storyPath) });
     const playSiblings = readSiblingPlayDeclarations(storyPath, { workItems: playWorkItems });
     const playGraph = playSiblings.length > 0

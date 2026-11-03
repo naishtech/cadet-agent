@@ -96,6 +96,43 @@ describe('collectWorkItems', () => {
     assert.ok(refs.has('m-flow-field'), 'a spike is a legitimate deferral target');
     assert.equal(status.get('epic-1::story-9.md'), 'done');
   });
+
+  it('indexes a planned story that state has not begun', () => {
+    // The deadlock this closes: a story that defers to the next story could not
+    // close, because the next story is not a work item until it is begun, and it
+    // cannot be begun until the deferring story closes.
+    const dir = mkdtempSync(join(tmpdir(), 'cadet-plans-'));
+    try {
+      const epicDir = join(dir, '.cadet', 'agent', 'project-plans', 'project-a', 'epics', 'epic-7');
+      mkdirSync(epicDir, { recursive: true });
+      writeFileSync(join(epicDir, 'epic.md'), '# Epic: seven\n');
+      writeFileSync(join(epicDir, 'story-1.md'), 'Reachability: witnessed — open it\n');
+      writeFileSync(join(epicDir, 'story-2.md'), 'Reachability: witnessed — open it\n');
+
+      const { refs, status } = collectWorkItems({ epics: {} }, { targetDir: dir });
+      assert.ok(refs.has('epic-7::story-2.md'), 'a story file in the plan is a work item');
+      assert.ok(refs.has('story-2.md'), 'its bare name resolves too');
+      assert.ok(refs.has('epic-7'), 'the epic directory is a work item');
+      assert.equal(status.get('epic-7::story-2.md'), 'planned');
+      assert.equal(refs.has('epic-7::epic.md'), false, 'epic.md carries the epic, not a story');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps the status state holds over the plan', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cadet-plans-'));
+    try {
+      const epicDir = join(dir, '.cadet', 'agent', 'project-plans', 'project-a', 'epics', 'epic-1');
+      mkdirSync(epicDir, { recursive: true });
+      writeFileSync(join(epicDir, 'story-9.md'), 'a closed story is still a file\n');
+
+      const { status } = collectWorkItems(stateFixture, { targetDir: dir });
+      assert.equal(status.get('story-9.md'), 'done', 'a finished target must not read as planned');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('validateReachabilityDeclaration', () => {

@@ -13,6 +13,14 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Fixed
+- **A deferral may name a story the plan declares but state has not begun.** `collectWorkItems` read
+  only `.cadet/state.json`, so a story whose `Play:` or `Reachability:` deferred to the next story had
+  no legal target: the next story is not a work item until it is begun, and it cannot be begun until
+  the deferring story closes. The scan now also reads `project-plans/<project>/epics/<epic>/*.md`, so a
+  story file is a work item with status `planned`. A status state already holds still wins, so a
+  finished target still reads as `done` and still fails a deferral.
+
 ### Added
 - **Three release artifacts from one packaging run, at one version.** `package-agent.ps1` now also writes
   `cadet-unreal-X.Y.Z.zip`: the plugin at the zip root with the CLI in `CLI/` beside it, for a team that drops
