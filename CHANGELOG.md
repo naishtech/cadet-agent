@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.65.1] — 2026-11-26
+
 ### Changed
 - **The npm release number.** 0.65.0 was staged by a failed publish and never became installable: the
   registry returns 404 for it and a re-publish answers E409, which this npm (11.6.2) cannot clear. 0.65.1
