@@ -13,8 +13,6 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
-## [0.64.3] — 2026-11-26
-
 ### Changed
 - **A seal is a pointer to the committed archive, not a copy of it.** `state seal` restated every record
   of the work item as `Cadet-*` trailer blocks in the closing commit, and the same records were already
