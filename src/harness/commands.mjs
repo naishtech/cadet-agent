@@ -68,7 +68,7 @@ export const COMMANDS = {
   },
   'state seal': {
     mutates: true,
-    summary: 'Write a work item\'s evidence as commit trailers, for `git commit -F`.',
+    summary: 'Write a work item\'s evidence seal, for `git commit -F`.',
     // Cadet does not commit (contract C5). Sealing prepares a message file and
     // archives the records; the commit itself stays a user action.
     writes: ['.cadet/archive/**', '*.commit-msg'],

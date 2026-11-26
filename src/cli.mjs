@@ -31,6 +31,7 @@ import {
   resolveCommand, describeCommand, describeAllCommands, checkUnattendedRequirements, COMMANDS,
   selfBoundFiles,
   STATE_VERSION, sealedEvidence, recordEvidence, appendEvidence, sealWorkItem, toStateV4,
+  encodeSealPointer, textSha256,
   isHistoryExternal, HISTORY_ENTRIES_KEPT, resetGatesForNewWorkItem,
   buildStateBrief, renderStateBrief, writeStateBrief, CONTEXT_BRIEF_FILE,
   generateDiagrams, syncDiagramTree, diagramDrift, DIAGRAM_OUT_DIR,
@@ -68,12 +69,12 @@ function showHelp() {
     cadet-agent state init          Create the first .cadet/state.json (never overwrites one)
     cadet-agent state brief         Print the tier-0 summary: phase, work item, gates, archivable records
     cadet-agent state validate      Validate .cadet/state.json against the schema
-    cadet-agent state validate --verify-sealed   Also read sealed evidence from commit trailers
+    cadet-agent state validate --verify-sealed   Also read sealed evidence from closing commits
     cadet-agent state migrate       Atomically migrate state to the current version (backup on write)
     cadet-agent state migrate --to 4   Compact: archive closed work items' evidence, build the index
     cadet-agent state compact --keep <bound>   Move closed work items' evidence into .cadet/archive/
     cadet-agent state begin --epic <id> --story <file>   Start a work item: reset gates, archive the previous item's evidence
-    cadet-agent state seal          Write the active work item's evidence as commit trailers
+    cadet-agent state seal          Write the active work item's evidence as a commit-message seal
     cadet-agent state transition --to <phase>   Enforce the transition matrix + evidence
     cadet-agent state transition --to <phase> --dry-run   Check only; writes nothing
 
@@ -131,7 +132,7 @@ function showHelp() {
     --retain-all   state compact: keep every record of the kept work items; only cross-work-item records leave
     --epic         Epic id of the work item being started (state begin)
     --commit-msg   Path to write the prepared commit message to (state seal)
-    --verify-sealed  Also verify evidence sealed in commit trailers (state validate)
+    --verify-sealed  Also verify evidence sealed into closing commits (state validate)
     --verify-host  Probe the configured host controls and report the measured level (harness capabilities)
     --dry-run      Report what a mutating command would do and write nothing (all mutating commands)
     --yes, -y      Never prompt; keep existing files (non-interactive installs)
@@ -546,7 +547,7 @@ async function cmdState(opts) {
       for (const w of result.warnings) console.log(`   ⚠️  ${w.path}: ${w.message}`);
       if (sealed) {
         if (sealed.available) {
-          console.log(`   Sealed evidence: ${sealed.records} record(s) in commit trailers; gates: ${sealed.gates.join(', ') || '(none)'}`);
+          console.log(`   Sealed evidence: ${sealed.records} record(s) from closing commits; gates: ${sealed.gates.join(', ') || '(none)'}`);
           for (const r of sealed.resolvedBySeal) console.log(`   ✅ ${r.gate} backed by sealed record in ${String(r.sealedCommit).slice(0, 8)}`);
         }
       }
@@ -799,26 +800,44 @@ async function cmdState(opts) {
     const { exists, state } = readState(opts.targetDir);
     if (!exists) fail(opts, 'No .cadet/state.json found.', () => 2);
     const policy = loadPolicy(opts.targetDir);
-    const { workItemId, records, lines, partial } = sealWorkItem(state, {
+    const { workItemId, records, lines: blockLines, partial } = sealWorkItem(state, {
       workItemId: opts.workItemId || null,
       maxBytes: policy.output?.maxInlineBytes,
     });
     if (records.length === 0) {
       fail(opts, `no inline evidence to seal for ${workItemId || '(no active work item)'}. Evidence for a closed work item lives in its commit and .cadet/archive/.`, () => 1, { ok: false, code: 'nothing-to-seal', workItemId });
     }
+    // The archive is written BEFORE the message, because the message points at
+    // it: a pointer to a file that does not exist yet cannot be opened later.
+    const archived = appendEvidenceArchive(opts.targetDir, records);
+    const evidenceFile = `.cadet/archive/evidence/${archiveFileName(workItemId || 'unscoped')}`;
+    const evidencePath = join(opts.targetDir, evidenceFile);
+    // A pointer names one file and pins its content, so the message stays a few
+    // lines instead of restating every record the archive already holds. The
+    // blocks are still written when there is no archive file to point at, and
+    // they are still read, so nothing this build seals can become unreadable.
+    const usedPointer = existsSync(evidencePath);
+    const lines = usedPointer
+      ? encodeSealPointer({
+        workItemId,
+        evidenceFile,
+        evidenceSha256: textSha256(readFileSync(evidencePath, 'utf-8')),
+        recordCount: records.length,
+      })
+      : blockLines;
     // The message file is what makes this compatible with C5: Cadet prepares the
     // message, and the commit is still the user's action.
     const messagePath = opts.commitMsgPath || join(opts.targetDir, '.cadet', 'seal.commit-msg');
     const header = [
       `chore(gates): seal evidence for ${workItemId}`,
       '',
-      'Evidence for this work item, written here so it travels with the code.',
-      'Edit the subject line to describe the change; keep the trailer block intact —',
-      'the records are read back out of it, and altering one changes the commit id.',
+      'The Cadet-* lines below name the archive file that holds this work item\'s',
+      'records, committed beside this message, and pin that file with a sha256.',
+      'Keep them intact: they are read back out of the commit, and changing one',
+      'changes the commit id.',
       '',
     ].join('\n');
     writeFileSync(messagePath, `${header}${lines.join('\n')}`, 'utf-8');
-    const archived = appendEvidenceArchive(opts.targetDir, records);
     const { state: next } = toStateV4(state, { keep: opts.keep ?? 'active' });
     writeState(opts.targetDir, next);
     emit(
@@ -828,9 +847,10 @@ async function cmdState(opts) {
         `   Message:  ${messagePath}`,
         `   Commit:   git commit -F "${messagePath}"`,
         archived.appended ? `   Archived: ${archived.appended} record(s) to ${evidenceArchiveDir(opts.targetDir)}` : '   Archive:  already up to date',
-        partial.length ? `   ⚠️  ${partial.length} record(s) exceeded the trailer bound and were marked partial (they cannot satisfy a gate).` : null,
+        usedPointer ? `   Seal:     pointer to ${evidenceFile}` : '   Seal:     in-message blocks (no archive file to point at)',
+        !usedPointer && partial.length ? `   ⚠️  ${partial.length} record(s) exceeded the trailer bound and were marked partial (they cannot satisfy a gate).` : null,
       ].filter(Boolean).join('\n'),
-      { ok: true, workItemId, records: records.length, messagePath, archived: archived.appended, partial },
+      { ok: true, workItemId, records: records.length, messagePath, archived: archived.appended, partial, evidenceFile: usedPointer ? evidenceFile : null },
     );
     return;
   }

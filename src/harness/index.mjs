@@ -54,7 +54,10 @@ export {
 
 export {
   TRAILER_PREFIX, BLOCK_TRAILER, TRAILER_GREP, DEFAULT_MAX_TRAILER_BYTES,
-  encodeEvidenceTrailers, parseEvidenceTrailers, sealedEvidence, latestSealedForGate, coverageFromSealed,
+  SEAL_TRAILER, SEAL_VERSION, POINTER_FIELDS, GIT_MAX_BUFFER,
+  encodeEvidenceTrailers, parseEvidenceTrailers,
+  encodeSealPointer, parseSealPointer, textSha256,
+  sealedEvidence, latestSealedForGate, coverageFromSealed,
 } from './gitmemo.mjs';
 
 export {

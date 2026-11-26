@@ -26,10 +26,19 @@
  * Cadet still does not commit (contract C5). `state seal` produces a message file
  * that a human or agent then commits with `git commit -F <file>`.
  *
+ * v4 narrows that further. A full block per record restated the audit trail that
+ * `.cadet/archive/evidence/` already holds, and the archive is committed in the
+ * same commit — so the message now carries a POINTER: the work item, the archive
+ * file, its sha256, and the number of records. Measured on a real project, 23
+ * seals of full blocks made `git log --grep=Cadet-Gate` 1.3 MB, which overflowed
+ * the reader's 1 MB buffer and was reported as "git is not installed". The block
+ * form is still parsed, because a history sealed before v4 still uses it.
+ *
  * Contract: docs/core/HarnessContract-v5.md.
  */
 
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 
 /** Prefix every trailer shares, so a message can be scanned cheaply. */
 export const TRAILER_PREFIX = 'Cadet-';
@@ -39,6 +48,32 @@ export const BLOCK_TRAILER = 'Cadet-Gate';
 
 /** `git log --grep` argument that bounds a scan to commits carrying evidence. */
 export const TRAILER_GREP = BLOCK_TRAILER;
+
+/**
+ * The trailer that opens a seal pointer.
+ *
+ * From v4 a closing commit carries a POINTER, not the records themselves: the
+ * records are already written to `.cadet/archive/evidence/<work item>.jsonl` and
+ * committed in the same commit, so restating them in the message is one copy of
+ * the audit trail too many. Measured on a real project, 23 seals of full blocks
+ * made a 1.3 MB `git log`, and the reader's 1 MB buffer could not hold it.
+ */
+export const SEAL_TRAILER = 'Cadet-Seal';
+
+/** Version of the pointer form this build writes. */
+export const SEAL_VERSION = 4;
+
+/** Pointer field names. They are not in `FIELDS`: a pointer describes a file. */
+export const POINTER_FIELDS = Object.freeze({
+  seal: SEAL_TRAILER,
+  workItemId: 'Cadet-Work-Item',
+  file: 'Cadet-Evidence-File',
+  sha256: 'Cadet-Evidence-Sha256',
+  count: 'Cadet-Evidence-Count',
+});
+
+/** Ceiling for one git invocation's output. A gate scan is not a budget. */
+export const GIT_MAX_BUFFER = 64 * 1024 * 1024;
 
 /**
  * Field table. `kind` decides how a value is written and read back:
@@ -267,27 +302,152 @@ export function parseEvidenceTrailers(message) {
 }
 
 /**
+ * sha256 of the bytes git will store.
+ *
+ * Normalised to LF first: a Windows checkout with `autocrlf` hands the sealer
+ * CRLF and the reader LF, and a hash that depends on that setting would fail on
+ * a machine it was not made on.
+ */
+export function textSha256(text) {
+  return createHash('sha256').update(String(text).replace(/\r\n/g, '\n'), 'utf-8').digest('hex');
+}
+
+/**
+ * Encode a seal pointer as trailer lines.
+ *
+ * The pointer names the archive file the records live in, and pins its content
+ * with a sha256. Because the pointer sits in the commit object, the commit id
+ * still covers the evidence: change the file and the hash no longer matches.
+ */
+export function encodeSealPointer({ workItemId, evidenceFile, evidenceSha256, recordCount = null } = {}) {
+  if (!workItemId) throw new TypeError('encodeSealPointer requires a workItemId');
+  if (!evidenceFile) throw new TypeError('encodeSealPointer requires an evidence file path');
+  const sha = String(evidenceSha256 ?? '');
+  if (!/^[0-9a-f]{64}$/i.test(sha)) throw new TypeError('encodeSealPointer requires a sha256 hex digest');
+  const lines = [
+    `${POINTER_FIELDS.seal}: ${SEAL_VERSION}`,
+    `${POINTER_FIELDS.workItemId}: ${workItemId}`,
+    `${POINTER_FIELDS.file}: ${evidenceFile}`,
+    `${POINTER_FIELDS.sha256}: ${sha}`,
+  ];
+  if (Number.isFinite(recordCount)) lines.push(`${POINTER_FIELDS.count}: ${recordCount}`);
+  return lines;
+}
+
+/**
+ * Read a seal pointer out of a commit message, or null when there is none.
+ *
+ * The first value of each name wins, so a later copy in a quoted reply cannot
+ * redirect the read at a different file.
+ */
+export function parseSealPointer(message) {
+  const values = new Map();
+  for (const rawLine of String(message ?? '').split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line.startsWith(TRAILER_PREFIX)) continue;
+    const sep = line.indexOf(':');
+    if (sep === -1) continue;
+    const name = line.slice(0, sep).trim();
+    if (!values.has(name)) values.set(name, line.slice(sep + 1).trim());
+  }
+  const seal = values.get(POINTER_FIELDS.seal);
+  if (seal === undefined) return null;
+  const count = values.get(POINTER_FIELDS.count);
+  return {
+    version: Number(seal),
+    workItemId: values.get(POINTER_FIELDS.workItemId) || null,
+    file: values.get(POINTER_FIELDS.file) || null,
+    sha256: values.get(POINTER_FIELDS.sha256) || null,
+    recordCount: count && Number.isFinite(Number(count)) ? Number(count) : null,
+  };
+}
+
+/** Escape a value so `git log --grep` reads it as text, not as a pattern. */
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Run `git` and report whether it was actually usable.
  *
  * Mirrors `gitChangedFiles` in util.mjs: `available: false` means the question
  * could not be asked, which callers must not confuse with "no sealed evidence".
  * `runner` is injectable so the parser is testable without a repository.
+ *
+ * `maxBuffer` is set explicitly because the default is 1 MB, and a history of
+ * sealed blocks passes that: the overflow surfaced as `ENOBUFS`, and the caller
+ * below reported it as "git is not installed".
  */
 function defaultRunner(cmd, args) {
   try {
-    return spawnSync(cmd, args, { encoding: 'utf-8', windowsHide: true });
+    return spawnSync(cmd, args, { encoding: 'utf-8', windowsHide: true, maxBuffer: GIT_MAX_BUFFER });
   } catch {
     return null;
   }
 }
 
 /**
+ * Read the sealed records a pointer names, out of the commit that carries it.
+ *
+ * The file is read from the commit, not from the working tree: the seal makes a
+ * claim about the history, and the working tree may have moved on since.
+ */
+function recordsFromPointer(pointer, { cwd, commit, runner }) {
+  const diagnostics = [];
+  if (!Number.isFinite(pointer.version) || pointer.version < SEAL_VERSION) {
+    return { records: [], diagnostics: [`seal version ${pointer.version} is not understood`] };
+  }
+  if (!pointer.file || !pointer.sha256) {
+    return { records: [], diagnostics: ['the seal names no evidence file'] };
+  }
+
+  let res;
+  try {
+    res = runner('git', ['-C', cwd, 'show', `${commit}:${pointer.file}`]);
+  } catch (err) {
+    return { records: [], diagnostics: [`git show failed: ${err.message}`] };
+  }
+  if (!res || res.error || res.status === null) {
+    return { records: [], diagnostics: ['the sealed archive could not be read'] };
+  }
+  if (res.status !== 0) {
+    const why = String(res.stderr || '').trim() || `git show exited ${res.status}`;
+    return { records: [], diagnostics: [why] };
+  }
+
+  const text = String(res.stdout || '');
+  const actual = textSha256(text);
+  if (actual !== pointer.sha256) {
+    // The pointer and the file disagree: report the seal as broken rather than
+    // reading a file that is not the one the commit made a claim about.
+    return { records: [], diagnostics: ['the sealed archive does not match its recorded sha256'] };
+  }
+
+  const records = [];
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    try {
+      const record = JSON.parse(line);
+      if (record && typeof record === 'object') records.push(record);
+    } catch {
+      diagnostics.push('a line of the sealed archive is not JSON');
+    }
+  }
+  return { records, diagnostics };
+}
+
+/**
  * Read sealed evidence from git history.
  *
- * The scan is bounded twice: `--grep` restricts it to commits that mention the
- * trailer prefix at all, and `--max-count` caps how far back it walks. Without
- * both, a large repository would pay a full-history parse on every call — the
- * same class of unbounded growth this design exists to remove.
+ * Two forms are read: the pointer form this build writes (`Cadet-Seal: 4`, one
+ * small block per commit) and the older per-record trailer blocks, so a history
+ * sealed before the pointer existed stays readable.
+ *
+ * The scan is bounded three times: `--grep` restricts it to commits that carry a
+ * seal at all, `--max-count` caps how far back it walks, and a `workItemId`
+ * filter is pushed into git so one work item's seal is read and not fifty. That
+ * last bound matters most — a scan that reads every seal and then discards all
+ * but one grows with the project, which is how a 1.3 MB log met a 1 MB buffer.
  *
  * `range` narrows the walk (e.g. `HEAD~20..HEAD`) and exists mainly so tests can
  * pin an exact commit set.
@@ -295,8 +455,19 @@ function defaultRunner(cmd, args) {
  * Returns `{ available, records, reason, diagnostics }`.
  */
 export function sealedEvidence(cwd, { workItemId = null, gate = null, maxCount = 500, range = null, runner = defaultRunner, log = null } = {}) {
-  const args = ['-C', cwd, 'log', `--max-count=${maxCount}`, `--grep=${TRAILER_GREP}`, '--format=%H%x00%B%x00'];
-  if (range) args.splice(3, 0, range);
+  const args = ['-C', cwd, 'log', `--max-count=${maxCount}`];
+  if (range) args.push(range);
+  if (workItemId) {
+    args.push(
+      '--all-match',
+      '--extended-regexp',
+      `--grep=^(${BLOCK_TRAILER}|${SEAL_TRAILER}):`,
+      `--grep=^${POINTER_FIELDS.workItemId}: ${escapeRegExp(workItemId)}$`,
+    );
+  } else {
+    args.push(`--grep=^${BLOCK_TRAILER}:`, `--grep=^${SEAL_TRAILER}:`);
+  }
+  args.push('--format=%H%x00%B%x00');
 
   let res;
   try {
@@ -306,7 +477,13 @@ export function sealedEvidence(cwd, { workItemId = null, gate = null, maxCount =
   }
   if (!res) return { available: false, records: [], reason: 'git is not available', diagnostics: [] };
   if (res.error || res.status === null) {
-    return { available: false, records: [], reason: 'git is not installed or could not be executed', diagnostics: [] };
+    const why = res.error ? String(res.error.message || res.error.code || res.error).trim() : '';
+    return {
+      available: false,
+      records: [],
+      reason: why ? `git could not be read: ${why}` : 'git could not be executed',
+      diagnostics: [],
+    };
   }
   if (res.status !== 0) {
     return { available: false, records: [], reason: String(res.stderr || '').trim() || `git exited ${res.status}`, diagnostics: [] };
@@ -321,9 +498,13 @@ export function sealedEvidence(cwd, { workItemId = null, gate = null, maxCount =
     const commit = parts[i].trim();
     const body = parts[i + 1];
     if (!commit || !/^[0-9a-f]{4,40}$/i.test(commit)) continue;
-    const parsed = parseEvidenceTrailers(body);
-    for (const d of parsed.diagnostics) diagnostics.push(`${commit.slice(0, 8)}: ${d}`);
-    for (const record of parsed.records) {
+
+    const pointer = parseSealPointer(body);
+    const found = pointer
+      ? recordsFromPointer(pointer, { cwd, commit, runner })
+      : parseEvidenceTrailers(body);
+    for (const d of found.diagnostics) diagnostics.push(`${commit.slice(0, 8)}: ${d}`);
+    for (const record of found.records) {
       if (workItemId && record.workItemId !== workItemId) continue;
       if (gate && record.gate !== gate) continue;
       records.push({ ...record, sealedCommit: commit });

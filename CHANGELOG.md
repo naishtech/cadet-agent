@@ -13,6 +13,26 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.64.3] — 2026-11-26
+
+### Changed
+- **A seal is a pointer to the committed archive, not a copy of it.** `state seal` restated every record
+  of the work item as `Cadet-*` trailer blocks in the closing commit, and the same records were already
+  in `.cadet/archive/evidence/`, committed in that commit. The message is now `Cadet-Seal: 4` plus the
+  work item, the archive file, its sha256 and the record count. One audit trail, one copy.
+
+  Measured on a consumer project: 23 seals of blocks made `git log --grep=Cadet-Gate` **1.3 MB** (one
+  seal was 400 KB on its own), while the same seals as pointers are a few hundred bytes each. The block
+  form is still parsed, so a history sealed before this version stays readable and needs no migration.
+
+### Fixed
+- **A sealed-evidence read blamed git for its own buffer overflow.** `sealedEvidence` ran
+  `git log … --grep=Cadet-Gate` through `spawnSync` with no `maxBuffer`, so node's 1 MB default applied;
+  past it the call returned `ENOBUFS` with a null status, and the CLI reported *"git is not installed or
+  could not be executed"* — on a machine with git installed and working. The buffer is now explicit, the
+  failure message carries the real reason, and the query is narrowed to one work item when one is named,
+  so the scan no longer grows with the project. `gitChangedFiles` had the same message and is fixed too.
+
 ## [0.64.2] — 2026-11-03
 
 ## [0.64.1] — 2026-11-03

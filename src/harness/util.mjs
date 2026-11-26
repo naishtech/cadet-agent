@@ -145,7 +145,8 @@ export function gitChangedFiles(cwd, { runner = defaultGitRunner } = {}) {
     return { available: false, files: [], reason: 'git is not available' };
   }
   if (res.error || res.status === null) {
-    return { available: false, files: [], reason: 'git is not installed or could not be executed' };
+    const why = res.error ? String(res.error.message || res.error.code || res.error).trim() : '';
+    return { available: false, files: [], reason: why ? `git could not be read: ${why}` : 'git could not be executed' };
   }
   if (res.status !== 0) {
     // Not a repository, or git refused the query.
@@ -168,7 +169,7 @@ export function gitChangedFiles(cwd, { runner = defaultGitRunner } = {}) {
 
 function defaultGitRunner(cmd, args) {
   try {
-    return spawnSync(cmd, args, { encoding: 'utf-8', windowsHide: true });
+    return spawnSync(cmd, args, { encoding: 'utf-8', windowsHide: true, maxBuffer: 64 * 1024 * 1024 });
   } catch {
     return null;
   }

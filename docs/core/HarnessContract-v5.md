@@ -73,8 +73,9 @@ item is indexed in `evidenceCoverage`, so compaction is never indistinguishable 
 
 ### Tier B — sealed evidence (git commit trailers)
 
-At story close, the work item's records are written into the closing commit as **trailers**. The
-commit id is the seal.
+At story close, the work item's records are committed beside the closing commit — in
+`.cadet/archive/evidence/<work item>.jsonl` — and the commit message carries a **pointer** to that file
+and its sha256. The commit id is the seal: it covers the pointer, and the hash covers the records.
 
 Trailers are preferred over `git notes` and tags:
 
@@ -151,13 +152,47 @@ C1–C13 are unchanged. v5 adds:
 |---|---|---|
 | **C14** | A v4 document's `gateEvidence` holds only the active work item's **live** records — the newest record per gate, every `passed`/`manual-confirmation` record, and every `failed` record; `superseded` history and non-newest `blocked` records live in `.cadet/archive/`. `evidenceCoverage` indexes what left; `gateExceptions` holds exceptions; and `changeHistory` stays **bounded** (most recent `HISTORY_ENTRIES_KEPT`, overflow archived). A transition adds no history line for v4. v1–v3 documents are unchanged and keep being appended to. `state begin` is the supported way to move to a new work item. `validateState` **warns** — never errors — on foreign records or an over-long array, because foreign records are unreadable by every gate check and a document that predates the check cannot repair itself in place. | `harness-state-v4.test.mjs`, `harness-state-begin.test.mjs` |
 | **C15** | Evidence history is preserved when it leaves the document. A record removed from `gateEvidence` is written to `.cadet/archive/` **before** the slimmer document replaces it, and its work item is recorded in `evidenceCoverage`, so the AR-2 coverage check and the audit trail both survive compaction. | `harness-state-v4.test.mjs` |
-| **C16** | Sealed evidence lives in commit trailers, encoded and decoded by `src/harness/gitmemo.mjs`. `state seal` prepares a message; it never commits. A record whose trailer block exceeded the output bound is marked `partial` and must not satisfy a gate. | `harness-git-evidence.test.mjs` |
+| **C16** | Sealed evidence is `Cadet-Seal: 4` — a pointer to the work item's committed archive and that file's sha256 — encoded and decoded by `src/harness/gitmemo.mjs`. The block form is still read, so a history sealed before it stays valid. `state seal` prepares a message; it never commits. A record whose trailer block exceeded the output bound is marked `partial` and must not satisfy a gate. | `harness-git-evidence.test.mjs` |
 
 `state validate` remains **offline by default**: it never requires git. Sealed evidence is consulted
 only under `--verify-sealed`, and a read that cannot reach git is reported as a warning, never as a
 silent pass and never as a new error — "not verified" and "verified clean" must not look the same.
 
-## 3. Trailer format
+## 3. Sealed evidence format
+
+A closing commit carries one of two forms. `parseSealPointer` decides per commit: a seal is either a
+pointer or blocks, never both.
+
+### The pointer form (written from 0.64.3)
+
+Five lines naming the archive file that holds the work item's records, and pinning that file with a
+sha256. The archive is committed in the same commit, so the records travel with the code without being
+restated in it.
+
+```
+feat(sim): derive grid from authored map
+
+Cadet-Seal: 4
+Cadet-Work-Item: epic-2-world-map-movement::story-3-derive-grid-from-authored-map.md
+Cadet-Evidence-File: .cadet/archive/evidence/epic-2-world-map-movement_story-3-derive-grid-from-authored-map.md.jsonl
+Cadet-Evidence-Sha256: 9f2c0b5e…(64 lowercase hex)
+Cadet-Evidence-Count: 12
+```
+
+- **Why.** A full block per record restated what the archive already held. On the audited consumer, 23
+  seals of blocks made `git log --grep=Cadet-Gate` 1.3 MB — one of them 400 KB on its own — and the
+  reader's default 1 MB `spawnSync` buffer overflowed with `ENOBUFS`, which surfaced to the user as
+  "git is not installed or could not be executed".
+- **What it keeps.** The pointer is in the commit object, so the commit id covers it. The sha256 pins the
+  file, so an archive edited after the seal no longer opens, and the records are read from the commit
+  (`git show <sha>:<path>`), never from the working tree.
+- **The hash is over LF-normalised UTF-8.** A Windows checkout with `autocrlf` hands the sealer CRLF and
+  the reader LF; hashing the stored bytes keeps one seal valid on both.
+- **Reading is bounded per work item.** When a work item is named, the filter goes into git
+  (`--all-match --grep=^Cadet-(Gate|Seal): --grep=^Cadet-Work-Item: <id>$`), so one seal is read instead
+  of the whole history. `--max-count` still bounds the walk.
+
+### The block form (read; written only when there is no archive to point at)
 
 One `Cadet-*` trailer per field, repeated per record, each block opened by `Cadet-Gate:`. Scalars are
 written plainly when unambiguous and JSON-quoted otherwise; arrays and objects are always JSON, so a
@@ -188,10 +223,12 @@ Cadet-Expires-At: null
   and `Cadet-Partial: true` is written. A partial record parses but cannot satisfy a gate.
 - **Tolerance.** Unknown `Cadet-*` trailers and malformed lines are reported as diagnostics and
   skipped, not fatal: a commit message is human-authored, and one typo must not make it unreadable.
-- **Reading.** `git log --max-count=N --grep=Cadet-Gate --format=%H%x00%B%x00`. The scan is bounded
-  twice — by `--grep` to commits that mention the prefix at all, and by `--max-count` — because an
-  unbounded full-history parse on every call would reintroduce the growth this design removes. NUL is
-  the field separator because a commit message cannot contain one.
+- **Reading.** `git log --max-count=N --grep=^Cadet-Gate: --grep=^Cadet-Seal: --format=%H%x00%B%x00`, with
+  a named work item pushing its own filter into git. The scan is bounded three times — by `--grep` to
+  commits that carry a seal, by `--max-count`, and by the work-item filter — because an unbounded
+  full-history parse on every call reintroduces the growth this design removes, and reading every seal to
+  keep one overflowed the reader's buffer on a real project. NUL is the field separator because a commit
+  message cannot contain one.
 
 ## 4. State schema v4
 

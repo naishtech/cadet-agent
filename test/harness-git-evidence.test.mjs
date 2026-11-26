@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import {
   encodeEvidenceTrailers, parseEvidenceTrailers, sealedEvidence, latestSealedForGate,
   coverageFromSealed, DEFAULT_MAX_TRAILER_BYTES,
+  encodeSealPointer, parseSealPointer, textSha256, SEAL_VERSION,
 } from '../src/harness/gitmemo.mjs';
 
 /**
@@ -262,5 +263,153 @@ describe('git evidence — real repository round trip', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('git evidence — the v4 seal pointer', () => {
+  const archiveFile = '.cadet/archive/evidence/epic-2-world-map-movement_story-3-derive-grid-from-authored-map.md.jsonl';
+
+  it('round-trips a pointer through a commit message', () => {
+    const lines = encodeSealPointer({
+      workItemId: 'epic-2-world-map-movement::story-3-derive-grid-from-authored-map.md',
+      evidenceFile: archiveFile,
+      evidenceSha256: 'a'.repeat(64),
+      recordCount: 3,
+    });
+    const pointer = parseSealPointer(['close the story', '', ...lines].join('\n'));
+
+    assert.equal(pointer.version, SEAL_VERSION);
+    assert.equal(pointer.workItemId, 'epic-2-world-map-movement::story-3-derive-grid-from-authored-map.md');
+    assert.equal(pointer.file, archiveFile);
+    assert.equal(pointer.sha256, 'a'.repeat(64));
+    assert.equal(pointer.recordCount, 3);
+  });
+
+  it('reads the records a pointer names out of the commit that carries it', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cadet-gitmemo-pointer-'));
+    const g = (args) => spawnSync('git', args, { cwd: dir, encoding: 'utf-8', windowsHide: true });
+    try {
+      g(['init', '-q', '.']);
+      g(['config', 'user.email', 't@t.t']);
+      g(['config', 'user.name', 't']);
+
+      const first = record({ evidenceId: 'pointer-1' });
+      const second = record({ evidenceId: 'pointer-2', gate: 'compileCheckConfirmed', status: 'manual-confirmation' });
+      const content = `${[first, second].map((r) => JSON.stringify(r)).join('\n')}\n`;
+      mkdirSync(join(dir, '.cadet', 'archive', 'evidence'), { recursive: true });
+      writeFileSync(join(dir, archiveFile), content);
+
+      const message = [
+        'chore(gates): seal evidence',
+        '',
+        ...encodeSealPointer({
+          workItemId: first.workItemId,
+          evidenceFile: archiveFile,
+          evidenceSha256: textSha256(content),
+          recordCount: 2,
+        }),
+        '',
+      ].join('\n');
+      writeFileSync(join(dir, 'msg.txt'), message);
+      g(['add', '-A']);
+      g(['commit', '-q', '-F', 'msg.txt']);
+
+      const result = sealedEvidence(dir, { workItemId: first.workItemId });
+
+      assert.equal(result.available, true, result.reason ?? '');
+      assert.deepEqual(result.records.map((r) => r.evidenceId).sort(), ['pointer-1', 'pointer-2']);
+      assert.equal(result.records[0].sealedCommit, g(['rev-parse', 'HEAD']).stdout.trim());
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses an archive whose content no longer matches the sealed hash', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cadet-gitmemo-pointer-tamper-'));
+    const g = (args) => spawnSync('git', args, { cwd: dir, encoding: 'utf-8', windowsHide: true });
+    try {
+      g(['init', '-q', '.']);
+      g(['config', 'user.email', 't@t.t']);
+      g(['config', 'user.name', 't']);
+
+      const seeded = record({ evidenceId: 'sealed-1' });
+      const content = `${JSON.stringify(seeded)}\n`;
+      mkdirSync(join(dir, '.cadet', 'archive', 'evidence'), { recursive: true });
+      writeFileSync(join(dir, archiveFile), content);
+      writeFileSync(join(dir, 'msg.txt'), [
+        'chore(gates): seal evidence',
+        '',
+        ...encodeSealPointer({
+          workItemId: seeded.workItemId,
+          evidenceFile: archiveFile,
+          evidenceSha256: textSha256(content),
+          recordCount: 1,
+        }),
+        '',
+      ].join('\n'));
+      g(['add', '-A']);
+      g(['commit', '-q', '-F', 'msg.txt']);
+
+      // The same commit, with the archive rewritten: the pointer now lies.
+      const forged = record({ evidenceId: 'forged-1' });
+      writeFileSync(join(dir, archiveFile), `${JSON.stringify(forged)}\n`);
+      g(['add', '-A']);
+      g(['commit', '--amend', '-q', '--no-edit']);
+
+      const result = sealedEvidence(dir, { workItemId: seeded.workItemId });
+
+      assert.equal(result.available, true);
+      assert.equal(result.records.length, 0, 'a record that fails its hash must not be returned');
+      assert.ok(
+        result.diagnostics.some((d) => /does not match its recorded sha256/.test(d)),
+        JSON.stringify(result.diagnostics),
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('asks git for one work item instead of every seal it holds', () => {
+    let seen = null;
+    const runner = (cmd, args) => {
+      seen = args;
+      return { status: 0, stdout: '', stderr: '', error: null };
+    };
+
+    sealedEvidence('/repo', { workItemId: 'epic-2::story-3.md', runner });
+
+    assert.ok(seen.includes('--all-match'), 'the filters must all apply');
+    assert.ok(seen.includes('--extended-regexp'), 'the format alternation needs ERE');
+    const filter = seen.find((a) => a.includes('Cadet-Work-Item:'));
+    assert.ok(filter, JSON.stringify(seen));
+    assert.ok(filter.startsWith('--grep=^Cadet-Work-Item: epic-2::story-3'), filter);
+    assert.ok(filter.endsWith('md$'), `the id is anchored and its dots escaped: ${filter}`);
+    assert.ok(seen.some((a) => a.includes('Cadet-Seal')), 'the pointer form must stay in scope');
+    assert.ok(seen.some((a) => a.includes('Cadet-Gate')), 'the block form must stay in scope');
+  });
+
+  it('still reads a commit sealed before the pointer existed', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cadet-gitmemo-legacy-'));
+    const g = (args) => spawnSync('git', args, { cwd: dir, encoding: 'utf-8', windowsHide: true });
+    try {
+      g(['init', '-q', '.']);
+      g(['config', 'user.email', 't@t.t']);
+      g(['config', 'user.name', 't']);
+      const legacy = record({ evidenceId: 'legacy-1' });
+      writeFileSync(join(dir, 'msg.txt'), `subject\n\n${encodeEvidenceTrailers(legacy).lines.join('\n')}\n`);
+      g(['add', '-A']);
+      g(['commit', '-q', '-F', 'msg.txt']);
+
+      const result = sealedEvidence(dir, { workItemId: legacy.workItemId });
+
+      assert.equal(result.available, true, result.reason ?? '');
+      assert.deepEqual(result.records.map((r) => r.evidenceId), ['legacy-1']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('hashes the bytes git stores, so a CRLF checkout seals the same file', () => {
+    assert.equal(textSha256('a\nb\n'), textSha256('a\r\nb\r\n'));
   });
 });
