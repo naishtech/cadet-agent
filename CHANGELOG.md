@@ -13,6 +13,8 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+## [0.65.2] — 2026-11-26
+
 ### Fixed
 - **`sync` installed every component instead of the recorded ones.** The CLI builds one options object for
   `init` and `sync`, so its `components` key is always present and is `undefined` when no flag is given.
