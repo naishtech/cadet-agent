@@ -13,6 +13,18 @@ Consumers should update `FrameworkManifest.json → frameworkVersion` in their i
 
 ## [Unreleased]
 
+### Fixed
+- **`sync` installed every component instead of the recorded ones.** The CLI builds one options object for
+  `init` and `sync`, so its `components` key is always present and is `undefined` when no flag is given.
+  `sync` spread that object after the recorded component list, which replaced the selection with
+  `undefined`, and `selectComponents` reads an absent list as *every component*. A Unity project that
+  records `core`, `engine.unity.cli`, `engine.unity.plugin` and `host.agents` was therefore given
+  `.claude/`, `.continue/`, `.cursor/rules`, `.github/agents|hooks|prompts` and the Unreal plugin in
+  `Plugins/CadetBuild/` — 84 files — recorded under `core`, because none of the recorded components owns
+  those paths. `sync` now spreads the options first and its recorded components last, and
+  `test/install-sync-record.test.mjs` covers the CLI's exact option shape. `init --components <ids>` was
+  and remains the command that chooses what a project installs.
+
 ## [0.65.1] — 2026-11-26
 
 ### Changed

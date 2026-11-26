@@ -1419,12 +1419,21 @@ export async function sync(targetDir, opts = {}) {
   console.log('📂 Extracting (preserving local policies and plans)...');
   const seededPolicy = willCreatePolicyFile(targetDir);
   const createOnly = readCreateOnlyPathsFromZip(zipBuf);
+  // `opts` is spread FIRST, and the recorded `components` after it.
+  //
+  // The CLI builds one options object for `init` and `sync`, so its `components`
+  // key is always present and is undefined when no flag was given. Spread after
+  // the recorded list, that key replaced the selection with undefined, and
+  // `selectComponents` reads an absent list as "every component" — a Unity
+  // project with four recorded components was handed every host adapter and the
+  // Unreal plugin in `Plugins/CadetBuild/`. Sync has no components flag: the
+  // record answers, and only the record.
   const result = await extractZipWithManifest(zipBuf, targetDir, {
+    ...opts,
     preserved: existingManifest.preservedPaths || [],
     managed: existingManifest.managedPaths || [],
     createOnly,
     components,
-    ...opts,
     interactive: canPrompt(opts),
   });
 

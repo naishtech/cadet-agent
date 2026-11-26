@@ -145,3 +145,32 @@ describe('sync with an install record', () => {
     assert.equal(record.engine.primary, 'unity', 'the recorded engine survives, with no detection');
   });
 });
+
+describe('sync called the way the CLI calls it', () => {
+  it('keeps the recorded components when the options carry an undefined components key', async () => {
+    // The CLI builds its options object once for both commands, so `components`
+    // is always present and is undefined when no flag was given. Spreading that
+    // object after the recorded list replaced the selection with undefined, and
+    // `selectComponents` reads an absent list as "every component" — so a Unity
+    // project with four recorded components was given the adapters it never had
+    // and an Unreal plugin in `Plugins/`.
+    legacyInstall({ withRecord: true, withMarkerDirs: true });
+    stubRelease(releaseZip());
+
+    await sync(work, {
+      sourceUrl: RELEASE_URL,
+      yes: false,
+      components: undefined,
+      hosts: undefined,
+      engine: undefined,
+      plugins: undefined,
+      createOnlyPolicy: undefined,
+    });
+
+    assert.notEqual(process.exitCode, 1);
+    assert.equal(existsSync(join(work, '.cursor/rules/cadet-agent.md')), false,
+      'a component the record does not own is never installed');
+    const record = JSON.parse(readFileSync(join(work, '.cadet/agent/install.json'), 'utf-8'));
+    assert.deepEqual(record.components, ['core'], 'the record keeps the components it had');
+  });
+});
